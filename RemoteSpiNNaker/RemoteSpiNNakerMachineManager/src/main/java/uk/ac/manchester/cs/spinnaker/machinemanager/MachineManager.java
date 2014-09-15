@@ -22,9 +22,9 @@ public class MachineManager {
 	 * Creates a new MachineManager for a set of machines
 	 * @param machinesAvailable The machines that are to be managed
 	 */
-	public MachineManager(List<String> machinesAvailable) {
-		for (String machine : machinesAvailable) {
-			this.machinesAvailable.add(new SpinnakerMachine(machine));
+	public MachineManager(List<SpinnakerMachine> machinesAvailable) {
+		for (SpinnakerMachine machine : machinesAvailable) {
+			this.machinesAvailable.add(machine);
 		}
 	}
 

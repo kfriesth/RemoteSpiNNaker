@@ -13,6 +13,18 @@ public class RemoteStackTraceElement {
 
 	private int lineNumber = 0;
 
+	public RemoteStackTraceElement() {
+
+		// Does Nothing
+	}
+
+	public RemoteStackTraceElement(StackTraceElement element) {
+		this.className = element.getClassName();
+		this.methodName = element.getMethodName();
+		this.fileName = element.getFileName();
+		this.lineNumber = element.getLineNumber();
+	}
+
 	public String getClassName() {
 		return className;
 	}

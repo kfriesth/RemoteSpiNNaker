@@ -1,5 +1,6 @@
 package uk.ac.manchester.cs.spinnaker.nmpi;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -7,5 +8,6 @@ import java.util.List;
  */
 public interface NMPIQueueListener {
 
-	void addJob(int id, List<String> inputData, String hardwareConfig);
+	void addJob(int id, String experimentDescription,  List<String> inputData,
+			String hardwareConfig) throws IOException;
 }

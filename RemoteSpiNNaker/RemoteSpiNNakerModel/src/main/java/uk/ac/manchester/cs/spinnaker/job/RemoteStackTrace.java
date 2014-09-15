@@ -16,6 +16,12 @@ public class RemoteStackTrace {
 		// Does Nothing
 	}
 
+	public RemoteStackTrace(Throwable throwable) {
+		for (StackTraceElement element : throwable.getStackTrace()) {
+			elements.add(new RemoteStackTraceElement(element));
+		}
+	}
+
 	public RemoteStackTrace(List<RemoteStackTraceElement> elements) {
 		this.elements = elements;
 	}

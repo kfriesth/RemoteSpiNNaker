@@ -20,8 +20,10 @@ public interface JobProcess<P extends JobParameters> {
 	 *
 	 * @param machine The machine to execute the job on
 	 * @param parameters The parameters of the job
+	 * @param logWriter Somewhere to write logs to
 	 */
-	public void execute(SpinnakerMachine machine, P parameters);
+	public void execute(SpinnakerMachine machine, P parameters,
+			LogWriter logWriter);
 
 	/**
 	 * Gets the status of the job
@@ -45,4 +47,9 @@ public interface JobProcess<P extends JobParameters> {
 	 * @return A list of output files.
 	 */
 	public List<File> getOutputs();
+
+	/**
+	 * Cleans up the job, removing any associated files
+	 */
+	public void cleanup();
 }

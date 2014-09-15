@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.nmpi;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
@@ -166,11 +167,17 @@ public class NMPIQueueManager extends Thread {
 				}
 		    } else if (response instanceof Job) {
 		    	Job job = (Job) response;
-		    	for (NMPIQueueListener listener: listeners) {
-		    		listener.addJob(job.getId(), job.getInputData(),
-		    				job.getHardwareConfig());
-		    	}
-		    	job.setStatus("running");
+		    	try {
+		    	    for (NMPIQueueListener listener: listeners) {
+						listener.addJob(job.getId(),
+								job.getExperimentDescription(),
+								job.getInputData(),
+								job.getHardwareConfig());
+		    	    }
+			    	job.setStatus("running");
+				} catch (IOException e) {
+					setJobError(job.getId(), null, e);
+				}
 		    	queue.updateJob(job.getId(), job);
 		    }
 	    }

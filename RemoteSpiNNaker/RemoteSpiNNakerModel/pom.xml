@@ -6,4 +6,12 @@
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>RemoteSpiNNakerModel</artifactId>
+
+	<dependencies>
+	    <dependency>
+	        <groupId>org.jboss.resteasy</groupId>
+            <artifactId>jaxrs-api</artifactId>
+            <version>3.0.8.Final</version>
+	    </dependency>
+	</dependencies>
 </project>

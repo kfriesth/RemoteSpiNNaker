@@ -7,6 +7,38 @@
 	</parent>
 	<artifactId>RemoteSpiNNakerJobManager</artifactId>
 
+	<build>
+	    <plugins>
+	        <plugin>
+	            <groupId>org.apache.maven.plugins</groupId>
+	            <artifactId>maven-dependency-plugin</artifactId>
+	            <version>2.8</version>
+	            <configuration>
+	                <artifactItems>
+	                    <artifactItem>
+	                        <groupId>${project.groupId}</groupId>
+	                        <artifactId>RemoteSpiNNakerJobProcessManager</artifactId>
+	                        <version>${project.version}</version>
+	                        <type>zip</type>
+	                    </artifactItem>
+	                </artifactItems>
+	                <stripVersion>true</stripVersion>
+	                <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+	                <overWriteReleases>true</overWriteReleases>
+	                <overWriteSnapshots>true</overWriteSnapshots>
+	            </configuration>
+	            <executions>
+	                <execution>
+	                    <phase>prepare-package</phase>
+	                    <goals>
+	                        <goal>copy</goal>
+	                    </goals>
+	                </execution>
+	            </executions>
+	        </plugin>
+	    </plugins>
+	</build>
+
 	<dependencies>
 	    <dependency>
 	        <groupId>${project.groupId}</groupId>
@@ -18,11 +50,10 @@
 	        <artifactId>RemoteSpiNNakerNMPIQueueClient</artifactId>
 	        <version>${project.version}</version>
 	    </dependency>
-	    <!-- <dependency>
-	        <groupId>${project.groupId}</groupId>
-	        <artifactId>RemoteSpiNNakerMachineJobProcessManager</artifactId>
-	        <version>${project.version}</version>
-	        <type>zip</type>
-	    </dependency> -->
+	    <dependency>
+		    <groupId>org.eclipse.jgit</groupId>
+		    <artifactId>org.eclipse.jgit</artifactId>
+		    <version>3.5.0.201409071800-rc1</version>
+		</dependency>
 	</dependencies>
 </project>

@@ -9,4 +9,45 @@ import uk.ac.manchester.cs.spinnaker.job.JobParametersTypeName;
 @JobParametersTypeName("PyNNJobParameters")
 public class PyNNJobParameters implements JobParameters {
 
+	private String workingDirectory = null;
+
+	private String script = null;
+
+	private boolean deleteOnCompletion = false;
+
+	public PyNNJobParameters() {
+
+		// Does Nothing
+	}
+
+	public PyNNJobParameters(String workingDirectory, String script,
+			boolean deleteOnCompletion) {
+		this.workingDirectory = workingDirectory;
+		this.script = script;
+		this.deleteOnCompletion = deleteOnCompletion;
+	}
+
+	public String getWorkingDirectory() {
+		return workingDirectory;
+	}
+
+	public void setWorkingDirectory(String workingDirectory) {
+		this.workingDirectory = workingDirectory;
+	}
+
+	public String getScript() {
+		return script;
+	}
+
+	public void setScript(String script) {
+		this.script = script;
+	}
+
+	public boolean isDeleteOnCompletion() {
+		return deleteOnCompletion;
+	}
+
+	public void setDeleteOnCompletion(boolean deleteOnCompletion) {
+		this.deleteOnCompletion = deleteOnCompletion;
+	}
 }

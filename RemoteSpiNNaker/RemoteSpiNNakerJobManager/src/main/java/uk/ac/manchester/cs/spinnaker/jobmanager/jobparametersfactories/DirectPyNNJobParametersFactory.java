@@ -1,0 +1,46 @@
+package uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+
+import uk.ac.manchester.cs.spinnaker.job.JobParameters;
+import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
+import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactory;
+import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactoryException;
+import uk.ac.manchester.cs.spinnaker.jobmanager.UnsupportedJobException;
+
+/**
+ * A JobParametersFactory that uses the experimentDescription itself as a PyNN
+ * script
+ */
+public class DirectPyNNJobParametersFactory implements JobParametersFactory {
+
+	private static final String SCRIPT_NAME = "run.py";
+
+	@Override
+	public JobParameters getJobParameters(String experimentDescription,
+			List<String> inputData, String hardwareConfiguration)
+			throws UnsupportedJobException, JobParametersFactoryException {
+		if (!experimentDescription.contains("import")) {
+			throw new UnsupportedJobException();
+		}
+		try {
+			File tempDirectory = File.createTempFile("pynn", ".tmp");
+			tempDirectory.delete();
+			tempDirectory.mkdirs();
+
+			File scriptFile = new File(tempDirectory, SCRIPT_NAME);
+			PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
+			writer.print(experimentDescription);
+			writer.close();
+
+			return new PyNNJobParameters(tempDirectory.getAbsolutePath(),
+					SCRIPT_NAME, true);
+		} catch (IOException e) {
+			throw new JobParametersFactoryException("Error storing script", e);
+		}
+	}
+
+}

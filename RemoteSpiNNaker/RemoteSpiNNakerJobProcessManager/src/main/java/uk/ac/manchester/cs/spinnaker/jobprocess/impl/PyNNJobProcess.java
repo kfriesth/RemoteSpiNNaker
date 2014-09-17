@@ -44,6 +44,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
     public void execute(SpinnakerMachine machine,
             PyNNJobParameters parameters, LogWriter logWriter) {
         try {
+        	status = Status.Running;
             workingDirectory = new File(parameters.getWorkingDirectory());
             deleteOnCleanup = parameters.isDeleteOnCompletion();
 
@@ -74,6 +75,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 
             // Wait for the process to finish
             int exitValue = process.waitFor();
+            Thread.sleep(1000);
             logger.close();
 
             // Get any output files
@@ -90,6 +92,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             	throw new Exception("Python exited with a non-zero code ("
                         + exitValue + ")");
             }
+            status = Status.Finished;
         } catch (Throwable e) {
             error = e;
             status = Status.Error;

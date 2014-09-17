@@ -5,7 +5,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -15,12 +14,15 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
+import uk.ac.manchester.cs.spinnaker.job.JobSpecification;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTrace;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTraceElement;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
@@ -59,6 +61,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private URL baseUrl = null;
 
+	private Log logger = LogFactory.getLog(getClass());
+
+	private Map<Integer, SpinnakerMachine> allocatedMachines =
+			new HashMap<Integer, SpinnakerMachine>();
+
 	public JobManager(MachineManager machineManager,
 			NMPIQueueManager queueManager,
 			List<JobParametersFactory> jobParametersFactories,
@@ -68,8 +75,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		this.queueManager = queueManager;
 		this.jobParametersFactories = jobParametersFactories;
 		this.baseUrl = baseUrl;
-
-		queueManager.addListener(this);
 
 		// Create a temporary folder for the job process manager
 		File jobProcessManagerDirectory =
@@ -92,9 +97,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		while (entry != null) {
 			File entryFile = new File(jobProcessManagerDirectory,
 					entry.getName());
-			if (entryFile.isDirectory()) {
-				entryFile.mkdirs();
-			} else {
+			if (!entry.isDirectory()) {
+				logger.debug("Extracting to " + entryFile);
+				entryFile.getParentFile().mkdirs();
 			    FileOutputStream output = new FileOutputStream(entryFile);
 			    byte[] buffer = new byte[8196];
 			    int bytesRead = input.read(buffer);
@@ -108,18 +113,29 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			    if (entryFile.getName().endsWith(".jar")) {
 			    	jobProcessManagerClasspath.add(entryFile);
 			    }
+			} else {
+				logger.debug(entryFile + " is directory");
 			}
 			entry = input.getNextEntry();
 		}
 		input.close();
+
+		// Start the queue manager
+		queueManager.addListener(this);
+		queueManager.start();
 	}
 
 	@Override
 	public void addJob(int id, String experimentDescription,
 			List<String> inputData, String hardwareConfig) throws IOException {
+		logger.info("New job " + id);
 
 		// Get a machine to run the job on
 		SpinnakerMachine machine = machineManager.getNextAvailableMachine();
+		synchronized (allocatedMachines) {
+		    allocatedMachines.put(id, machine);
+		}
+		logger.info("Running " + id + " on " + machine.getMachineName());
 
 		// Get job parameters if possible
 		JobParameters parameters = null;
@@ -155,41 +171,46 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 					"The job did not appear to be supported on this system");
 		}
 
+		File workingDirectory = File.createTempFile("job", ".tmp");
+		workingDirectory.delete();
+		workingDirectory.mkdirs();
 		JobExecuter executer = new JobExecuter(getJavaExec(),
 				jobProcessManagerClasspath,
 				JOB_PROCESS_MANAGER_MAIN_CLASS,
-				new ArrayList<String>(),
-				File.createTempFile("job", ".tmp"));
-		OutputStream output = executer.getProcessOutputStream();
+				new ArrayList<String>(), workingDirectory);
+		executer.start();
+		OutputStream output = new UnclosableOutputStream(
+				executer.getProcessOutputStream());
 
 		// Send the job executed the details of what to run
 		ObjectMapper mapper = new ObjectMapper();
-		mapper.setPropertyNamingStrategy(PropertyNamingStrategy
-		        .CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
 		JobParametersSerializer serializer =
 				new JobParametersSerializer("jobType");
 		SimpleModule serializerModule = new SimpleModule();
 		serializerModule.addSerializer(JobParameters.class, serializer);
 		mapper.registerModule(serializerModule);
 
-		mapper.writeValue(output, machine);
-		mapper.writeValue(output, parameters);
-
-		PrintWriter writer = new PrintWriter(output);
-		writer.println(id);
-		writer.println(baseUrl.toString());
-		writer.flush();
+		logger.debug("Writing specification");
+		mapper.writeValue(output, new JobSpecification(machine, parameters, id,
+				baseUrl.toString()));
 		output.flush();
+		logger.debug("Finished writing");
 	}
 
 	@Override
 	public void appendLog(int id, String logToAppend) {
+		logger.debug("Updating log for " + id);
 		queueManager.appendJobLog(id, logToAppend);
 	}
 
 	@Override
 	public void setJobFinished(int id, String logToAppend,
 			List<String> outputs) {
+		logger.debug("Marking job " + id + " as finished");
+		synchronized (allocatedMachines) {
+			SpinnakerMachine machine = allocatedMachines.remove(id);
+			machineManager.releaseMachine(machine);
+		}
 		List<File> outputFiles = new ArrayList<File>();
 		for (String filename : outputs) {
 			outputFiles.add(new File(filename));
@@ -197,18 +218,22 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		try {
 			queueManager.setJobFinished(id, logToAppend, outputFiles);
 		} catch (MalformedURLException e) {
-			System.err.println("Error creating URLs while updating job");
-			e.printStackTrace();
+			logger.error("Error creating URLs while updating job", e);
 		}
 	}
 
 	@Override
 	public void setJobError(int id, String error, RemoteStackTrace stackTrace) {
+		logger.debug("Marking job " + id + " as error");
+		synchronized (allocatedMachines) {
+			SpinnakerMachine machine = allocatedMachines.remove(id);
+			machineManager.releaseMachine(machine);
+		}
 		StackTraceElement[] elements =
 				new StackTraceElement[stackTrace.getElements().size()];
 		int i = 0;
 		for (RemoteStackTraceElement element : stackTrace.getElements()) {
-			elements[i] = new StackTraceElement(element.getClassName(),
+			elements[i++] = new StackTraceElement(element.getClassName(),
 					element.getMethodName(), element.getFileName(),
 					element.getLineNumber());
 		}

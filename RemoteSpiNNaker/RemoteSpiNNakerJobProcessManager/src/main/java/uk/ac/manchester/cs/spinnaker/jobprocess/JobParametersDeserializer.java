@@ -58,7 +58,7 @@ public class JobParametersDeserializer extends StdDeserializer<JobParameters> {
 		ObjectMapper mapper = (ObjectMapper) parser.getCodec();
 	    ObjectNode root = (ObjectNode) mapper.readTree(parser);
 
-	    JsonNode typeNode = root.get(typeField);
+	    JsonNode typeNode = root.remove(typeField);
 	    if (typeNode == null) {
 	    	throw new JsonMappingException(
 	    			"Type field " + typeField + " not found in received object."
@@ -67,6 +67,7 @@ public class JobParametersDeserializer extends StdDeserializer<JobParameters> {
 	    }
 	    String typeName = typeNode.asText();
 	    Class<? extends JobParameters> type = typeMap.get(typeName);
+	    System.err.println("Deserialising " + type);
 
 	    if (type == null) {
 	    	throw new JsonMappingException("No type with name " + typeName

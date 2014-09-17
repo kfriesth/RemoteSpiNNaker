@@ -10,7 +10,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -48,8 +47,7 @@ public class PropertyBasedDeserialiser<T> extends StdDeserializer<T> {
 	public T deserialize(JsonParser parser,
 			DeserializationContext context) throws IOException,
 			JsonProcessingException {
-		ObjectMapper mapper = (ObjectMapper) parser.getCodec();
-		ObjectNode root = (ObjectNode) mapper.readTree(parser);
+		ObjectNode root = parser.readValueAsTree();
 		Class<? extends T> responseClass = null;
 		Iterator<Entry<String, JsonNode>> elementsIterator = root.fields();
 		while (elementsIterator.hasNext()) {
@@ -63,7 +61,7 @@ public class PropertyBasedDeserialiser<T> extends StdDeserializer<T> {
 		if (responseClass == null) {
 			return null;
 		}
-		return mapper.treeToValue(root, responseClass);
+		return parser.getCodec().treeToValue(root, responseClass);
 	}
 
 }

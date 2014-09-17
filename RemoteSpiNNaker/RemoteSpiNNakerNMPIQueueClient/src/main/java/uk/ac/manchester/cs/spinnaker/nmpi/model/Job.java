@@ -3,6 +3,10 @@ package uk.ac.manchester.cs.spinnaker.nmpi.model;
 import java.util.Date;
 import java.util.List;
 
+import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIDateSerialiser;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 /**
  * A NMPI job
  */
@@ -28,8 +32,10 @@ public class Job implements QueueNextResponse {
 
 	private String status = null;
 
+	@JsonSerialize(using=NMPIDateSerialiser.class)
 	private Date timestampCompletion = null;
 
+	@JsonSerialize(using=NMPIDateSerialiser.class)
 	private Date timestampSubmission = null;
 
 	private String user = null;

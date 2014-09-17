@@ -6,11 +6,14 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * Executes jobs in an external process
  *
  */
-public class JobExecuter {
+public class JobExecuter extends Thread {
 
 	private File javaExec = null;
 
@@ -24,7 +27,13 @@ public class JobExecuter {
 
 	private File outputLog = File.createTempFile("exec", ".log");
 
+	private JobOutputPipe pipe = null;
+
 	private Process process = null;
+
+	private Log logger = LogFactory.getLog(getClass());
+
+	private IOException startException = null;
 
 	/**
 	 * Create a JobExecuter
@@ -49,7 +58,7 @@ public class JobExecuter {
 	 * Runs the external job
 	 * @throws IOException If there is an error starting the job
 	 */
-	public void run() throws IOException {
+	public void run() {
 		List<String> command = new ArrayList<String>();
 		command.add(javaExec.getAbsolutePath());
 
@@ -62,26 +71,63 @@ public class JobExecuter {
 		}
 		command.add("-cp");
 		command.add(classPathBuilder.toString());
+		logger.debug("Classpath: " + classPathBuilder.toString());
 
 		command.add(mainClass);
+		logger.debug("Main command: " + mainClass);
 		for (String argument : arguments) {
 			command.add(argument);
+			logger.debug("Argument: " + argument);
 		}
 
 		ProcessBuilder builder = new ProcessBuilder(command);
 		builder.directory(workingDirectory);
+		logger.debug("Working directory: " + workingDirectory);
 		builder.redirectErrorStream(true);
-		builder.redirectOutput(outputLog);
+		synchronized (this) {
+			try {
+			    logger.debug("Starting execution process");
+			    process = builder.start();
+			    logger.debug("Starting pipe from process");
+				pipe = new JobOutputPipe(process.getInputStream(), outputLog);
+				pipe.start();
+				notifyAll();
+			} catch (IOException e) {
+				logger.error("Error running external job", e);
+				startException = e;
+				notifyAll();
+			}
+		}
 
-		process = builder.start();
+		try {
+			logger.debug("Waiting for process to finish");
+			process.waitFor();
+		} catch (InterruptedException e) {
+			// Do Nothing
+		}
+		logger.debug("Process finished, closing pipe");
+	    pipe.close();
 	}
 
 	/**
 	 * Gets an OutputStream which writes to the process stdin
 	 * @return An OutputStream
 	 */
-	public OutputStream getProcessOutputStream() {
-		return process.getOutputStream();
+	public OutputStream getProcessOutputStream() throws IOException {
+		synchronized (this) {
+			while ((process == null) && (startException == null)) {
+				try {
+					wait();
+				} catch (InterruptedException e) {
+
+					// Do Nothing
+				}
+			}
+			if (startException != null) {
+				throw startException;
+			}
+		    return process.getOutputStream();
+		}
 	}
 
 	/**

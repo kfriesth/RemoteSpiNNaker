@@ -14,7 +14,7 @@ import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
 public interface NMPIQueue {
 
 	@GET
-	@Path("submitted/next/{hardware}")
+	@Path("submitted/next/{hardware}/")
 	@Produces("application/json")
 	QueueNextResponse getNextJob(@PathParam("hardware") String hardware);
 

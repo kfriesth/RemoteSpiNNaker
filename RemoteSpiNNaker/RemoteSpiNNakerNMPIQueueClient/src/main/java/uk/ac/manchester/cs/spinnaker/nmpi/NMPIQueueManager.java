@@ -22,16 +22,31 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScheme;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.AuthCache;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.protocol.ClientContext;
+import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.client.BasicAuthCache;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.protocol.BasicHttpContext;
 import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
+import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 
 import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIJacksonJsonProvider;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
-import uk.ac.manchester.cs.spinnaker.nmpi.rest.PropertyBasedDeserialiser;
+import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
 
 /**
  * Manages the NMPI queue, receiving jobs and submitting them to be run
@@ -80,25 +95,47 @@ public class NMPIQueueManager extends Thread {
 	private URL baseServerUrl = null;
 
 	/**
+	 * The logger
+	 */
+	private Log logger = LogFactory.getLog(getClass());
+
+	/**
 	 * Creates a new Manager, pointing at a queue at a specific URL
 	 * @param url The URL from which to load the data
 	 * @param hardware The name of the hardware that this queue is for
 	 * @param resultsDirectory The directory where results are stored
 	 * @param baseServerUrl The URL of the server up to this rest resource
+	 * @param username The username to log in to the server with
+	 * @param password The password to log in to the server with
 	 */
-	public NMPIQueueManager(String url, String hardware,
-			File resultsDirectory, URL baseServerUrl) {
-		PropertyBasedDeserialiser<QueueNextResponse> deserialiser =
-				new PropertyBasedDeserialiser<QueueNextResponse>(
-						QueueNextResponse.class);
-		deserialiser.register("id", Job.class);
-		deserialiser.register("warning", QueueEmpty.class);
-		NMPIJacksonJsonProvider provider = new NMPIJacksonJsonProvider();
-		provider.addDeserialiser(QueueNextResponse.class, deserialiser);
+	public NMPIQueueManager(URL url, String hardware,
+			File resultsDirectory, URL baseServerUrl, String username,
+			String password) {
 
-		ResteasyClient client = new ResteasyClientBuilder().build();
+		NMPIJacksonJsonProvider provider = new NMPIJacksonJsonProvider();
+		provider.addDeserialiser(QueueNextResponse.class,
+				new QueueResponseDeserialiser());
+
+		// Set up authentication
+		HttpHost targetHost = new HttpHost(url.getHost(), url.getPort());
+		CredentialsProvider credsProvider = new BasicCredentialsProvider();
+		credsProvider.setCredentials(
+		        new AuthScope(targetHost.getHostName(), targetHost.getPort()),
+		        new UsernamePasswordCredentials(username, password));
+		AuthCache authCache = new BasicAuthCache();
+		AuthScheme basicAuth = new BasicScheme();
+		authCache.put(new HttpHost("url"), basicAuth);
+		BasicHttpContext localContext = new BasicHttpContext();
+		localContext.setAttribute(ClientContext.AUTH_CACHE, authCache);
+		localContext.setAttribute(ClientContext.CREDS_PROVIDER, credsProvider);
+		DefaultHttpClient httpClient = new DefaultHttpClient();
+		ApacheHttpClient4Engine engine = new ApacheHttpClient4Engine(httpClient,
+				localContext);
+
+		ResteasyClient client =
+				new ResteasyClientBuilder().httpEngine(engine).build();
 		client.register(provider);
-        ResteasyWebTarget target = client.target(url);
+        ResteasyWebTarget target = client.target(url.toString());
         queue = target.proxy(NMPIQueue.class);
 
         this.hardware = hardware;
@@ -138,12 +175,16 @@ public class NMPIQueueManager extends Thread {
 	 * @return The job
 	 */
 	private Job getJob(int id) {
-		Job job = jobCache.get(id);
-		if (job == null) {
-			job = queue.getJob(id);
-			jobCache.put(id, job);
+		synchronized (jobCache) {
+			Job job = jobCache.get(id);
+			if (job == null) {
+				synchronized (queue) {
+				    job = queue.getJob(id);
+				}
+				jobCache.put(id, job);
+			}
+			return job;
 		}
-		return job;
 	}
 
 	/**
@@ -157,29 +198,52 @@ public class NMPIQueueManager extends Thread {
 	@Override
 	public void run() {
 	    while (!done) {
-		    QueueNextResponse response = queue.getNextJob(hardware);
-		    if (response instanceof QueueEmpty) {
-		    	try {
-					Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
-				} catch (InterruptedException e) {
+	    	try {
+	    		logger.debug("Getting next job");
+			    QueueNextResponse response = null;
+			    synchronized (queue) {
+			    	response = queue.getNextJob(hardware);
+			    }
+			    if (response instanceof QueueEmpty) {
+			    	logger.debug("No job received, sleeping");
+			    	try {
+						Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
+					} catch (InterruptedException e) {
 
+						// Do Nothing
+					}
+			    } else if (response instanceof Job) {
+			    	Job job = (Job) response;
+			    	synchronized (jobCache) {
+			    	    jobCache.put(job.getId(), job);
+			    	}
+			    	logger.debug("Job " + job.getId() + " received");
+			    	try {
+			    	    for (NMPIQueueListener listener: listeners) {
+							listener.addJob(job.getId(),
+									job.getExperimentDescription(),
+									job.getInputData(),
+									job.getHardwareConfig());
+			    	    }
+			    	    logger.debug("Setting job status to running");
+				    	job.setStatus("running");
+				    	logger.debug("Updating job status on server");
+				    	synchronized (queue) {
+				    	    queue.updateJob(job.getId(), job);
+				    	}
+					} catch (IOException e) {
+						logger.error("Error in executing job", e);
+						setJobError(job.getId(), null, e);
+					}
+			    }
+	    	} catch (Exception e) {
+	    		logger.error("Error in getting next job", e);
+	    		try {
+					Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
+				} catch (InterruptedException e1) {
 					// Do Nothing
 				}
-		    } else if (response instanceof Job) {
-		    	Job job = (Job) response;
-		    	try {
-		    	    for (NMPIQueueListener listener: listeners) {
-						listener.addJob(job.getId(),
-								job.getExperimentDescription(),
-								job.getInputData(),
-								job.getHardwareConfig());
-		    	    }
-			    	job.setStatus("running");
-				} catch (IOException e) {
-					setJobError(job.getId(), null, e);
-				}
-		    	queue.updateJob(job.getId(), job);
-		    }
+	    	}
 	    }
 	}
 
@@ -197,7 +261,10 @@ public class NMPIQueueManager extends Thread {
 			existingLog += logToAppend;
 		}
 		job.setLog(existingLog);
-		queue.updateJob(id, job);
+		logger.debug("Job " + id + " log is being updated");
+		synchronized (queue) {
+		    queue.updateJob(id, job);
+		}
 	}
 
 	/**
@@ -210,6 +277,7 @@ public class NMPIQueueManager extends Thread {
 	 */
 	public void setJobFinished(int id, String logToAppend, List<File> outputs)
 			throws MalformedURLException {
+		logger.debug("Job " + id + " is finished");
 		File idDirectory = new File(resultsDirectory, String.valueOf(id));
 		idDirectory.mkdirs();
 		List<String> outputUrls = new ArrayList<String>();
@@ -220,6 +288,8 @@ public class NMPIQueueManager extends Thread {
 				URL outputUrl = new URL(baseServerUrl,
 						id + "/" + output.getName());
 				outputUrls.add(outputUrl.toExternalForm());
+				logger.debug("New output " + newOutput + " mapped to "
+				    + outputUrl);
 			}
 		}
 
@@ -236,7 +306,11 @@ public class NMPIQueueManager extends Thread {
 			job.setLog(existingLog);
 		}
 		job.setTimestampCompletion(new Date());
-		queue.updateJob(id, job);
+
+		logger.debug("Updating job status on server");
+		synchronized (queue) {
+		    queue.updateJob(id, job);
+		}
 	}
 
 	/**
@@ -247,6 +321,7 @@ public class NMPIQueueManager extends Thread {
 	 * @param error The error details
 	 */
 	public void setJobError(int id, String logToAppend, Throwable error) {
+		logger.debug("Job " + id + " finished with an error");
 		StringWriter errors = new StringWriter();
 		error.printStackTrace(new PrintWriter(errors));
 		String logMessage = "Error:\n";
@@ -270,7 +345,11 @@ public class NMPIQueueManager extends Thread {
 		}
 		job.setLog(existingLog);
 		job.setTimestampCompletion(new Date());
-		queue.updateJob(id, job);
+
+		logger.debug("Updating job on server");
+		synchronized (queue) {
+		    queue.updateJob(id, job);
+		}
 	}
 
 	/**

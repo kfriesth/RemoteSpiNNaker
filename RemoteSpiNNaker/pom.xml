@@ -25,5 +25,6 @@
 		<module>RemoteSpiNNakerNMPIQueueClient</module>
 		<module>RemoteSpiNNakerMachineManager</module>
 		<module>RemoteSpiNNakerJobManager</module>
+		<module>RemoteSpiNNakerWeb</module>
 	</modules>
 </project>

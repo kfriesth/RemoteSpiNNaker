@@ -7,6 +7,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
 
 @Path("job")
 public interface JobManagerInterface {
@@ -18,11 +19,13 @@ public interface JobManagerInterface {
 
 	@POST
 	@Path("{id}/finished")
+	@Consumes("text/plain")
 	public void setJobFinished(@PathParam("id") int id, String logToAppend,
 			@QueryParam("outputFilename") List<String> outputs);
 
 	@POST
 	@Path("{id}/error")
+	@Consumes(MediaType.APPLICATION_JSON)
 	public void setJobError(@PathParam("id") int id,
 			@QueryParam("error") String error, RemoteStackTrace stackTrace);
 }

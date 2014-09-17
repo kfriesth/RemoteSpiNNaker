@@ -17,6 +17,10 @@ public class ReaderLogWriter extends Thread {
 
 	private boolean done = false;
 
+	private boolean isRunning = false;
+
+	private boolean isWriting = false;
+
 	/**
 	 * Creates a new ReaderLogWriter with another reader
 	 * @param reader The reader to read from
@@ -42,13 +46,27 @@ public class ReaderLogWriter extends Thread {
 
 	@Override
 	public void run() {
+		synchronized (this) {
+		    isRunning = true;
+		}
 		while (!done) {
 			try {
 				String line = reader.readLine();
-				writer.append(line + "\n");
+				if (line != null) {
+					synchronized (this) {
+						isWriting = true;
+				        writer.append(line + "\n");
+				        isWriting = false;
+				        notifyAll();
+					}
+				}
 			} catch (IOException e) {
 				done = true;
 			}
+		}
+		synchronized (this) {
+		    isRunning = false;
+		    notifyAll();
 		}
 	}
 
@@ -62,6 +80,18 @@ public class ReaderLogWriter extends Thread {
 		} catch (IOException e) {
 
 			// Do Nothing
+		}
+		synchronized (this) {
+			System.err.println("Waiting for log writer to exit...");
+			while (isRunning || isWriting) {
+				try {
+					wait();
+				} catch (InterruptedException e) {
+
+					// Does Nothing
+				}
+			}
+			System.err.println("Log writer has exited");
 		}
 	}
 }

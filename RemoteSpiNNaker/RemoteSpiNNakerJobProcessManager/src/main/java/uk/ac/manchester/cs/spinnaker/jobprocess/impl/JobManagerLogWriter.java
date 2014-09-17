@@ -1,5 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.jobprocess.impl;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.Timer;
+
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
 
@@ -12,14 +17,39 @@ public class JobManagerLogWriter implements LogWriter {
 
 	private int id = 0;
 
+	private String cached = "";
+
+	private Timer sendTimer = null;
+
 	public JobManagerLogWriter(JobManagerInterface jobManager, int id) {
 		this.jobManager = jobManager;
 		this.id = id;
+
+		sendTimer = new Timer(500, new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				synchronized (this) {
+					if (cached != "") {
+						System.err.println(
+								"Sending cached data to job manager");
+						JobManagerLogWriter.this.jobManager.appendLog(
+								JobManagerLogWriter.this.id, cached);
+						cached = "";
+						sendTimer.stop();
+					}
+				}
+			}
+		});
 	}
 
 	@Override
 	public void append(String log) {
-		jobManager.appendLog(id, log);
+		synchronized (this) {
+			System.err.println("Process Output: " + log);
+			cached += log;
+			sendTimer.restart();
+		}
 	}
 
 }

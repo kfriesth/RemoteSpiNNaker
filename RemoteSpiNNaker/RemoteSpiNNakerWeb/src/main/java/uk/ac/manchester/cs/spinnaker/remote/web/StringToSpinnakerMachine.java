@@ -10,13 +10,14 @@ public class StringToSpinnakerMachine
 	@Override
 	public SpinnakerMachine convert(String value) {
 		if (!value.startsWith("(") || !value.endsWith(")")) {
-			throw new RuntimeException(
-					"Cannot convert string \"" + value + "\" - missing start and end brackets");
+			throw new IllegalArgumentException(
+					"Cannot convert string \"" + value
+					+ "\" - missing start and end brackets");
 		}
-		String[] parts = value.substring(1, value.length() - 1).split(",");
+		String[] parts = value.substring(1, value.length() - 1).split(":");
 		if (parts.length != 4) {
-			throw new RuntimeException(
-					"Wrong number of arguments - " + parts.length
+			throw new IllegalArgumentException(
+					"Wrong number of :-separated arguments - " + parts.length
 					+ " found but 4 required");
 		}
 

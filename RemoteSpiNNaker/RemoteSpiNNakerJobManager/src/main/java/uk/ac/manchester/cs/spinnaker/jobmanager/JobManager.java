@@ -138,13 +138,16 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		logger.info("Running " + id + " on " + machine.getMachineName());
 
 		// Get job parameters if possible
+		File workingDirectory = File.createTempFile("job", ".tmp");
+		workingDirectory.delete();
+		workingDirectory.mkdirs();
 		JobParameters parameters = null;
 		Map<String, JobParametersFactoryException> errors =
 				new HashMap<String, JobParametersFactoryException>();
 		for (JobParametersFactory factory : jobParametersFactories) {
 			try {
 				parameters = factory.getJobParameters(experimentDescription,
-						inputData, hardwareConfig);
+						inputData, hardwareConfig, workingDirectory);
 			} catch (UnsupportedJobException e) {
 
 				// Do Nothing
@@ -171,9 +174,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 					"The job did not appear to be supported on this system");
 		}
 
-		File workingDirectory = File.createTempFile("job", ".tmp");
-		workingDirectory.delete();
-		workingDirectory.mkdirs();
 		JobExecuter executer = new JobExecuter(getJavaExec(),
 				jobProcessManagerClasspath,
 				JOB_PROCESS_MANAGER_MAIN_CLASS,

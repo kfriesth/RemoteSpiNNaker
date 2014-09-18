@@ -1,7 +1,6 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 
 import org.eclipse.jgit.api.CloneCommand;
@@ -25,40 +24,36 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
 
 	@Override
 	public JobParameters getJobParameters(String experimentDescription,
-			List<String> inputData, String hardwareConfiguration)
+			List<String> inputData, String hardwareConfiguration,
+			File workingDirectory)
 			throws UnsupportedJobException, JobParametersFactoryException {
 
 		// Test that there is a URL
-		if (!experimentDescription.startsWith("http://")) {
+		if (!experimentDescription.startsWith("http://")
+				&& !experimentDescription.startsWith("https://")) {
 			throw new UnsupportedJobException();
 		}
 
 		// Try to get the repository
 		try {
-		    File repositoryDirectory = File.createTempFile("git", ".tmp");
-		    repositoryDirectory.delete();
-		    repositoryDirectory.mkdirs();
-
 		    CloneCommand clone = Git.cloneRepository();
 		    clone.setURI(experimentDescription);
-		    clone.setDirectory(repositoryDirectory);
+		    clone.setDirectory(workingDirectory);
 		    clone.call();
 
-		    File scriptFile = new File(repositoryDirectory,
+		    File scriptFile = new File(workingDirectory,
 		    		DEFAULT_SCRIPT_NAME);
 		    if (!scriptFile.exists()) {
-		    	deleteDirectory(repositoryDirectory);
+		    	deleteDirectory(workingDirectory);
 		    	throw new JobParametersFactoryException(
 		    			"Repository doesn't appear to contain a script called "
 		    	        + DEFAULT_SCRIPT_NAME);
 		    }
 
 		    PyNNJobParameters parameters = new PyNNJobParameters(
-		    		repositoryDirectory.getAbsolutePath(), DEFAULT_SCRIPT_NAME,
+		    		workingDirectory.getAbsolutePath(), DEFAULT_SCRIPT_NAME,
 		    		true);
 		    return parameters;
-		} catch (IOException e) {
-			throw new JobParametersFactoryException("Error reading url", e);
 		} catch (InvalidRemoteException e) {
 			throw new JobParametersFactoryException("Remote is not valid", e);
 		} catch (TransportException e) {

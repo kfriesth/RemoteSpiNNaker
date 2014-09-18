@@ -21,22 +21,20 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
 
 	@Override
 	public JobParameters getJobParameters(String experimentDescription,
-			List<String> inputData, String hardwareConfiguration)
+			List<String> inputData, String hardwareConfiguration,
+			File workingDirectory)
 			throws UnsupportedJobException, JobParametersFactoryException {
 		if (!experimentDescription.contains("import")) {
 			throw new UnsupportedJobException();
 		}
 		try {
-			File tempDirectory = File.createTempFile("pynn", ".tmp");
-			tempDirectory.delete();
-			tempDirectory.mkdirs();
 
-			File scriptFile = new File(tempDirectory, SCRIPT_NAME);
+			File scriptFile = new File(workingDirectory, SCRIPT_NAME);
 			PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
 			writer.print(experimentDescription);
 			writer.close();
 
-			return new PyNNJobParameters(tempDirectory.getAbsolutePath(),
+			return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
 					SCRIPT_NAME, true);
 		} catch (IOException e) {
 			throw new JobParametersFactoryException("Error storing script", e);

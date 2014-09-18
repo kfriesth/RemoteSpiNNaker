@@ -41,6 +41,7 @@ import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
 import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 
+import uk.ac.manchester.cs.spinnaker.nmpi.model.DataItem;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
@@ -151,14 +152,16 @@ public class NMPIQueueManager extends Thread {
 	 *         file does not exist
 	 */
 	@GET
-	@Path("{id}/{filename}")
+	@Path("{id}/{filename:.*}")
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	public Response getResultFile(@PathParam("id") int id,
 			@PathParam("filename") String filename) {
+		logger.debug("Retrieving " + filename + " from " + id);
 		File idDirectory = new File(resultsDirectory, String.valueOf(id));
 		File resultFile = new File(idDirectory, filename);
 
 		if (!resultFile.canRead()) {
+			logger.debug(resultFile + " was not found");
 			return Response.status(Status.NOT_FOUND).build();
 		}
 
@@ -219,10 +222,14 @@ public class NMPIQueueManager extends Thread {
 			    	}
 			    	logger.debug("Job " + job.getId() + " received");
 			    	try {
+			    		List<String> inputDataUrls = new ArrayList<String>();
+			    		for (DataItem item : job.getInputData()) {
+			    			inputDataUrls.add(item.getUrl());
+			    		}
 			    	    for (NMPIQueueListener listener: listeners) {
 							listener.addJob(job.getId(),
 									job.getExperimentDescription(),
-									job.getInputData(),
+									inputDataUrls,
 									job.getHardwareConfig());
 			    	    }
 			    	    logger.debug("Setting job status to running");
@@ -280,14 +287,14 @@ public class NMPIQueueManager extends Thread {
 		logger.debug("Job " + id + " is finished");
 		File idDirectory = new File(resultsDirectory, String.valueOf(id));
 		idDirectory.mkdirs();
-		List<String> outputUrls = new ArrayList<String>();
+		List<DataItem> outputData = new ArrayList<DataItem>();
 		if (outputs != null) {
 			for (File output : outputs) {
 				File newOutput = new File(idDirectory, output.getName());
 				output.renameTo(newOutput);
 				URL outputUrl = new URL(baseServerUrl,
-						id + "/" + output.getName());
-				outputUrls.add(outputUrl.toExternalForm());
+						"output/" + id + "/" + output.getName());
+				outputData.add(new DataItem(outputUrl.toExternalForm()));
 				logger.debug("New output " + newOutput + " mapped to "
 				    + outputUrl);
 			}
@@ -295,7 +302,7 @@ public class NMPIQueueManager extends Thread {
 
 		Job job = getJob(id);
 		job.setStatus("finished");
-		job.setOutputData(outputUrls);
+		job.setOutputData(outputData);
 		if (logToAppend != null) {
 			String existingLog = job.getLog();
 			if (existingLog == null) {

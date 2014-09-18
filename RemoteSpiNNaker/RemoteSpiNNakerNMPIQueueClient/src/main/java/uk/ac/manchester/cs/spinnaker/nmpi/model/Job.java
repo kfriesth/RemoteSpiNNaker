@@ -20,11 +20,11 @@ public class Job implements QueueNextResponse {
 
 	private Integer id = null;
 
-	private List<String> inputData = null;
+	private List<DataItem> inputData = null;
 
 	private String log = null;
 
-	private List<String> outputData = null;
+	private List<DataItem> outputData = null;
 
 	private String project = null;
 
@@ -72,11 +72,11 @@ public class Job implements QueueNextResponse {
 		this.id = id;
 	}
 
-	public List<String> getInputData() {
+	public List<DataItem> getInputData() {
 		return inputData;
 	}
 
-	public void setInputData(List<String> inputData) {
+	public void setInputData(List<DataItem> inputData) {
 		this.inputData = inputData;
 	}
 
@@ -88,11 +88,11 @@ public class Job implements QueueNextResponse {
 		this.log = log;
 	}
 
-	public List<String> getOutputData() {
+	public List<DataItem> getOutputData() {
 		return outputData;
 	}
 
-	public void setOutputData(List<String> outputData) {
+	public void setOutputData(List<DataItem> outputData) {
 		this.outputData = outputData;
 	}
 

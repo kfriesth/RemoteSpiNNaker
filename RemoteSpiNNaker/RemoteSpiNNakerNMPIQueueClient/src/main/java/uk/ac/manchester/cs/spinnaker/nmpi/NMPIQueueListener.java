@@ -8,6 +8,7 @@ import java.util.List;
  */
 public interface NMPIQueueListener {
 
-	void addJob(int id, String experimentDescription,  List<String> inputData,
-			String hardwareConfig) throws IOException;
+	void addJob(int id, String experimentDescription,
+			List<String> inputDataUrls, String hardwareConfig)
+					throws IOException;
 }

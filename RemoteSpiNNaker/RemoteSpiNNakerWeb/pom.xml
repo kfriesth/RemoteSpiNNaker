@@ -24,6 +24,12 @@
 					<webAppConfig>
 						<contextPath>/</contextPath>
 					</webAppConfig>
+				    <systemProperties>
+				        <systemProperty>
+				            <name>java.awt.headless</name>
+				            <value>true</value>
+				        </systemProperty>
+				    </systemProperties>
 				</configuration>
 			</plugin>
 		</plugins>

@@ -51,7 +51,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             File pacmanCfg = new File(workingDirectory, "pacman.cfg");
             PrintWriter writer = new PrintWriter(pacmanCfg);
             writer.println("[Machine]");
-            writer.println("machine = " + machine.getMachineName());
+            writer.println("machineName = " + machine.getMachineName());
             writer.println("version = " + machine.getVersion());
             writer.close();
 

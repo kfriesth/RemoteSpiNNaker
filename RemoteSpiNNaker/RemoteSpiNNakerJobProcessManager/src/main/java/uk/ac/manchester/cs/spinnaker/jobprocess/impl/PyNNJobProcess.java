@@ -63,6 +63,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             List<String> command = new ArrayList<String>();
             command.add("python");
             command.add(parameters.getScript());
+            command.add("spiNNaker");
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(workingDirectory);
             builder.redirectErrorStream(true);

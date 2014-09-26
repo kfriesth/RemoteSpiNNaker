@@ -3,6 +3,8 @@ package uk.ac.manchester.cs.spinnaker.remote.web;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -70,13 +72,15 @@ public class RemoteSpinnakerBeans {
 	}
 
     @Bean
-	public NMPIQueueManager queueManager() {
+	public NMPIQueueManager queueManager() throws NoSuchAlgorithmException,
+	        KeyManagementException {
 		return new NMPIQueueManager(nmpiUrl, nmpiHardware, resultsDirectory,
 				baseServerUrl, nmpiUsername, nmpiPassword);
 	}
 
     @Bean
-	public JobManager jobManager() throws IOException {
+	public JobManager jobManager() throws IOException,
+	        NoSuchAlgorithmException, KeyManagementException {
 		List<JobParametersFactory> factories =
 				new ArrayList<JobParametersFactory>();
 		factories.add(new GitPyNNJobParametersFactory());

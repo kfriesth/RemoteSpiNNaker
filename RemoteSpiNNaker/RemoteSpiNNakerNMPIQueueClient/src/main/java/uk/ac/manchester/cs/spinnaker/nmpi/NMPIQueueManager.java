@@ -6,6 +6,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -14,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -31,10 +36,15 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.AuthCache;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.protocol.ClientContext;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.BasicClientConnectionManager;
 import org.apache.http.protocol.BasicHttpContext;
 import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
@@ -45,6 +55,7 @@ import uk.ac.manchester.cs.spinnaker.nmpi.model.DataItem;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
+import uk.ac.manchester.cs.spinnaker.nmpi.rest.IgnoreSSLCertificateTrustManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIJacksonJsonProvider;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
@@ -108,14 +119,28 @@ public class NMPIQueueManager extends Thread {
 	 * @param baseServerUrl The URL of the server up to this rest resource
 	 * @param username The username to log in to the server with
 	 * @param password The password to log in to the server with
+	 * @throws NoSuchAlgorithmException
+	 * @throws KeyManagementException
 	 */
 	public NMPIQueueManager(URL url, String hardware,
 			File resultsDirectory, URL baseServerUrl, String username,
-			String password) {
+			String password) throws NoSuchAlgorithmException,
+			KeyManagementException {
 
 		NMPIJacksonJsonProvider provider = new NMPIJacksonJsonProvider();
 		provider.addDeserialiser(QueueNextResponse.class,
 				new QueueResponseDeserialiser());
+
+		// Set up HTTPS to ignore certificate errors
+		SSLContext sslContext = SSLContext.getInstance("SSL");
+		sslContext.init(null, new TrustManager[]{
+				new IgnoreSSLCertificateTrustManager()},
+				new SecureRandom());
+		SSLSocketFactory sf = new SSLSocketFactory(sslContext,
+				SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+		Scheme httpsScheme = new Scheme("https", 443, sf);
+		SchemeRegistry schemeRegistry = new SchemeRegistry();
+		schemeRegistry.register(httpsScheme);
 
 		// Set up authentication
 		HttpHost targetHost = new HttpHost(url.getHost(), url.getPort());
@@ -129,7 +154,9 @@ public class NMPIQueueManager extends Thread {
 		BasicHttpContext localContext = new BasicHttpContext();
 		localContext.setAttribute(ClientContext.AUTH_CACHE, authCache);
 		localContext.setAttribute(ClientContext.CREDS_PROVIDER, credsProvider);
-		DefaultHttpClient httpClient = new DefaultHttpClient();
+		ClientConnectionManager cm = new BasicClientConnectionManager(
+				schemeRegistry);
+		DefaultHttpClient httpClient = new DefaultHttpClient(cm);
 		ApacheHttpClient4Engine engine = new ApacheHttpClient4Engine(httpClient,
 				localContext);
 

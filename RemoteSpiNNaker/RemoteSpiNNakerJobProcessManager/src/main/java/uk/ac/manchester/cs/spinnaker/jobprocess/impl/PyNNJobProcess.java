@@ -20,6 +20,12 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
  */
 public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 
+	@SuppressWarnings("serial")
+	private static final Set<String> IGNORED_EXTENSIONS =
+			new HashSet<String>(){{
+				add("pyc");
+			}};
+
     private File workingDirectory = null;
 
     private boolean deleteOnCleanup = false;
@@ -38,6 +44,15 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
                 files.add(file);
             }
         }
+    }
+
+    private boolean isIgnored(File file) {
+    	int index = file.getName().lastIndexOf('.');
+    	if (index == -1) {
+    		return false;
+    	}
+    	String extension = file.getName().substring(index);
+    	return IGNORED_EXTENSIONS.contains(extension);
     }
 
     @Override
@@ -83,7 +98,8 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             List<File> allFiles = new ArrayList<File>();
             gatherFiles(workingDirectory, allFiles);
             for (File file : allFiles) {
-            	if (!existingFiles.contains(file)) {
+
+            	if (!existingFiles.contains(file) && !isIgnored(file)) {
             		outputs.add(file);
             	}
             }

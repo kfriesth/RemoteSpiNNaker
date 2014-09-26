@@ -23,7 +23,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 	@SuppressWarnings("serial")
 	private static final Set<String> IGNORED_EXTENSIONS =
 			new HashSet<String>(){{
-				add("pyc");
+				add(".pyc");
 			}};
 
     private File workingDirectory = null;

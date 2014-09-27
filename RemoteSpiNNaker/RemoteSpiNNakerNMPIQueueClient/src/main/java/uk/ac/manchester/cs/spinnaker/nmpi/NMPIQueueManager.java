@@ -10,7 +10,6 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -50,6 +49,7 @@ import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
 import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
+import org.joda.time.DateTime;
 
 import uk.ac.manchester.cs.spinnaker.nmpi.model.DataItem;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
@@ -260,6 +260,7 @@ public class NMPIQueueManager extends Thread {
 									job.getHardwareConfig());
 			    	    }
 			    	    logger.debug("Setting job status to running");
+			    	    job.setTimestampCompletion(null);
 				    	job.setStatus("running");
 				    	logger.debug("Updating job status on server");
 				    	synchronized (queue) {
@@ -339,7 +340,7 @@ public class NMPIQueueManager extends Thread {
 			}
 			job.setLog(existingLog);
 		}
-		job.setTimestampCompletion(new Date());
+		job.setTimestampCompletion(new DateTime());
 
 		logger.debug("Updating job status on server");
 		synchronized (queue) {
@@ -378,7 +379,7 @@ public class NMPIQueueManager extends Thread {
 			existingLog += logMessage;
 		}
 		job.setLog(existingLog);
-		job.setTimestampCompletion(new Date());
+		job.setTimestampCompletion(new DateTime());
 
 		logger.debug("Updating job on server");
 		synchronized (queue) {

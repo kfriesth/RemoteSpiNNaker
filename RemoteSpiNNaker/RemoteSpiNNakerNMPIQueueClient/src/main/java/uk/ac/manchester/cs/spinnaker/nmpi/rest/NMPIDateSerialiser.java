@@ -1,27 +1,30 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.rest;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 
-public class NMPIDateSerialiser extends StdSerializer<Date> {
+public class NMPIDateSerialiser extends StdSerializer<DateTime> {
 
-	private static final SimpleDateFormat FORMAT = new SimpleDateFormat(
-			"yyyy-MM-dd'T'HH:mm:ss.SSS");
+	private static final DateTimeFormatter FORMAT = DateTimeFormat.forPattern(
+			"yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
 
 	public NMPIDateSerialiser() {
-		super(Date.class);
+		super(DateTime.class);
 	}
 
 	@Override
-	public void serialize(Date value, JsonGenerator jgen,
+	public void serialize(DateTime value, JsonGenerator jgen,
 			SerializerProvider provider) throws IOException,
 			JsonGenerationException {
-		jgen.writeString(FORMAT.format(value));
+		String dateString = FORMAT.print(value);
+		jgen.writeString(dateString);
 	}
 }

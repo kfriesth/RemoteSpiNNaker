@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.datatype.joda.JodaModule;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
 @Provider
@@ -27,6 +28,8 @@ public class NMPIJacksonJsonProvider extends JacksonJsonProvider {
 	private Set<ObjectMapper> registeredMappers = new HashSet<ObjectMapper>();
 
 	private SimpleModule module = new SimpleModule();
+
+	private JodaModule jodaModule = new JodaModule();
 
 	public <T> void addDeserialiser(Class<T> type,
 			StdDeserializer<T> deserialiser) {
@@ -45,6 +48,7 @@ public class NMPIJacksonJsonProvider extends JacksonJsonProvider {
             mapper.setPropertyNamingStrategy(
             	    PropertyNamingStrategy
             	        .CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+            mapper.registerModule(jodaModule);
             registeredMappers.add(mapper);
         }
 		return super.readFrom(type, genericType, annotations, mediaType, httpHeaders,

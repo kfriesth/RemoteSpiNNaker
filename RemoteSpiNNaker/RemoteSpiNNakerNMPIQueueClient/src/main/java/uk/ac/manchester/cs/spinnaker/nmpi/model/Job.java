@@ -1,10 +1,13 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.model;
 
-import java.util.Date;
 import java.util.List;
+
+import org.joda.time.DateTime;
 
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIDateSerialiser;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**
@@ -33,10 +36,11 @@ public class Job implements QueueNextResponse {
 	private String status = null;
 
 	@JsonSerialize(using=NMPIDateSerialiser.class)
-	private Date timestampCompletion = null;
+	@JsonInclude(Include.NON_NULL)
+	private DateTime timestampCompletion = null;
 
 	@JsonSerialize(using=NMPIDateSerialiser.class)
-	private Date timestampSubmission = null;
+	private DateTime timestampSubmission = null;
 
 	private String user = null;
 
@@ -120,19 +124,19 @@ public class Job implements QueueNextResponse {
 		this.status = status;
 	}
 
-	public Date getTimestampCompletion() {
+	public DateTime getTimestampCompletion() {
 		return timestampCompletion;
 	}
 
-	public void setTimestampCompletion(Date timestampCompletion) {
+	public void setTimestampCompletion(DateTime timestampCompletion) {
 		this.timestampCompletion = timestampCompletion;
 	}
 
-	public Date getTimestampSubmission() {
+	public DateTime getTimestampSubmission() {
 		return timestampSubmission;
 	}
 
-	public void setTimestampSubmission(Date timestampSubmission) {
+	public void setTimestampSubmission(DateTime timestampSubmission) {
 		this.timestampSubmission = timestampSubmission;
 	}
 

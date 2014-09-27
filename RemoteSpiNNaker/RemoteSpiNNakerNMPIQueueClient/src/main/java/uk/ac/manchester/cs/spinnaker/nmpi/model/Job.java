@@ -36,7 +36,6 @@ public class Job implements QueueNextResponse {
 	private String status = null;
 
 	@JsonSerialize(using=NMPIDateSerialiser.class)
-	@JsonInclude(Include.NON_NULL)
 	private DateTime timestampCompletion = null;
 
 	@JsonSerialize(using=NMPIDateSerialiser.class)

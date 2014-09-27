@@ -50,6 +50,7 @@ import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
 import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 import uk.ac.manchester.cs.spinnaker.nmpi.model.DataItem;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
@@ -340,7 +341,7 @@ public class NMPIQueueManager extends Thread {
 			}
 			job.setLog(existingLog);
 		}
-		job.setTimestampCompletion(new DateTime());
+		job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
 
 		logger.debug("Updating job status on server");
 		synchronized (queue) {
@@ -379,7 +380,7 @@ public class NMPIQueueManager extends Thread {
 			existingLog += logMessage;
 		}
 		job.setLog(existingLog);
-		job.setTimestampCompletion(new DateTime());
+		job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
 
 		logger.debug("Updating job on server");
 		synchronized (queue) {

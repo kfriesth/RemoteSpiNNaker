@@ -261,6 +261,8 @@ public class NMPIQueueManager extends Thread {
 									job.getHardwareConfig());
 			    	    }
 			    	    logger.debug("Setting job status to running");
+			    	    job.setTimestampSubmission(job.getTimestampSubmission()
+			    	    		.withZoneRetainFields(DateTimeZone.UTC));
 			    	    job.setTimestampCompletion(null);
 				    	job.setStatus("running");
 				    	logger.debug("Updating job status on server");

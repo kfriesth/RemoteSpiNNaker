@@ -6,8 +6,6 @@ import org.joda.time.DateTime;
 
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIDateSerialiser;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**

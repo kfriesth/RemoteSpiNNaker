@@ -40,7 +40,6 @@ import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.auth.BasicScheme;
-import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.BasicClientConnectionManager;
@@ -52,11 +51,14 @@ import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
+import uk.ac.manchester.cs.spinnaker.nmpi.model.APIKeyResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.DataItem;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
+import uk.ac.manchester.cs.spinnaker.nmpi.rest.APIKeyScheme;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.IgnoreSSLCertificateTrustManager;
+import uk.ac.manchester.cs.spinnaker.nmpi.rest.MyAuthCache;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIJacksonJsonProvider;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
@@ -144,14 +146,16 @@ public class NMPIQueueManager extends Thread {
 		schemeRegistry.register(httpsScheme);
 
 		// Set up authentication
-		HttpHost targetHost = new HttpHost(url.getHost(), url.getPort());
+		HttpHost targetHost = new HttpHost(url.getHost(), url.getPort(),
+				url.getProtocol());
 		CredentialsProvider credsProvider = new BasicCredentialsProvider();
 		credsProvider.setCredentials(
 		        new AuthScope(targetHost.getHostName(), targetHost.getPort()),
 		        new UsernamePasswordCredentials(username, password));
-		AuthCache authCache = new BasicAuthCache();
+		AuthCache authCache = new MyAuthCache();
 		AuthScheme basicAuth = new BasicScheme();
-		authCache.put(new HttpHost("url"), basicAuth);
+		System.err.println("Target host = " + targetHost);
+		authCache.put(targetHost, basicAuth);
 		BasicHttpContext localContext = new BasicHttpContext();
 		localContext.setAttribute(ClientContext.AUTH_CACHE, authCache);
 		localContext.setAttribute(ClientContext.CREDS_PROVIDER, credsProvider);
@@ -166,6 +170,14 @@ public class NMPIQueueManager extends Thread {
 		client.register(provider);
         ResteasyWebTarget target = client.target(url.toString());
         queue = target.proxy(NMPIQueue.class);
+
+        APIKeyResponse tokenResponse = queue.getToken(username);
+        credsProvider.setCredentials(
+        		new AuthScope(targetHost.getHostName(), targetHost.getPort()),
+		        new UsernamePasswordCredentials(username,
+		        		tokenResponse.getKey()));
+        AuthScheme tokenAuth = new APIKeyScheme();
+        authCache.put(targetHost, tokenAuth);
 
         this.hardware = hardware;
         this.resultsDirectory = resultsDirectory;

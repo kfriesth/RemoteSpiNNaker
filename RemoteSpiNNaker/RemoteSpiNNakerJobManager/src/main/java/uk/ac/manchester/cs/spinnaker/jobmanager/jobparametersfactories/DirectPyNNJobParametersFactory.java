@@ -23,7 +23,7 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
     @Override
     public JobParameters getJobParameters(String experimentDescription,
             List<String> inputData, Map<String, Object> hardwareConfiguration,
-            File workingDirectory)
+            File workingDirectory, boolean deleteJobOnExit)
             throws UnsupportedJobException, JobParametersFactoryException {
         if (!experimentDescription.contains("import")) {
             throw new UnsupportedJobException();
@@ -36,7 +36,7 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
             writer.close();
 
             return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
-                    SCRIPT_NAME, hardwareConfiguration, true);
+                    SCRIPT_NAME, hardwareConfiguration, deleteJobOnExit);
         } catch (IOException e) {
             throw new JobParametersFactoryException("Error storing script", e);
         }

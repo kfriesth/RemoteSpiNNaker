@@ -69,6 +69,9 @@ public class RemoteSpinnakerBeans {
     @Value("${baseserver.url}")
     private URL baseServerUrl;
 
+    @Value("${deleteJobsOnExit}")
+    private boolean deleteJobsOnExit;
+
     @Bean
     public MachineManager machineManager() {
         return new MachineManager(machines);
@@ -79,7 +82,7 @@ public class RemoteSpinnakerBeans {
             KeyManagementException {
         return new NMPIQueueManager(nmpiUrl, nmpiHardware, resultsDirectory,
                 baseServerUrl, nmpiUsername, nmpiPassword,
-                nmpiPasswordIsApiKey);
+                nmpiPasswordIsApiKey, deleteJobsOnExit);
     }
 
     @Bean

@@ -26,7 +26,7 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
     @Override
     public JobParameters getJobParameters(String experimentDescription,
             List<String> inputData, Map<String, Object> hardwareConfiguration,
-            File workingDirectory)
+            File workingDirectory, boolean deleteJobOnExit)
             throws UnsupportedJobException, JobParametersFactoryException {
 
         // Test that there is a URL
@@ -53,7 +53,7 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
 
             PyNNJobParameters parameters = new PyNNJobParameters(
                     workingDirectory.getAbsolutePath(), DEFAULT_SCRIPT_NAME,
-                    hardwareConfiguration, true);
+                    hardwareConfiguration, deleteJobOnExit);
             return parameters;
         } catch (InvalidRemoteException e) {
             throw new JobParametersFactoryException("Remote is not valid", e);

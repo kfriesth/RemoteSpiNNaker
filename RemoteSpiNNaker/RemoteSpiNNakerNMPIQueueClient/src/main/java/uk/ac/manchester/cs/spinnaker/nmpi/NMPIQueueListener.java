@@ -10,6 +10,7 @@ import java.util.Map;
 public interface NMPIQueueListener {
 
     void addJob(int id, String experimentDescription,
-            List<String> inputDataUrls, Map<String, Object> hardwareConfig)
+            List<String> inputDataUrls, Map<String, Object> hardwareConfig,
+            boolean deleteJobOnExit)
                     throws IOException;
 }

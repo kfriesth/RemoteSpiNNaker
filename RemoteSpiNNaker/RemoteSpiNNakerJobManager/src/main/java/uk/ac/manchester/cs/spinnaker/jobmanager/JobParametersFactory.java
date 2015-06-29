@@ -17,6 +17,7 @@ public interface JobParametersFactory {
      * @param inputData A list of input data to be processed
      * @param hardwareConfiguration The configuration of the hardware
      * @param workingDirectory The working directory where the job will be run
+     * @param deleteJobOnExit True if the job should be deleted when complete
      * @return A job description to be executed
      * @throws UnsupportedJobException If the factory does not support the job
      * @throws JobParametersFactoryException If there was an error getting
@@ -24,6 +25,6 @@ public interface JobParametersFactory {
      */
     JobParameters getJobParameters(String experimentDescription,
             List<String> inputData, Map<String, Object> hardwareConfiguration,
-            File workingDirectory)
+            File workingDirectory, boolean deleteJobOnExit)
             throws UnsupportedJobException, JobParametersFactoryException;
 }

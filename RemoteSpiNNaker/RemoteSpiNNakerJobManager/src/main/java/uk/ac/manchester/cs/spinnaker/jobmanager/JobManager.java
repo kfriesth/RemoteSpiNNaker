@@ -127,7 +127,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     @Override
     public void addJob(int id, String experimentDescription,
-            List<String> inputData, Map<String, Object> hardwareConfig)
+            List<String> inputData, Map<String, Object> hardwareConfig,
+            boolean deleteJobOnExit)
                 throws IOException {
         logger.info("New job " + id);
 
@@ -148,7 +149,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         for (JobParametersFactory factory : jobParametersFactories) {
             try {
                 parameters = factory.getJobParameters(experimentDescription,
-                        inputData, hardwareConfig, workingDirectory);
+                        inputData, hardwareConfig, workingDirectory,
+                        deleteJobOnExit);
             } catch (UnsupportedJobException e) {
 
                 // Do Nothing

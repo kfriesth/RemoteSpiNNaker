@@ -110,11 +110,14 @@ public class NMPIQueueManager extends Thread {
     private URL baseServerUrl = null;
 
     /**
+     * Determines whether jobs should be deleted when complete
+     */
+    private boolean deleteJobsOnExit = true;
+
+    /**
     * The logger
     */
     private Log logger = LogFactory.getLog(getClass());
-
-
 
     /**
     * Creates a new Manager, pointing at a queue at a specific URL
@@ -126,12 +129,13 @@ public class NMPIQueueManager extends Thread {
     * @param password The password or API key to log in to the server with
     * @param passwordIsKey True if the password is an API key, False if the
     *         password should be used to obtain the key
+    * @param deleteJobsOnExit True if jobs should be deleted when complete
     * @throws NoSuchAlgorithmException
     * @throws KeyManagementException
     */
     public NMPIQueueManager(URL url, String hardware,
             File resultsDirectory, URL baseServerUrl, String username,
-            String password, boolean passwordIsKey)
+            String password, boolean passwordIsKey, boolean deleteJobsOnExit)
                     throws NoSuchAlgorithmException, KeyManagementException {
 
         NMPIJacksonJsonProvider provider = new NMPIJacksonJsonProvider();
@@ -205,6 +209,7 @@ public class NMPIQueueManager extends Thread {
         this.hardware = hardware;
         this.resultsDirectory = resultsDirectory;
         this.baseServerUrl = baseServerUrl;
+        this.deleteJobsOnExit = deleteJobsOnExit;
     }
 
     /**
@@ -293,7 +298,8 @@ public class NMPIQueueManager extends Thread {
                             listener.addJob(job.getId(),
                                     job.getExperimentDescription(),
                                     inputDataUrls,
-                                    job.getHardwareConfig());
+                                    job.getHardwareConfig(),
+                                    deleteJobsOnExit);
                         }
                         logger.debug("Setting job status to running");
                         job.setTimestampSubmission(job.getTimestampSubmission()

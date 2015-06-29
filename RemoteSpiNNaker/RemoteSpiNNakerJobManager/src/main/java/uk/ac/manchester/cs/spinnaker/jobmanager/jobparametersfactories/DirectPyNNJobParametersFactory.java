@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.Map;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
@@ -21,7 +22,7 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
 
     @Override
     public JobParameters getJobParameters(String experimentDescription,
-            List<String> inputData, String hardwareConfiguration,
+            List<String> inputData, Map<String, Object> hardwareConfiguration,
             File workingDirectory)
             throws UnsupportedJobException, JobParametersFactoryException {
         if (!experimentDescription.contains("import")) {

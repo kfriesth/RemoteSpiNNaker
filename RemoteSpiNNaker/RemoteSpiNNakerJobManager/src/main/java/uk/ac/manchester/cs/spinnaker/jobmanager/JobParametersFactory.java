@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 
@@ -21,8 +22,8 @@ public interface JobParametersFactory {
      * @throws JobParametersFactoryException If there was an error getting
      *                                       the parameters
      */
-	JobParameters getJobParameters(String experimentDescription,
-			List<String> inputData, String hardwareConfiguration,
-			File workingDirectory)
-	        throws UnsupportedJobException, JobParametersFactoryException;
+    JobParameters getJobParameters(String experimentDescription,
+            List<String> inputData, Map<String, Object> hardwareConfiguration,
+            File workingDirectory)
+            throws UnsupportedJobException, JobParametersFactoryException;
 }

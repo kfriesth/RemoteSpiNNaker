@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
@@ -24,7 +25,7 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
 
     @Override
     public JobParameters getJobParameters(String experimentDescription,
-            List<String> inputData, String hardwareConfiguration,
+            List<String> inputData, Map<String, Object> hardwareConfiguration,
             File workingDirectory)
             throws UnsupportedJobException, JobParametersFactoryException {
 

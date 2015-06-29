@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.ini4j.ConfigParser;
@@ -65,15 +66,8 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             workingDirectory = new File(parameters.getWorkingDirectory());
             deleteOnCleanup = parameters.isDeleteOnCompletion();
 
-            // Deal with hardware configuration
+            // TODO: Deal with hardware configuration
             File cfgFile = new File(workingDirectory, "spynnaker.cfg");
-            String hardwareConfiguration =
-                    parameters.getHardwareConfiguration().trim();
-            if (!hardwareConfiguration.isEmpty()) {
-                PrintWriter writer = new PrintWriter(cfgFile);
-                writer.println(hardwareConfiguration);
-                writer.close();
-            }
 
             // Add the details of the machine
             ConfigParser parser = new ConfigParser();

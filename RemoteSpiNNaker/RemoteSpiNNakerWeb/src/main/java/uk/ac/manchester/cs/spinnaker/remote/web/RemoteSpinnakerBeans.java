@@ -37,12 +37,12 @@ public class RemoteSpinnakerBeans {
 
     @Bean
     public static ConversionServiceFactoryBean conversionService() {
-    	ConversionServiceFactoryBean factory =
-    			new ConversionServiceFactoryBean();
-    	Set<Converter<?, ?>> converters = new HashSet<Converter<?,?>>();
-    	converters.add(new StringToSpinnakerMachine());
-    	factory.setConverters(converters);
-    	return factory;
+        ConversionServiceFactoryBean factory =
+                new ConversionServiceFactoryBean();
+        Set<Converter<?, ?>> converters = new HashSet<Converter<?,?>>();
+        converters.add(new StringToSpinnakerMachine());
+        factory.setConverters(converters);
+        return factory;
     }
 
     @Value("${machines}")
@@ -57,6 +57,9 @@ public class RemoteSpinnakerBeans {
     @Value("${nmpi.password}")
     private String nmpiPassword;
 
+    @Value("${nmpi.passwordIsApiKey}")
+    private boolean nmpiPasswordIsApiKey;
+
     @Value("${nmpi.hardware}")
     private String nmpiHardware;
 
@@ -67,25 +70,26 @@ public class RemoteSpinnakerBeans {
     private URL baseServerUrl;
 
     @Bean
-	public MachineManager machineManager() {
-		return new MachineManager(machines);
-	}
+    public MachineManager machineManager() {
+        return new MachineManager(machines);
+    }
 
     @Bean
-	public NMPIQueueManager queueManager() throws NoSuchAlgorithmException,
-	        KeyManagementException {
-		return new NMPIQueueManager(nmpiUrl, nmpiHardware, resultsDirectory,
-				baseServerUrl, nmpiUsername, nmpiPassword);
-	}
+    public NMPIQueueManager queueManager() throws NoSuchAlgorithmException,
+            KeyManagementException {
+        return new NMPIQueueManager(nmpiUrl, nmpiHardware, resultsDirectory,
+                baseServerUrl, nmpiUsername, nmpiPassword,
+                nmpiPasswordIsApiKey);
+    }
 
     @Bean
-	public JobManager jobManager() throws IOException,
-	        NoSuchAlgorithmException, KeyManagementException {
-		List<JobParametersFactory> factories =
-				new ArrayList<JobParametersFactory>();
-		factories.add(new GitPyNNJobParametersFactory());
-		factories.add(new DirectPyNNJobParametersFactory());
-		return new JobManager(machineManager(), queueManager(),
-				factories, baseServerUrl);
-	}
+    public JobManager jobManager() throws IOException,
+            NoSuchAlgorithmException, KeyManagementException {
+        List<JobParametersFactory> factories =
+                new ArrayList<JobParametersFactory>();
+        factories.add(new GitPyNNJobParametersFactory());
+        factories.add(new DirectPyNNJobParametersFactory());
+        return new JobManager(machineManager(), queueManager(),
+                factories, baseServerUrl);
+    }
 }

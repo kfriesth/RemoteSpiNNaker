@@ -80,6 +80,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             parser.set("Machine", "width", machine.getWidth());
             parser.set("Machine", "height", machine.getHeight());
             parser.set("Machine", "bmp_names", machine.getBmpDetails());
+            parser.write(cfgFile);
 
             // Keep existing files to compare to later
             Set<File> existingFiles = new HashSet<File>();

@@ -9,45 +9,56 @@ import uk.ac.manchester.cs.spinnaker.job.JobParametersTypeName;
 @JobParametersTypeName("PyNNJobParameters")
 public class PyNNJobParameters implements JobParameters {
 
-	private String workingDirectory = null;
+    private String workingDirectory = null;
 
-	private String script = null;
+    private String script = null;
 
-	private boolean deleteOnCompletion = false;
+    private String hardwareConfiguration = null;
 
-	public PyNNJobParameters() {
+    private boolean deleteOnCompletion = false;
 
-		// Does Nothing
-	}
+    public PyNNJobParameters() {
 
-	public PyNNJobParameters(String workingDirectory, String script,
-			boolean deleteOnCompletion) {
-		this.workingDirectory = workingDirectory;
-		this.script = script;
-		this.deleteOnCompletion = deleteOnCompletion;
-	}
+        // Does Nothing
+    }
 
-	public String getWorkingDirectory() {
-		return workingDirectory;
-	}
+    public PyNNJobParameters(String workingDirectory, String script,
+            String hardwareConfiguration, boolean deleteOnCompletion) {
+        this.workingDirectory = workingDirectory;
+        this.script = script;
+        this.hardwareConfiguration = hardwareConfiguration;
+        this.deleteOnCompletion = deleteOnCompletion;
+    }
 
-	public void setWorkingDirectory(String workingDirectory) {
-		this.workingDirectory = workingDirectory;
-	}
+    public String getWorkingDirectory() {
+        return workingDirectory;
+    }
 
-	public String getScript() {
-		return script;
-	}
+    public void setWorkingDirectory(String workingDirectory) {
+        this.workingDirectory = workingDirectory;
+    }
 
-	public void setScript(String script) {
-		this.script = script;
-	}
+    public String getScript() {
+        return script;
+    }
 
-	public boolean isDeleteOnCompletion() {
-		return deleteOnCompletion;
-	}
+    public void setScript(String script) {
+        this.script = script;
+    }
 
-	public void setDeleteOnCompletion(boolean deleteOnCompletion) {
-		this.deleteOnCompletion = deleteOnCompletion;
-	}
+    public String getHardwareConfiguration() {
+        return hardwareConfiguration;
+    }
+
+    public void setHardwareConfiguration(String hardwareConfiguration) {
+        this.hardwareConfiguration = hardwareConfiguration;
+    }
+
+    public boolean isDeleteOnCompletion() {
+        return deleteOnCompletion;
+    }
+
+    public void setDeleteOnCompletion(boolean deleteOnCompletion) {
+        this.deleteOnCompletion = deleteOnCompletion;
+    }
 }

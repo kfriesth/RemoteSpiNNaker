@@ -17,28 +17,28 @@ import uk.ac.manchester.cs.spinnaker.jobmanager.UnsupportedJobException;
  */
 public class DirectPyNNJobParametersFactory implements JobParametersFactory {
 
-	private static final String SCRIPT_NAME = "run.py";
+    private static final String SCRIPT_NAME = "run.py";
 
-	@Override
-	public JobParameters getJobParameters(String experimentDescription,
-			List<String> inputData, String hardwareConfiguration,
-			File workingDirectory)
-			throws UnsupportedJobException, JobParametersFactoryException {
-		if (!experimentDescription.contains("import")) {
-			throw new UnsupportedJobException();
-		}
-		try {
+    @Override
+    public JobParameters getJobParameters(String experimentDescription,
+            List<String> inputData, String hardwareConfiguration,
+            File workingDirectory)
+            throws UnsupportedJobException, JobParametersFactoryException {
+        if (!experimentDescription.contains("import")) {
+            throw new UnsupportedJobException();
+        }
+        try {
 
-			File scriptFile = new File(workingDirectory, SCRIPT_NAME);
-			PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
-			writer.print(experimentDescription);
-			writer.close();
+            File scriptFile = new File(workingDirectory, SCRIPT_NAME);
+            PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
+            writer.print(experimentDescription);
+            writer.close();
 
-			return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
-					SCRIPT_NAME, true);
-		} catch (IOException e) {
-			throw new JobParametersFactoryException("Error storing script", e);
-		}
-	}
+            return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
+                    SCRIPT_NAME, hardwareConfiguration, true);
+        } catch (IOException e) {
+            throw new JobParametersFactoryException("Error storing script", e);
+        }
+    }
 
 }

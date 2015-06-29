@@ -5,109 +5,131 @@ package uk.ac.manchester.cs.spinnaker.machine;
  */
 public class SpinnakerMachine {
 
-	/**
-	 * The name of the machine
-	 */
-	private String machineName = null;
+    /**
+    * The name of the machine
+    */
+    private String machineName = null;
 
-	/**
-	 * The version of the machine
-	 */
-	private String version = null;
+    /**
+    * The version of the machine
+    */
+    private String version = null;
 
-	/**
-	 * The width of the machine
-	 */
-	private int width = 0;
+    /**
+    * The width of the machine
+    */
+    private int width = 0;
 
-	/**
-	 * The height of the machine
-	 */
-	private int height = 0;
+    /**
+    * The height of the machine
+    */
+    private int height = 0;
 
-	/**
-	 * Creates an empty machine
-	 */
-	public SpinnakerMachine() {
+    /**
+    * The BMP details of the machine
+    */
+    private String bmpDetails = null;
 
-		// Does Nothing
-	}
+    /**
+    * Creates an empty machine
+    */
+    public SpinnakerMachine() {
 
-	/**
-	 * Creates a new Spinnaker Machine
-	 *
-	 * @param machineName The name of the machine
-	 */
-	public SpinnakerMachine(String machineName, String version, int width,
-			int height) {
-		this.machineName = machineName;
-		this.version = version;
-		this.width = width;
-		this.height = height;
-	}
+        // Does Nothing
+    }
 
-	/**
-	 * Gets the name of the machine
-	 *
-	 * @return The name of the machine
-	 */
-	public String getMachineName() {
-		return machineName;
-	}
+    /**
+    * Creates a new Spinnaker Machine
+    *
+    * @param machineName The name of the machine
+    */
+    public SpinnakerMachine(String machineName, String version, int width,
+            int height, String bmpDetails) {
+        this.machineName = machineName;
+        this.version = version;
+        this.width = width;
+        this.height = height;
+        this.bmpDetails = bmpDetails;
+    }
 
-	/**
-	 * Sets the name of the machine
-	 * @param machineName The name of the machine
-	 */
-	public void setMachineName(String machineName) {
-		this.machineName = machineName;
-	}
+    /**
+    * Gets the name of the machine
+    *
+    * @return The name of the machine
+    */
+    public String getMachineName() {
+        return machineName;
+    }
 
-	/**
-	 * Gets the version of the machine
-	 * @return The version of the machine
-	 */
-	public String getVersion() {
-		return version;
-	}
+    /**
+    * Sets the name of the machine
+    * @param machineName The name of the machine
+    */
+    public void setMachineName(String machineName) {
+        this.machineName = machineName;
+    }
 
-	/**
-	 * Sets the version of the machine
-	 * @param version The version of the machine
-	 */
-	public void setVersion(String version) {
-		this.version = version;
-	}
+    /**
+    * Gets the version of the machine
+    * @return The version of the machine
+    */
+    public String getVersion() {
+        return version;
+    }
 
-	/**
-	 * Gets the width of the machine
-	 * @return The width of the machine
-	 */
-	public int getWidth() {
-		return width;
-	}
+    /**
+    * Sets the version of the machine
+    * @param version The version of the machine
+    */
+    public void setVersion(String version) {
+        this.version = version;
+    }
 
-	/**
-	 * Sets the width of the machine
-	 * @param width The width of the machine
-	 */
-	public void setWidth(int width) {
-		this.width = width;
-	}
+    /**
+    * Gets the width of the machine
+    * @return The width of the machine
+    */
+    public int getWidth() {
+        return width;
+    }
 
-	/**
-	 * Gets the height of the machine
-	 * @return The height of the machine
-	 */
-	public int getHeight() {
-		return height;
-	}
+    /**
+    * Sets the width of the machine
+    * @param width The width of the machine
+    */
+    public void setWidth(int width) {
+        this.width = width;
+    }
 
-	/**
-	 * Sets the height of the machine
-	 * @param height The height of the machine
-	 */
-	public void setHeight(int height) {
-		this.height = height;
-	}
+    /**
+    * Gets the height of the machine
+    * @return The height of the machine
+    */
+    public int getHeight() {
+        return height;
+    }
+
+    /**
+    * Sets the height of the machine
+    * @param height The height of the machine
+    */
+    public void setHeight(int height) {
+        this.height = height;
+    }
+
+    /**
+     * Gets the BMP details of the machine
+     * @return The BMP details of the machine
+     */
+    public String getBmpDetails() {
+        return bmpDetails;
+    }
+
+    /**
+     * Sets the BMP details of the machine
+     * @param bmpDetails The BMP details of the machine
+     */
+    public void setBmpDetails(String bmpDetails) {
+        this.bmpDetails = bmpDetails;
+    }
 }

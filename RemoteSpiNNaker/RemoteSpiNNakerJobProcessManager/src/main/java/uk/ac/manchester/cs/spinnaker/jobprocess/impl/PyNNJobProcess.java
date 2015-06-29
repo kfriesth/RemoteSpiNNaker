@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.ini4j.ConfigParser;
+
 import uk.ac.manchester.cs.spinnaker.job.Status;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcess;
@@ -20,11 +22,11 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
  */
 public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 
-	@SuppressWarnings("serial")
-	private static final Set<String> IGNORED_EXTENSIONS =
-			new HashSet<String>(){{
-				add(".pyc");
-			}};
+    @SuppressWarnings("serial")
+    private static final Set<String> IGNORED_EXTENSIONS =
+            new HashSet<String>(){{
+                add(".pyc");
+            }};
 
     private File workingDirectory = null;
 
@@ -47,28 +49,42 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
     }
 
     private boolean isIgnored(File file) {
-    	int index = file.getName().lastIndexOf('.');
-    	if (index == -1) {
-    		return false;
-    	}
-    	String extension = file.getName().substring(index);
-    	return IGNORED_EXTENSIONS.contains(extension);
+        int index = file.getName().lastIndexOf('.');
+        if (index == -1) {
+            return false;
+        }
+        String extension = file.getName().substring(index);
+        return IGNORED_EXTENSIONS.contains(extension);
     }
 
     @Override
     public void execute(SpinnakerMachine machine,
             PyNNJobParameters parameters, LogWriter logWriter) {
         try {
-        	status = Status.Running;
+            status = Status.Running;
             workingDirectory = new File(parameters.getWorkingDirectory());
             deleteOnCleanup = parameters.isDeleteOnCompletion();
 
-            File pacmanCfg = new File(workingDirectory, "pacman.cfg");
-            PrintWriter writer = new PrintWriter(pacmanCfg);
-            writer.println("[Machine]");
-            writer.println("machineName = " + machine.getMachineName());
-            writer.println("version = " + machine.getVersion());
-            writer.close();
+            // Deal with hardware configuration
+            File cfgFile = new File(workingDirectory, "spynnaker.cfg");
+            String hardwareConfiguration =
+                    parameters.getHardwareConfiguration().trim();
+            if (!hardwareConfiguration.isEmpty()) {
+                PrintWriter writer = new PrintWriter(cfgFile);
+                writer.println(hardwareConfiguration);
+                writer.close();
+            }
+
+            // Add the details of the machine
+            ConfigParser parser = new ConfigParser();
+            if (cfgFile.exists()) {
+                parser.read(cfgFile);
+            }
+            parser.set("Machine", "machineName", machine.getMachineName());
+            parser.set("Machine", "version", machine.getVersion());
+            parser.set("Machine", "width", machine.getWidth());
+            parser.set("Machine", "height", machine.getHeight());
+            parser.set("Machine", "bmp_names", machine.getBmpDetails());
 
             // Keep existing files to compare to later
             Set<File> existingFiles = new HashSet<File>();
@@ -86,7 +102,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 
             // Run a thread to gather the log
             ReaderLogWriter logger = new ReaderLogWriter(
-            		process.getInputStream(), logWriter);
+                    process.getInputStream(), logWriter);
             logger.start();
 
             // Wait for the process to finish
@@ -99,14 +115,14 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             gatherFiles(workingDirectory, allFiles);
             for (File file : allFiles) {
 
-            	if (!existingFiles.contains(file) && !isIgnored(file)) {
-            		outputs.add(file);
-            	}
+                if (!existingFiles.contains(file) && !isIgnored(file)) {
+                    outputs.add(file);
+                }
             }
 
             // If the exit is an error, mark an error
             if (exitValue != 0) {
-            	throw new Exception("Python exited with a non-zero code ("
+                throw new Exception("Python exited with a non-zero code ("
                         + exitValue + ")");
             }
             status = Status.Finished;
@@ -132,20 +148,20 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
     }
 
     private void deleteDirectory(File directory) {
-    	for (File file : directory.listFiles()) {
-    		if (file.isDirectory()) {
-    			deleteDirectory(file);
-    		} else {
-    			file.delete();
-    		}
-    	}
-    	directory.delete();
+        for (File file : directory.listFiles()) {
+            if (file.isDirectory()) {
+                deleteDirectory(file);
+            } else {
+                file.delete();
+            }
+        }
+        directory.delete();
     }
 
     @Override
     public void cleanup() {
         if (deleteOnCleanup) {
-        	deleteDirectory(workingDirectory);
+            deleteDirectory(workingDirectory);
         }
     }
 }

@@ -1,12 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.jobprocess.impl;
 
 import java.io.File;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.ini4j.ConfigParser;
@@ -73,6 +71,9 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             ConfigParser parser = new ConfigParser();
             if (cfgFile.exists()) {
                 parser.read(cfgFile);
+            }
+            if (!parser.hasSection("Machine")) {
+                parser.addSection("Machine");
             }
             parser.set("Machine", "machineName", machine.getMachineName());
             parser.set("Machine", "version", machine.getVersion());

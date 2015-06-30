@@ -57,6 +57,7 @@ import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.APIKeyScheme;
+import uk.ac.manchester.cs.spinnaker.nmpi.rest.ErrorCaptureResponseFilter;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.IgnoreSSLCertificateTrustManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.MyAuthCache;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIJacksonJsonProvider;
@@ -190,6 +191,7 @@ public class NMPIQueueManager extends Thread {
         ResteasyClient client =
                 new ResteasyClientBuilder().httpEngine(engine).build();
         client.register(provider);
+        client.register(new ErrorCaptureResponseFilter());
         ResteasyWebTarget target = client.target(url.toString());
         queue = target.proxy(NMPIQueue.class);
 

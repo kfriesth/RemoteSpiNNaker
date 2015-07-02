@@ -226,7 +226,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
-    public void setJobError(int id, String error, RemoteStackTrace stackTrace) {
+    public void setJobError(int id, String error, String logToAppend,
+            RemoteStackTrace stackTrace) {
         logger.debug("Marking job " + id + " as error");
         synchronized (allocatedMachines) {
             SpinnakerMachine machine = allocatedMachines.remove(id);
@@ -243,6 +244,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
         Exception exception = new Exception(error);
         exception.setStackTrace(elements);
-        queueManager.setJobError(id, null, exception);
+        queueManager.setJobError(id, logToAppend, exception);
     }
 }

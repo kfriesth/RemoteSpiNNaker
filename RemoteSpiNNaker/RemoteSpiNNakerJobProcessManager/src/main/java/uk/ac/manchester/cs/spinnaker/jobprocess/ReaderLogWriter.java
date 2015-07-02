@@ -76,12 +76,6 @@ public class ReaderLogWriter extends Thread {
     * Closes the reader/writer
     */
     public void close() {
-        try {
-            reader.close();
-        } catch (IOException e) {
-
-            // Do Nothing
-        }
         synchronized (this) {
             System.err.println("Waiting for log writer to exit...");
             while (isRunning || isWriting) {
@@ -93,6 +87,14 @@ public class ReaderLogWriter extends Thread {
                 }
             }
             System.err.println("Log writer has exited");
+        }
+
+
+        try {
+            reader.close();
+        } catch (IOException e) {
+
+            // Do Nothing
         }
     }
 }

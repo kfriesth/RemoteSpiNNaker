@@ -272,13 +272,13 @@ public class NMPIQueueManager extends Thread {
     public void run() {
         while (!done) {
             try {
-                logger.debug("Getting next job");
+                //logger.debug("Getting next job");
                 QueueNextResponse response = null;
                 synchronized (queue) {
                     response = queue.getNextJob(hardware);
                 }
                 if (response instanceof QueueEmpty) {
-                    logger.debug("No job received, sleeping");
+                    //logger.debug("No job received, sleeping");
                     try {
                         Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
                     } catch (InterruptedException e) {

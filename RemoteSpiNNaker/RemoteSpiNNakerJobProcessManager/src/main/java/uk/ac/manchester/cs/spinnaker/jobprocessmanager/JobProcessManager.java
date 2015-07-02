@@ -83,14 +83,14 @@ public class JobProcessManager {
             System.err.println("Executing process");
             process.execute(specification.getMachine(),
                     specification.getParameters(), logWriter);
-            logWriter.close();
+            String log = logWriter.getLog();
 
             // Get the exit status
             Status status = process.getStatus();
             System.err.println("Process has finished with status " + status);
             if (status == Status.Error) {
                 Throwable error = process.getError();
-                jobManager.setJobError(id, error.getMessage(),
+                jobManager.setJobError(id, error.getMessage(), log,
                         new RemoteStackTrace(error));
             } else if (status == Status.Finished) {
                 List<File> outputs = process.getOutputs();
@@ -98,7 +98,7 @@ public class JobProcessManager {
                 for (File output : outputs) {
                     outputsAsStrings.add(output.getAbsolutePath());
                 }
-                jobManager.setJobFinished(id, "", outputsAsStrings);
+                jobManager.setJobFinished(id, log, outputsAsStrings);
             } else {
                 throw new RuntimeException("Unknown status returned!");
             }
@@ -109,10 +109,11 @@ public class JobProcessManager {
         } catch (Throwable error) {
             if (jobManager != null) {
                 try {
+                    String log = "";
                     if (logWriter != null) {
-                        logWriter.close();
+                        log = logWriter.getLog();
                     }
-                    jobManager.setJobError(id, error.getMessage(),
+                    jobManager.setJobError(id, error.getMessage(), log,
                             new RemoteStackTrace(error));
                 } catch (Throwable t) {
                     t.printStackTrace();

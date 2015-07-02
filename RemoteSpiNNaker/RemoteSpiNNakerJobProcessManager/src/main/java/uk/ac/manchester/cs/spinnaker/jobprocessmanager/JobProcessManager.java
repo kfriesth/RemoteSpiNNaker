@@ -30,92 +30,96 @@ import uk.ac.manchester.cs.spinnaker.jobprocess.impl.PyNNJobProcess;
  */
 public class JobProcessManager {
 
-	// Prepare a factory for converting parameters into processes
-	private static final JobProcessFactory FACTORY = new JobProcessFactory() {{
-		addMapping(PyNNJobParameters.class, PyNNJobProcess.class);
-	}};
+    // Prepare a factory for converting parameters into processes
+    private static final JobProcessFactory FACTORY = new JobProcessFactory() {{
+        addMapping(PyNNJobParameters.class, PyNNJobProcess.class);
+    }};
 
-	private static JobManagerInterface createJobManager(String url) {
-		ResteasyClient client = new ResteasyClientBuilder().build();
+    private static JobManagerInterface createJobManager(String url) {
+        ResteasyClient client = new ResteasyClientBuilder().build();
         ResteasyWebTarget target = client.target(url);
         return target.proxy(JobManagerInterface.class);
-	}
+    }
 
-	public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {
 
-		int id = -1;
-		JobManagerInterface jobManager = null;
+        int id = -1;
+        JobManagerInterface jobManager = null;
+        JobManagerLogWriter logWriter = null;
+        try {
 
-		try {
+            UnclosableInputStream in = new UnclosableInputStream(System.in);
 
-			UnclosableInputStream in = new UnclosableInputStream(System.in);
+            // Prepare to decode JSON parameters
+            ObjectMapper mapper = new ObjectMapper();
+            JobParametersDeserializer deserializer =
+                    new JobParametersDeserializer("jobType",
+                            FACTORY.getParameterTypes());
+            SimpleModule deserializerModule = new SimpleModule();
+            deserializerModule.addDeserializer(JobParameters.class,
+                    deserializer);
+            mapper.registerModule(deserializerModule);
 
-			// Prepare to decode JSON parameters
-			ObjectMapper mapper = new ObjectMapper();
-			JobParametersDeserializer deserializer =
-					new JobParametersDeserializer("jobType",
-							FACTORY.getParameterTypes());
-			SimpleModule deserializerModule = new SimpleModule();
-			deserializerModule.addDeserializer(JobParameters.class,
-					deserializer);
-			mapper.registerModule(deserializerModule);
+            // Read the machine from System.in
+            System.err.println("Reading specification");
+            JobSpecification specification = mapper.readValue(in,
+                    JobSpecification.class);
+            System.err.println("Running job " + specification.getId() + " on "
+                    + specification.getMachine().getMachineName() + " using "
+                    + specification.getParameters().getClass()
+                    + " reporting to " + specification.getUrl());
 
-			// Read the machine from System.in
-			System.err.println("Reading specification");
-			JobSpecification specification = mapper.readValue(in,
-					JobSpecification.class);
-			System.err.println("Running job " + specification.getId() + " on "
-					+ specification.getMachine().getMachineName() + " using "
-					+ specification.getParameters().getClass()
-					+ " reporting to " + specification.getUrl());
+            jobManager = createJobManager(specification.getUrl());
+            id = specification.getId();
 
-	        jobManager = createJobManager(specification.getUrl());
-	        id = specification.getId();
+            // Create a process to process the request
+            System.err.println("Creating process from parameters");
+            JobProcess<JobParameters> process =
+                    FACTORY.createProcess(specification.getParameters());
 
-			// Create a process to process the request
-	        System.err.println("Creating process from parameters");
-			JobProcess<JobParameters> process =
-					FACTORY.createProcess(specification.getParameters());
+            // Execute the process
+            logWriter = new JobManagerLogWriter(
+                    createJobManager(specification.getUrl()), id);
+            System.err.println("Executing process");
+            process.execute(specification.getMachine(),
+                    specification.getParameters(), logWriter);
+            logWriter.close();
 
-			// Execute the process
-			JobManagerLogWriter logWriter = new JobManagerLogWriter(
-					createJobManager(specification.getUrl()), id);
-			System.err.println("Executing process");
-			process.execute(specification.getMachine(),
-					specification.getParameters(), logWriter);
+            // Get the exit status
+            Status status = process.getStatus();
+            System.err.println("Process has finished with status " + status);
+            if (status == Status.Error) {
+                Throwable error = process.getError();
+                jobManager.setJobError(id, error.getMessage(),
+                        new RemoteStackTrace(error));
+            } else if (status == Status.Finished) {
+                List<File> outputs = process.getOutputs();
+                List<String> outputsAsStrings = new ArrayList<String>();
+                for (File output : outputs) {
+                    outputsAsStrings.add(output.getAbsolutePath());
+                }
+                jobManager.setJobFinished(id, "", outputsAsStrings);
+            } else {
+                throw new RuntimeException("Unknown status returned!");
+            }
 
-			// Get the exit status
-			Status status = process.getStatus();
-			System.err.println("Process has finished with status " + status);
-			if (status == Status.Error) {
-				Throwable error = process.getError();
-				jobManager.setJobError(id, error.getMessage(),
-						new RemoteStackTrace(error));
-			} else if (status == Status.Finished) {
-				List<File> outputs = process.getOutputs();
-				List<String> outputsAsStrings = new ArrayList<String>();
-				for (File output : outputs) {
-					outputsAsStrings.add(output.getAbsolutePath());
-				}
-				jobManager.setJobFinished(id, "", outputsAsStrings);
-			} else {
-				throw new RuntimeException("Unknown status returned!");
-			}
+            // Clean up
+            process.cleanup();
 
-			// Clean up
-			process.cleanup();
-
-		} catch (Throwable error) {
-			if (jobManager != null) {
-				try {
-					jobManager.setJobError(id, error.getMessage(),
-							new RemoteStackTrace(error));
-				} catch (Throwable t) {
-					t.printStackTrace();
-				}
-			} else {
-				error.printStackTrace();
-			}
-		}
-	}
+        } catch (Throwable error) {
+            if (jobManager != null) {
+                try {
+                    if (logWriter != null) {
+                        logWriter.close();
+                    }
+                    jobManager.setJobError(id, error.getMessage(),
+                            new RemoteStackTrace(error));
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            } else {
+                error.printStackTrace();
+            }
+        }
+    }
 }

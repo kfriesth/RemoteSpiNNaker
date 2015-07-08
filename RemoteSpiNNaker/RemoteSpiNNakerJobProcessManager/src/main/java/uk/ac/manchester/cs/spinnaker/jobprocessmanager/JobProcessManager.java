@@ -99,12 +99,12 @@ public class JobProcessManager {
                     outputsAsStrings.add(output.getAbsolutePath());
                 }
                 jobManager.setJobFinished(id, log, outputsAsStrings);
+
+                // Clean up
+                process.cleanup();
             } else {
                 throw new RuntimeException("Unknown status returned!");
             }
-
-            // Clean up
-            process.cleanup();
 
         } catch (Throwable error) {
             if (jobManager != null) {

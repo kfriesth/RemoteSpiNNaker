@@ -314,7 +314,7 @@ public class NMPIQueueManager extends Thread {
                         }
                     } catch (IOException e) {
                         logger.error("Error in executing job", e);
-                        setJobError(job.getId(), null, e);
+                        setJobError(job.getId(), null, null, e);
                     }
                 }
             } catch (Exception e) {
@@ -348,17 +348,8 @@ public class NMPIQueueManager extends Thread {
         }
     }
 
-    /**
-    * Marks a job as finished successfully
-    * @param id The id of the job
-    * @param logToAppend Any additional log messages to append to the existing
-    *        log (null if none)
-    * @param outputs The file outputs of the job (null if none)
-    * @throws MalformedURLException
-    */
-    public void setJobFinished(int id, String logToAppend, List<File> outputs)
+    private List<DataItem> getOutputData(List<File> outputs, int id)
             throws MalformedURLException {
-        logger.debug("Job " + id + " is finished");
         File idDirectory = new File(resultsDirectory, String.valueOf(id));
         idDirectory.mkdirs();
         List<DataItem> outputData = new ArrayList<DataItem>();
@@ -373,10 +364,25 @@ public class NMPIQueueManager extends Thread {
                     + outputUrl);
             }
         }
+        return outputData;
+    }
+
+    /**
+    * Marks a job as finished successfully
+    * @param id The id of the job
+    * @param logToAppend Any additional log messages to append to the existing
+    *        log (null if none)
+    * @param outputs The file outputs of the job (null if none)
+    * @throws MalformedURLException
+    */
+    public void setJobFinished(int id, String logToAppend, List<File> outputs)
+            throws MalformedURLException {
+        logger.debug("Job " + id + " is finished");
+
 
         Job job = getJob(id);
         job.setStatus("finished");
-        job.setOutputData(outputData);
+        job.setOutputData(getOutputData(outputs, id));
         if (logToAppend != null) {
             String existingLog = job.getLog();
             if (existingLog == null) {
@@ -400,8 +406,10 @@ public class NMPIQueueManager extends Thread {
     * @param logToAppend Any additional log messages to append to the existing
     *        log (null if none)
     * @param error The error details
+     * @throws MalformedURLException
     */
-    public void setJobError(int id, String logToAppend, Throwable error) {
+    public void setJobError(int id, String logToAppend, List<File> outputs,
+                            Throwable error) throws MalformedURLException {
         logger.debug("Job " + id + " finished with an error");
         StringWriter errors = new StringWriter();
         error.printStackTrace(new PrintWriter(errors));
@@ -426,6 +434,7 @@ public class NMPIQueueManager extends Thread {
         }
         job.setLog(existingLog);
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
+        job.setOutputData(getOutputData(outputs, id));
 
         logger.debug("Updating job on server");
         synchronized (queue) {

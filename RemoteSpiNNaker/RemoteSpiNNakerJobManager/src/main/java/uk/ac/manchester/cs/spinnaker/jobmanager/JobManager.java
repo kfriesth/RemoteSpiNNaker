@@ -227,7 +227,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     @Override
     public void setJobError(int id, String error, String logToAppend,
-            RemoteStackTrace stackTrace) {
+            List<String> outputs, RemoteStackTrace stackTrace) {
         logger.debug("Marking job " + id + " as error");
         synchronized (allocatedMachines) {
             SpinnakerMachine machine = allocatedMachines.remove(id);
@@ -241,9 +241,17 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                     element.getMethodName(), element.getFileName(),
                     element.getLineNumber());
         }
+        List<File> outputFiles = new ArrayList<File>();
+        for (String filename : outputs) {
+            outputFiles.add(new File(filename));
+        }
 
         Exception exception = new Exception(error);
         exception.setStackTrace(elements);
-        queueManager.setJobError(id, logToAppend, exception);
+        try {
+            queueManager.setJobError(id, logToAppend, outputFiles, exception);
+        } catch (MalformedURLException e) {
+            logger.error("Error creating URLs while updating job", e);
+        }
     }
 }

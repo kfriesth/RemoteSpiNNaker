@@ -88,16 +88,16 @@ public class JobProcessManager {
             // Get the exit status
             Status status = process.getStatus();
             System.err.println("Process has finished with status " + status);
+            List<File> outputs = process.getOutputs();
+            List<String> outputsAsStrings = new ArrayList<String>();
+            for (File output : outputs) {
+                outputsAsStrings.add(output.getAbsolutePath());
+            }
             if (status == Status.Error) {
                 Throwable error = process.getError();
                 jobManager.setJobError(id, error.getMessage(), log,
-                        new RemoteStackTrace(error));
+                        outputsAsStrings, new RemoteStackTrace(error));
             } else if (status == Status.Finished) {
-                List<File> outputs = process.getOutputs();
-                List<String> outputsAsStrings = new ArrayList<String>();
-                for (File output : outputs) {
-                    outputsAsStrings.add(output.getAbsolutePath());
-                }
                 jobManager.setJobFinished(id, log, outputsAsStrings);
 
                 // Clean up
@@ -114,6 +114,7 @@ public class JobProcessManager {
                         log = logWriter.getLog();
                     }
                     jobManager.setJobError(id, error.getMessage(), log,
+                            new ArrayList<String>(),
                             new RemoteStackTrace(error));
                 } catch (Throwable t) {
                     t.printStackTrace();

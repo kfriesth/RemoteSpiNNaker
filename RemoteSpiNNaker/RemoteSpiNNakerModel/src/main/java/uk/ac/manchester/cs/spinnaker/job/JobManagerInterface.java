@@ -29,5 +29,6 @@ public interface JobManagerInterface {
     public void setJobError(@PathParam("id") int id,
             @QueryParam("error") String error,
             @QueryParam("logToAppend") String logToAppend,
+            @QueryParam("outputFilename") List<String> outputs,
             RemoteStackTrace stackTrace);
 }

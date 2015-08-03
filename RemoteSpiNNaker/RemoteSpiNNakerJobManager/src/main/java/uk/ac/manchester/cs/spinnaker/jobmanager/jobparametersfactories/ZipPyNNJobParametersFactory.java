@@ -8,6 +8,7 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.rauschig.jarchivelib.ArchiveFormat;
 import org.rauschig.jarchivelib.Archiver;
@@ -53,7 +54,8 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             File inputPath = new File(url.getPath());
             URLConnection urlConnection = url.openConnection();
             urlConnection.setDoOutput(true);
-            File output = new File(workingDirectory, inputPath.getName());
+            File output = new File(
+                workingDirectory, UUID.randomUUID().toString() + ".tmp");
             Files.copy(urlConnection.getInputStream(), output.toPath());
 
             // Test if there is a recognised archive

@@ -12,6 +12,7 @@ import java.util.Map;
 import org.rauschig.jarchivelib.ArchiveFormat;
 import org.rauschig.jarchivelib.Archiver;
 import org.rauschig.jarchivelib.ArchiverFactory;
+import org.rauschig.jarchivelib.CompressionType;
 import org.rauschig.jarchivelib.FileType;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
@@ -74,9 +75,29 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
                     archiver = ArchiverFactory.createArchiver(format);
                     archiver.extract(output, workingDirectory);
                     archiveExtracted = true;
+                    break;
                 } catch (IOException e) {
 
                     // Ignore - try the next
+                }
+            }
+
+            // If the archive was still not extracted, try again with
+            // compressors
+            if (!archiveExtracted) {
+                for (ArchiveFormat format : ArchiveFormat.values()) {
+                    for (CompressionType type : CompressionType.values()) {
+                        try {
+                            archiver = ArchiverFactory.createArchiver(
+                                format, type);
+                            archiver.extract(output, workingDirectory);
+                            archiveExtracted = true;
+                            break;
+                        } catch (IOException e) {
+
+                            // Ignore - try the next
+                        }
+                    }
                 }
             }
 

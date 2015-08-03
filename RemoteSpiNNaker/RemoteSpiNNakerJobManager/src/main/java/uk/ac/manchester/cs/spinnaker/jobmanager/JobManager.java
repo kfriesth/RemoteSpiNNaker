@@ -160,6 +160,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             }
         }
         if (parameters == null) {
+            synchronized (allocatedMachines) {
+                allocatedMachines.remove(id);
+                machineManager.releaseMachine(machine);
+            }
             if (!errors.isEmpty()) {
                 StringBuilder problemBuilder = new StringBuilder();
                 problemBuilder.append("The job type was recognised by at least"

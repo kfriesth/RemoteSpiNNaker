@@ -22,6 +22,7 @@ import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories.DirectPyNNJobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories.GitPyNNJobParametersFactory;
+import uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories.ZipPyNNJobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
@@ -90,6 +91,7 @@ public class RemoteSpinnakerBeans {
             NoSuchAlgorithmException, KeyManagementException {
         List<JobParametersFactory> factories =
                 new ArrayList<JobParametersFactory>();
+        factories.add(new ZipPyNNJobParametersFactory());
         factories.add(new GitPyNNJobParametersFactory());
         factories.add(new DirectPyNNJobParametersFactory());
         return new JobManager(machineManager(), queueManager(),

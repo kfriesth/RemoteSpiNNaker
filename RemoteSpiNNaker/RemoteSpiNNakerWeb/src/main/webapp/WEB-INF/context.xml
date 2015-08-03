@@ -18,12 +18,5 @@
         <property name="location"><value>${remotespinnaker.properties.location}</value></property>
     </bean>
 
-    <bean id="factDao" class="uk.ac.nactem.eupmc.simplefactservice.dao.FactDaoImpl"/>
-
-    <bean id="factupload" class="uk.ac.nactem.eupmc.simplefactservice.DocFactUploadImpl">
-        <constructor-arg><value>${requiredKey}</value></constructor-arg>
-        <constructor-arg><ref bean="factDao"/></constructor-arg>
-    </bean>
-
     <context:annotation-config />
 </beans>

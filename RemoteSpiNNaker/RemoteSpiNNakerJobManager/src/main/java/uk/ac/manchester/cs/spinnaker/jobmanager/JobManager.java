@@ -151,6 +151,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 parameters = factory.getJobParameters(experimentDescription,
                         inputData, hardwareConfig, workingDirectory,
                         deleteJobOnExit);
+                break;
             } catch (UnsupportedJobException e) {
 
                 // Do Nothing

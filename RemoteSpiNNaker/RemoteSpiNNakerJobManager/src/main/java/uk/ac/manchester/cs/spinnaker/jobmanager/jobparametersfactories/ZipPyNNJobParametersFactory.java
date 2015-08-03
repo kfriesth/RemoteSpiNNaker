@@ -14,7 +14,6 @@ import org.rauschig.jarchivelib.ArchiveFormat;
 import org.rauschig.jarchivelib.Archiver;
 import org.rauschig.jarchivelib.ArchiverFactory;
 import org.rauschig.jarchivelib.CompressionType;
-import org.rauschig.jarchivelib.FileType;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
@@ -87,8 +86,11 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             // If the archive was still not extracted, try again with
             // compressors
             if (!archiveExtracted) {
+                CompressionType[] typesSupported = new CompressionType[]{
+                    CompressionType.BZIP2, CompressionType.GZIP
+                };
                 for (ArchiveFormat format : ArchiveFormat.values()) {
-                    for (CompressionType type : CompressionType.values()) {
+                    for (CompressionType type : typesSupported) {
                         try {
                             archiver = ArchiverFactory.createArchiver(
                                 format, type);

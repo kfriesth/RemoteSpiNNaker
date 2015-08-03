@@ -8,8 +8,11 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+
+import org.rauschig.jarchivelib.ArchiveFormat;
 import org.rauschig.jarchivelib.Archiver;
 import org.rauschig.jarchivelib.ArchiverFactory;
+import org.rauschig.jarchivelib.FileType;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
@@ -44,25 +47,47 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             throw new JobParametersFactoryException("The URL is malformed", e);
         }
 
-        // Test if there is a recognised archive
-        File inputPath = new File(url.getPath());
-        Archiver archiver = null;
-        try {
-            archiver = ArchiverFactory.createArchiver(inputPath);
-        } catch (IllegalArgumentException e) {
-
-            // If this happens, the archive cannot be extracted
-            throw new UnsupportedJobException();
-        }
-
         // Try to get the file and extract it
         try {
+            File inputPath = new File(url.getPath());
             URLConnection urlConnection = url.openConnection();
             urlConnection.setDoOutput(true);
             File output = new File(workingDirectory, inputPath.getName());
             Files.copy(urlConnection.getInputStream(), output.toPath());
-            archiver.extract(output, workingDirectory);
+
+            // Test if there is a recognised archive
+            Archiver archiver = null;
+            boolean archiveExtracted = false;
+            try {
+                archiver = ArchiverFactory.createArchiver(inputPath);
+                archiver.extract(output, workingDirectory);
+                archiveExtracted = true;
+            } catch (IllegalArgumentException e) {
+
+                // Ignore - will be handled next
+            }
+
+            // If the archive wasn't extracted by the last line, try the
+            // known formats
+            for (ArchiveFormat format : ArchiveFormat.values()) {
+                try {
+                    archiver = ArchiverFactory.createArchiver(format);
+                    archiver.extract(output, workingDirectory);
+                    archiveExtracted = true;
+                } catch (IOException e) {
+
+                    // Ignore - try the next
+                }
+            }
+
+            // Delete the archive
             output.delete();
+
+            // If the archive wasn't extracted, throw an error
+            if (!archiveExtracted) {
+                throw new JobParametersFactoryException(
+                    "The URL could not be decompressed with any known method");
+            }
 
             File scriptFile = new File(workingDirectory,
                     DEFAULT_SCRIPT_NAME);

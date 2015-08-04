@@ -1,24 +1,27 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class DataItem {
 
-	private String url = null;
+    private String url = null;
 
-	public DataItem() {
+    public DataItem() {
 
-		// Does Nothing
-	}
+        // Does Nothing
+    }
 
-	public DataItem(String url) {
-		this.url = url;
-	}
+    public DataItem(String url) {
+        this.url = url;
+    }
 
-	public String getUrl() {
-		return url;
-	}
+    public String getUrl() {
+        return url;
+    }
 
-	public void setUrl(String url) {
-		this.url = url;
-	}
+    public void setUrl(String url) {
+        this.url = url;
+    }
 
 }

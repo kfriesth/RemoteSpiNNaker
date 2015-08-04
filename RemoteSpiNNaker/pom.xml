@@ -26,6 +26,5 @@
         <module>RemoteSpiNNakerMachineManager</module>
         <module>RemoteSpiNNakerJobManager</module>
         <module>RemoteSpiNNakerWeb</module>
-        <module>?</module>
     </modules>
 </project>

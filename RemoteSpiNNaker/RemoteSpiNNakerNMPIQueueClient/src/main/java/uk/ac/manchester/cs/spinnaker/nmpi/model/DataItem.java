@@ -1,8 +1,5 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-@JsonIgnoreProperties(ignoreUnknown=true)
 public class DataItem {
 
     private String url = null;

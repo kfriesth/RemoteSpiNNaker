@@ -52,7 +52,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
         try {
             File inputPath = new File(url.getPath());
             URLConnection urlConnection = url.openConnection();
-            urlConnection.setDoOutput(true);
+            urlConnection.setDoInput(true);
             File output = new File(
                 workingDirectory, UUID.randomUUID().toString() + ".tmp");
             Files.copy(urlConnection.getInputStream(), output.toPath());

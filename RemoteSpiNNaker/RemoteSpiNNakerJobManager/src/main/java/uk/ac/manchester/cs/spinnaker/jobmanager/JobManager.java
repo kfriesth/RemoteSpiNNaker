@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -128,8 +130,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     @Override
     public void addJob(int id, String experimentDescription,
             List<String> inputData, Map<String, Object> hardwareConfig,
-            boolean deleteJobOnExit)
-                throws IOException {
+            boolean deleteJobOnExit) throws IOException {
         logger.info("New job " + id);
 
         // Get a machine to run the job on
@@ -180,6 +181,18 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             }
             throw new IOException(
                     "The job did not appear to be supported on this system");
+        }
+
+        // Get any requested input files
+        if (inputData != null) {
+            for (String input : inputData) {
+                URL inputUrl = new URL(input);
+                File inputPath = new File(inputUrl.getPath());
+                URLConnection urlConnection = inputUrl.openConnection();
+                urlConnection.setDoInput(true);
+                File output = new File(workingDirectory, inputPath.getName());
+                Files.copy(urlConnection.getInputStream(), output.toPath());
+            }
         }
 
         JobExecuter executer = new JobExecuter(getJavaExec(),

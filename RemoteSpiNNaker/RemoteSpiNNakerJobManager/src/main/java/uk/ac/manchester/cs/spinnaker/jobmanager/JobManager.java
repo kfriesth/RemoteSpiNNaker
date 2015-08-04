@@ -7,8 +7,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -140,78 +138,87 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
 
-        // Get job parameters if possible
-        File workingDirectory = File.createTempFile("job", ".tmp");
-        workingDirectory.delete();
-        workingDirectory.mkdirs();
-        JobParameters parameters = null;
-        Map<String, JobParametersFactoryException> errors =
-                new HashMap<String, JobParametersFactoryException>();
-        for (JobParametersFactory factory : jobParametersFactories) {
-            try {
-                parameters = factory.getJobParameters(experimentDescription,
-                        inputData, hardwareConfig, workingDirectory,
-                        deleteJobOnExit);
-                break;
-            } catch (UnsupportedJobException e) {
+        try {
 
-                // Do Nothing
-            } catch (JobParametersFactoryException e) {
-                errors.put(factory.getClass().getSimpleName(), e);
+            // Get job parameters if possible
+            File workingDirectory = File.createTempFile("job", ".tmp");
+            workingDirectory.delete();
+            workingDirectory.mkdirs();
+            JobParameters parameters = null;
+            Map<String, JobParametersFactoryException> errors =
+                    new HashMap<String, JobParametersFactoryException>();
+            for (JobParametersFactory factory : jobParametersFactories) {
+                try {
+                    parameters = factory.getJobParameters(experimentDescription,
+                            inputData, hardwareConfig, workingDirectory,
+                            deleteJobOnExit);
+                    break;
+                } catch (UnsupportedJobException e) {
+
+                    // Do Nothing
+                } catch (JobParametersFactoryException e) {
+                    errors.put(factory.getClass().getSimpleName(), e);
+                }
             }
-        }
-        if (parameters == null) {
+            if (parameters == null) {
+                if (!errors.isEmpty()) {
+                    StringBuilder problemBuilder = new StringBuilder();
+                    problemBuilder.append(
+                        "The job type was recognised by at least"
+                        + " one factory, but could not be decoded.  The errors "
+                        + " are as follows:\n");
+                    for (String key : errors.keySet()) {
+                        JobParametersFactoryException error = errors.get(key);
+                        problemBuilder.append(key);
+                        problemBuilder.append(": ");
+                        problemBuilder.append(error.getMessage());
+                        problemBuilder.append('\n');
+                    }
+                    throw new IOException(problemBuilder.toString());
+                }
+                throw new IOException(
+                    "The job did not appear to be supported on this system");
+            }
+
+            // Get any requested input files
+            if (inputData != null) {
+                for (String input : inputData) {
+                    URL inputUrl = new URL(input);
+                    FileDownloader.downloadFile(
+                        inputUrl, workingDirectory, null);
+                }
+            }
+
+            JobExecuter executer = new JobExecuter(getJavaExec(),
+                    jobProcessManagerClasspath,
+                    JOB_PROCESS_MANAGER_MAIN_CLASS,
+                    new ArrayList<String>(), workingDirectory);
+            executer.start();
+            OutputStream output = new UnclosableOutputStream(
+                    executer.getProcessOutputStream());
+
+            // Send the job executed the details of what to run
+            ObjectMapper mapper = new ObjectMapper();
+            JobParametersSerializer serializer =
+                    new JobParametersSerializer("jobType");
+            SimpleModule serializerModule = new SimpleModule();
+            serializerModule.addSerializer(JobParameters.class, serializer);
+            mapper.registerModule(serializerModule);
+
+            logger.debug("Writing specification");
+            mapper.writeValue(output, new JobSpecification(machine, parameters, id,
+                    baseUrl.toString()));
+            output.flush();
+            logger.debug("Finished writing");
+        } catch (IOException|RuntimeException e) {
+
+            // Ensure that the allocated machine is released
             synchronized (allocatedMachines) {
                 allocatedMachines.remove(id);
                 machineManager.releaseMachine(machine);
             }
-            if (!errors.isEmpty()) {
-                StringBuilder problemBuilder = new StringBuilder();
-                problemBuilder.append("The job type was recognised by at least"
-                        + " one factory, but could not be decoded.  The errors "
-                        + " are as follows:\n");
-                for (String key : errors.keySet()) {
-                    JobParametersFactoryException error = errors.get(key);
-                    problemBuilder.append(key);
-                    problemBuilder.append(": ");
-                    problemBuilder.append(error.getMessage());
-                    problemBuilder.append('\n');
-                }
-                throw new IOException(problemBuilder.toString());
-            }
-            throw new IOException(
-                    "The job did not appear to be supported on this system");
+            throw e;
         }
-
-        // Get any requested input files
-        if (inputData != null) {
-            for (String input : inputData) {
-                URL inputUrl = new URL(input);
-                FileDownloader.downloadFile(inputUrl, workingDirectory, null);
-            }
-        }
-
-        JobExecuter executer = new JobExecuter(getJavaExec(),
-                jobProcessManagerClasspath,
-                JOB_PROCESS_MANAGER_MAIN_CLASS,
-                new ArrayList<String>(), workingDirectory);
-        executer.start();
-        OutputStream output = new UnclosableOutputStream(
-                executer.getProcessOutputStream());
-
-        // Send the job executed the details of what to run
-        ObjectMapper mapper = new ObjectMapper();
-        JobParametersSerializer serializer =
-                new JobParametersSerializer("jobType");
-        SimpleModule serializerModule = new SimpleModule();
-        serializerModule.addSerializer(JobParameters.class, serializer);
-        mapper.registerModule(serializerModule);
-
-        logger.debug("Writing specification");
-        mapper.writeValue(output, new JobSpecification(machine, parameters, id,
-                baseUrl.toString()));
-        output.flush();
-        logger.debug("Finished writing");
     }
 
     @Override

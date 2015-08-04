@@ -187,11 +187,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         if (inputData != null) {
             for (String input : inputData) {
                 URL inputUrl = new URL(input);
-                File inputPath = new File(inputUrl.getPath());
-                URLConnection urlConnection = inputUrl.openConnection();
-                urlConnection.setDoInput(true);
-                File output = new File(workingDirectory, inputPath.getName());
-                Files.copy(urlConnection.getInputStream(), output.toPath());
+                FileDownloader.downloadFile(inputUrl, workingDirectory, null);
             }
         }
 

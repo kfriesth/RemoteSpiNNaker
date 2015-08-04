@@ -17,6 +17,7 @@ import org.rauschig.jarchivelib.CompressionType;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
+import uk.ac.manchester.cs.spinnaker.jobmanager.FileDownloader;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactoryException;
 import uk.ac.manchester.cs.spinnaker.jobmanager.UnsupportedJobException;
@@ -50,18 +51,14 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 
         // Try to get the file and extract it
         try {
-            File inputPath = new File(url.getPath());
-            URLConnection urlConnection = url.openConnection();
-            urlConnection.setDoInput(true);
-            File output = new File(
-                workingDirectory, UUID.randomUUID().toString() + ".tmp");
-            Files.copy(urlConnection.getInputStream(), output.toPath());
+            File output = FileDownloader.downloadFile(
+                url, workingDirectory, null);
 
             // Test if there is a recognised archive
             Archiver archiver = null;
             boolean archiveExtracted = false;
             try {
-                archiver = ArchiverFactory.createArchiver(inputPath);
+                archiver = ArchiverFactory.createArchiver(output);
                 archiver.extract(output, workingDirectory);
                 archiveExtracted = true;
             } catch (IllegalArgumentException e) {

@@ -13,9 +13,8 @@ public class FileDownloader {
 
     private static String getFileName(String contentDisposition) {
         if (contentDisposition != null) {
-            contentDisposition = contentDisposition.toLowerCase();
-            if (contentDisposition.startsWith("form-data")
-                    || contentDisposition.startsWith("attachment")) {
+            String cdl = contentDisposition.toLowerCase();
+            if (cdl.startsWith("form-data") || cdl.startsWith("attachment")) {
                 ParameterParser parser = new ParameterParser();
                 parser.setLowerCaseNames(true);
                 Map<String, String> params = parser.parse(

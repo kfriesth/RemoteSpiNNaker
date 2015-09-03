@@ -19,6 +19,8 @@
                     <connectors>
                         <connector implementation="org.eclipse.jetty.server.nio.SelectChannelConnector">
                             <port>9090</port>
+                            <requestBufferSize>8388608</requestBufferSize>
+                            <requestHeaderSize>8388608</requestHeaderSize>
                         </connector>
                     </connectors>
                     <webAppConfig>

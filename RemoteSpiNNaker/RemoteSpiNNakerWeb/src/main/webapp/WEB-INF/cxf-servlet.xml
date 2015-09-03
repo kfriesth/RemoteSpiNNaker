@@ -21,6 +21,9 @@
         <cxf:features>
             <!-- <cxf:logging/> -->
         </cxf:features>
+        <cxf:properties>
+            <entry key="bus.io.CachedOutputStream.MaxSize" value="-1"/>
+        </cxf:properties>
     </cxf:bus>
 
     <jaxrs:server id="restservice" address="/rest" >

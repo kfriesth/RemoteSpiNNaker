@@ -189,7 +189,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 }
             }
 
-            JobExecuter executer = new JobExecuter(getJavaExec(),
+            JobExecuter executer = new JobExecuter(this, id, getJavaExec(),
                     jobProcessManagerClasspath,
                     JOB_PROCESS_MANAGER_MAIN_CLASS,
                     new ArrayList<String>(), workingDirectory);
@@ -273,6 +273,30 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             queueManager.setJobError(id, logToAppend, outputFiles, exception);
         } catch (MalformedURLException e) {
             logger.error("Error creating URLs while updating job", e);
+        }
+    }
+
+    public void setJobExited(int id, String logToAppend) {
+        logger.debug("Job " + id + " has exited ");
+
+        boolean alreadyGone = false;
+        synchronized (allocatedMachines) {
+            if (allocatedMachines.containsKey(id)) {
+                SpinnakerMachine machine = allocatedMachines.remove(id);
+                machineManager.releaseMachine(machine);
+            } else {
+                alreadyGone = true;
+            }
+        }
+
+        if (!alreadyGone) {
+            logger.debug("Job " + id + " has not exited cleanly");
+            try {
+                queueManager.setJobError(id, logToAppend, null,
+                    new Exception("Job did not finish cleanly"));
+            } catch (MalformedURLException e) {
+                logger.error("Error creating URLs while updating job", e);
+            }
         }
     }
 }

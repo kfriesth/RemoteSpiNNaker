@@ -1,6 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -15,126 +17,147 @@ import org.apache.commons.logging.LogFactory;
  */
 public class JobExecuter extends Thread {
 
-	private File javaExec = null;
+    private JobManager jobManager = null;
 
-	private List<File> classPath = null;
+    private int id = 0;
 
-	private String mainClass = null;
+    private File javaExec = null;
 
-	private List<String> arguments = null;
+    private List<File> classPath = null;
 
-	private File workingDirectory = null;
+    private String mainClass = null;
 
-	private File outputLog = File.createTempFile("exec", ".log");
+    private List<String> arguments = null;
 
-	private JobOutputPipe pipe = null;
+    private File workingDirectory = null;
 
-	private Process process = null;
+    private File outputLog = File.createTempFile("exec", ".log");
 
-	private Log logger = LogFactory.getLog(getClass());
+    private JobOutputPipe pipe = null;
 
-	private IOException startException = null;
+    private Process process = null;
 
-	/**
-	 * Create a JobExecuter
-	 * @param javaExec The Java executable
-	 * @param classPath The classpath of the job
-	 * @param mainClass The main class to run
-	 * @param arguments The arguments to use
-	 * @param workingDirectory The working directory to run in
-	 * @throws IOException If there is an error creating the log file
-	 */
-	public JobExecuter(File javaExec, List<File> classPath, String mainClass,
-			List<String> arguments, File workingDirectory)
-			throws IOException {
-		this.javaExec = javaExec;
-		this.classPath = classPath;
-		this.mainClass = mainClass;
-		this.arguments = arguments;
-		this.workingDirectory = workingDirectory;
-	}
+    private Log logger = LogFactory.getLog(getClass());
 
-	/**
-	 * Runs the external job
-	 * @throws IOException If there is an error starting the job
-	 */
-	public void run() {
-		List<String> command = new ArrayList<String>();
-		command.add(javaExec.getAbsolutePath());
+    private IOException startException = null;
 
-		StringBuilder classPathBuilder = new StringBuilder();
-		for (File file : classPath) {
-			if (classPathBuilder.length() != 0) {
-				classPathBuilder.append(File.pathSeparatorChar);
-			}
-			classPathBuilder.append(file);
-		}
-		command.add("-cp");
-		command.add(classPathBuilder.toString());
-		logger.debug("Classpath: " + classPathBuilder.toString());
+    /**
+    * Create a JobExecuter
+    * @param javaExec The Java executable
+    * @param classPath The classpath of the job
+    * @param mainClass The main class to run
+    * @param arguments The arguments to use
+    * @param workingDirectory The working directory to run in
+    * @throws IOException If there is an error creating the log file
+    */
+    public JobExecuter(JobManager jobManager, int id, File javaExec,
+            List<File> classPath, String mainClass, List<String> arguments,
+            File workingDirectory) throws IOException {
+        this.jobManager = jobManager;
+        this.id = id;
+        this.javaExec = javaExec;
+        this.classPath = classPath;
+        this.mainClass = mainClass;
+        this.arguments = arguments;
+        this.workingDirectory = workingDirectory;
+    }
 
-		command.add(mainClass);
-		logger.debug("Main command: " + mainClass);
-		for (String argument : arguments) {
-			command.add(argument);
-			logger.debug("Argument: " + argument);
-		}
+    /**
+    * Runs the external job
+    * @throws IOException If there is an error starting the job
+    */
+    public void run() {
+        List<String> command = new ArrayList<String>();
+        command.add(javaExec.getAbsolutePath());
 
-		ProcessBuilder builder = new ProcessBuilder(command);
-		builder.directory(workingDirectory);
-		logger.debug("Working directory: " + workingDirectory);
-		builder.redirectErrorStream(true);
-		synchronized (this) {
-			try {
-			    logger.debug("Starting execution process");
-			    process = builder.start();
-			    logger.debug("Starting pipe from process");
-				pipe = new JobOutputPipe(process.getInputStream(), outputLog);
-				pipe.start();
-				notifyAll();
-			} catch (IOException e) {
-				logger.error("Error running external job", e);
-				startException = e;
-				notifyAll();
-			}
-		}
+        StringBuilder classPathBuilder = new StringBuilder();
+        for (File file : classPath) {
+            if (classPathBuilder.length() != 0) {
+                classPathBuilder.append(File.pathSeparatorChar);
+            }
+            classPathBuilder.append(file);
+        }
+        command.add("-cp");
+        command.add(classPathBuilder.toString());
+        logger.debug("Classpath: " + classPathBuilder.toString());
 
-		try {
-			logger.debug("Waiting for process to finish");
-			process.waitFor();
-		} catch (InterruptedException e) {
-			// Do Nothing
-		}
-		logger.debug("Process finished, closing pipe");
-	    pipe.close();
-	}
+        command.add(mainClass);
+        logger.debug("Main command: " + mainClass);
+        for (String argument : arguments) {
+            command.add(argument);
+            logger.debug("Argument: " + argument);
+        }
 
-	/**
-	 * Gets an OutputStream which writes to the process stdin
-	 * @return An OutputStream
-	 */
-	public OutputStream getProcessOutputStream() throws IOException {
-		synchronized (this) {
-			while ((process == null) && (startException == null)) {
-				try {
-					wait();
-				} catch (InterruptedException e) {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDirectory);
+        logger.debug("Working directory: " + workingDirectory);
+        builder.redirectErrorStream(true);
+        synchronized (this) {
+            try {
+                logger.debug("Starting execution process");
+                process = builder.start();
+                logger.debug("Starting pipe from process");
+                pipe = new JobOutputPipe(process.getInputStream(), outputLog);
+                pipe.start();
+                notifyAll();
+            } catch (IOException e) {
+                logger.error("Error running external job", e);
+                startException = e;
+                notifyAll();
+            }
+        }
 
-					// Do Nothing
-				}
-			}
-			if (startException != null) {
-				throw startException;
-			}
-		    return process.getOutputStream();
-		}
-	}
+        try {
+            logger.debug("Waiting for process to finish");
+            process.waitFor();
+        } catch (InterruptedException e) {
+            // Do Nothing
+        }
+        logger.debug("Process finished, closing pipe");
+        pipe.close();
 
-	/**
-	 * Gets the location of the process log file
-	 * @return The location of the log file
-	 */
-	public File getLogFile() {
-		return outputLog;
-	}
+        String logToAppend = "";
+        try {
+            BufferedReader reader = new BufferedReader(
+                new FileReader(outputLog));
+            String line = reader.readLine();
+            while (line != null) {
+                logToAppend += line + "\n";
+                line = reader.readLine();
+            }
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        jobManager.setJobExited(id, logToAppend);
+    }
+
+    /**
+    * Gets an OutputStream which writes to the process stdin
+    * @return An OutputStream
+    */
+    public OutputStream getProcessOutputStream() throws IOException {
+        synchronized (this) {
+            while ((process == null) && (startException == null)) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+
+                    // Do Nothing
+                }
+            }
+            if (startException != null) {
+                throw startException;
+            }
+            return process.getOutputStream();
+        }
+    }
+
+    /**
+    * Gets the location of the process log file
+    * @return The location of the log file
+    */
+    public File getLogFile() {
+        return outputLog;
+    }
 }

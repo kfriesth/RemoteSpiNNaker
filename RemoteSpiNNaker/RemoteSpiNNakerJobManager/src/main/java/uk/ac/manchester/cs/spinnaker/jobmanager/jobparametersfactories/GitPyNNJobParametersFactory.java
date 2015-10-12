@@ -40,8 +40,8 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
             CloneCommand clone = Git.cloneRepository();
             clone.setURI(experimentDescription);
             clone.setDirectory(workingDirectory);
-            clone.call();
             clone.setCloneSubmodules(true);
+            clone.call();
 
             File scriptFile = new File(workingDirectory,
                     DEFAULT_SCRIPT_NAME);

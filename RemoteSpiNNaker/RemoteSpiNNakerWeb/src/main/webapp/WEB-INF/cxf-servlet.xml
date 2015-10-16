@@ -31,10 +31,6 @@
         <jaxrs:providers>
             <bean class="com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider"/>
         </jaxrs:providers>
-        <jaxrs:extensionMappings>
-            <entry key="json" value="application/json"/>
-            <entry key="xml" value="text/xml"/>
-        </jaxrs:extensionMappings>
         <jaxrs:properties>
         </jaxrs:properties>
         <jaxrs:inInterceptors>

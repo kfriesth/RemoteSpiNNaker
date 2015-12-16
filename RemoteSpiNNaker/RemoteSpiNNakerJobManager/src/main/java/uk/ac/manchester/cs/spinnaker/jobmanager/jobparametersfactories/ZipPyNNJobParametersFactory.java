@@ -124,6 +124,9 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
         } catch (IOException e) {
             throw new JobParametersFactoryException(
                 "Error in communication or extraction", e);
+        } catch (Throwable e) {
+            throw new JobParametersFactoryException(
+                "General error with zip extraction", e);
         }
 
     }

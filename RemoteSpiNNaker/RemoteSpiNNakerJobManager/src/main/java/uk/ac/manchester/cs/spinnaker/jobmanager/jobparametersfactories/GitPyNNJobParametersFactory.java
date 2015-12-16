@@ -62,6 +62,9 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
             throw new JobParametersFactoryException("Transport failed", e);
         } catch (GitAPIException e) {
             throw new JobParametersFactoryException("Error using Git", e);
+        } catch (Throwable e) {
+            throw new JobParametersFactoryException(
+                "General error getting git repository", e);
         }
 
     }

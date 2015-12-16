@@ -39,6 +39,9 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
                     SCRIPT_NAME, hardwareConfiguration, deleteJobOnExit);
         } catch (IOException e) {
             throw new JobParametersFactoryException("Error storing script", e);
+        } catch (Throwable e) {
+            throw new JobParametersFactoryException(
+                "General error with PyNN Script", e);
         }
     }
 

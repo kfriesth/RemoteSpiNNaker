@@ -6,6 +6,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.ini4j.ConfigParser;
 
@@ -87,10 +89,14 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             gatherFiles(workingDirectory, existingFiles);
 
             // Execute the program
+            Matcher scriptMatcher = Pattern.compile(
+                "([^\"]\\S*|\".+?\")\\s*").matcher(parameters.getScript());
             List<String> command = new ArrayList<String>();
             command.add("python");
-            command.add(parameters.getScript().replace(
-                "{system}", "spiNNaker"));
+            while (scriptMatcher.find()) {
+                command.add(scriptMatcher.group(1).replace(
+                    "{system}", "spiNNaker"));
+            }
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(workingDirectory);
             builder.redirectErrorStream(true);

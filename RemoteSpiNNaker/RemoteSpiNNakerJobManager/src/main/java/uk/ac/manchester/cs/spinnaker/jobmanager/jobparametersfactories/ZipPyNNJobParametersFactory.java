@@ -28,7 +28,8 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 
     @Override
     public JobParameters getJobParameters(String experimentDescription,
-            List<String> inputData, Map<String, Object> hardwareConfiguration,
+            String command, List<String> inputData,
+            Map<String, Object> hardwareConfiguration,
             File workingDirectory, boolean deleteJobOnExit)
             throws UnsupportedJobException, JobParametersFactoryException {
 
@@ -108,17 +109,13 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
                     "The URL could not be decompressed with any known method");
             }
 
-            File scriptFile = new File(workingDirectory,
-                    DEFAULT_SCRIPT_NAME);
-            if (!scriptFile.exists()) {
-                deleteDirectory(workingDirectory);
-                throw new JobParametersFactoryException(
-                        "Repository doesn't appear to contain a script called "
-                        + DEFAULT_SCRIPT_NAME);
+            String script = DEFAULT_SCRIPT_NAME + SYSTEM_ARG;
+            if (command != null && !command.equals("")) {
+                script = command;
             }
 
             PyNNJobParameters parameters = new PyNNJobParameters(
-                    workingDirectory.getAbsolutePath(), DEFAULT_SCRIPT_NAME,
+                    workingDirectory.getAbsolutePath(), script,
                     hardwareConfiguration, deleteJobOnExit);
             return parameters;
         } catch (IOException e) {
@@ -128,18 +125,5 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             throw new JobParametersFactoryException(
                 "General error with zip extraction", e);
         }
-
     }
-
-    private void deleteDirectory(File directory) {
-        for (File file : directory.listFiles()) {
-            if (file.isDirectory()) {
-                deleteDirectory(file);
-            } else {
-                file.delete();
-            }
-        }
-        directory.delete();
-    }
-
 }

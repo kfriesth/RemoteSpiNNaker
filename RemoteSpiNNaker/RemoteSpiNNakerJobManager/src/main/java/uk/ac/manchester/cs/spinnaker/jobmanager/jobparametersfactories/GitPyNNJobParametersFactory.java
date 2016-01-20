@@ -25,7 +25,8 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
 
     @Override
     public JobParameters getJobParameters(String experimentDescription,
-            List<String> inputData, Map<String, Object> hardwareConfiguration,
+            String command, List<String> inputData,
+            Map<String, Object> hardwareConfiguration,
             File workingDirectory, boolean deleteJobOnExit)
             throws UnsupportedJobException, JobParametersFactoryException {
 
@@ -43,17 +44,13 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
             clone.setCloneSubmodules(true);
             clone.call();
 
-            File scriptFile = new File(workingDirectory,
-                    DEFAULT_SCRIPT_NAME);
-            if (!scriptFile.exists()) {
-                deleteDirectory(workingDirectory);
-                throw new JobParametersFactoryException(
-                        "Repository doesn't appear to contain a script called "
-                        + DEFAULT_SCRIPT_NAME);
+            String script = DEFAULT_SCRIPT_NAME + SYSTEM_ARG;
+            if (command != null && !command.equals("")) {
+                script = command;
             }
 
             PyNNJobParameters parameters = new PyNNJobParameters(
-                    workingDirectory.getAbsolutePath(), DEFAULT_SCRIPT_NAME,
+                    workingDirectory.getAbsolutePath(), script,
                     hardwareConfiguration, deleteJobOnExit);
             return parameters;
         } catch (InvalidRemoteException e) {
@@ -66,18 +63,5 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
             throw new JobParametersFactoryException(
                 "General error getting git repository", e);
         }
-
     }
-
-    private void deleteDirectory(File directory) {
-        for (File file : directory.listFiles()) {
-            if (file.isDirectory()) {
-                deleteDirectory(file);
-            } else {
-                file.delete();
-            }
-        }
-        directory.delete();
-    }
-
 }

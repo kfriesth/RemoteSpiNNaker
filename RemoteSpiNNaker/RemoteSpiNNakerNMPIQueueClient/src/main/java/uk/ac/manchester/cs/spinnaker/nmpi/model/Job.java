@@ -34,6 +34,8 @@ public class Job implements QueueNextResponse {
 
     private String status = null;
 
+    private String command = null;
+
     @JsonSerialize(using=NMPIDateSerialiser.class)
     private DateTime timestampCompletion = null;
 
@@ -144,5 +146,13 @@ public class Job implements QueueNextResponse {
 
     public void setUser(String user) {
         this.user = user;
+    }
+
+    public String getCommand() {
+        return command;
+    }
+
+    public void setCommand(String command) {
+        this.command = command;
     }
 }

@@ -299,6 +299,7 @@ public class NMPIQueueManager extends Thread {
                         for (NMPIQueueListener listener: listeners) {
                             listener.addJob(job.getId(),
                                     job.getExperimentDescription(),
+                                    job.getCommand(),
                                     inputDataUrls,
                                     job.getHardwareConfig(),
                                     deleteJobsOnExit);

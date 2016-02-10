@@ -4,121 +4,67 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.Queue;
+import java.util.UUID;
+
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response.Status;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
-import uk.ac.manchester.cs.spinnaker.job.JobParameters;
-import uk.ac.manchester.cs.spinnaker.job.JobSpecification;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTrace;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTraceElement;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueListener;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
 
 /**
- * The manager of jobs; synchronizes and manages all the ongoing and future
+ * The manager of jobs; synchronises and manages all the ongoing and future
  * processes and machines.
  */
 public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
-    private static final String JOB_PROCESS_MANAGER_ZIP =
-            "/RemoteSpiNNakerJobProcessManager.zip";
-
-    private static final String JOB_PROCESS_MANAGER_MAIN_CLASS =
-            "uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager";
-
-    private static File getJavaExec() throws IOException {
-        File binDir = new File(System.getProperty("java.home"), "bin");
-        File exec = new File(binDir, "java");
-        if (!exec.canExecute()) {
-            exec = new File(binDir, "java.exe");
-        }
-        return exec;
-    }
-
     private MachineManager machineManager = null;
 
     private NMPIQueueManager queueManager = null;
-
-    private List<JobParametersFactory> jobParametersFactories = null;
-
-    private List<File> jobProcessManagerClasspath = new ArrayList<File>();
 
     private URL baseUrl = null;
 
     private Log logger = LogFactory.getLog(getClass());
 
     private Map<Integer, SpinnakerMachine> allocatedMachines =
-            new HashMap<Integer, SpinnakerMachine>();
+        new HashMap<Integer, SpinnakerMachine>();
+
+    private JobExecuterFactory jobExecuterFactory = null;
+
+    private Queue<Job> jobsToRun = new LinkedList<Job>();
+
+    private Map<String, JobExecuter> jobExecuters =
+        new HashMap<String, JobExecuter>();
+
+    private Map<String, Job> executorJobId = new HashMap<String, Job>();
+
+    private Map<Integer, File> jobOutputTempFiles =
+        new HashMap<Integer, File>();
 
     public JobManager(MachineManager machineManager,
-            NMPIQueueManager queueManager,
-            List<JobParametersFactory> jobParametersFactories,
-            URL baseUrl)
-                    throws IOException {
+            NMPIQueueManager queueManager, URL baseUrl,
+            JobExecuterFactory jobExecuterFactory) {
         this.machineManager = machineManager;
         this.queueManager = queueManager;
-        this.jobParametersFactories = jobParametersFactories;
         this.baseUrl = baseUrl;
-
-        // Create a temporary folder for the job process manager
-        File jobProcessManagerDirectory =
-                File.createTempFile("processManager", "tmp");
-        jobProcessManagerDirectory.delete();
-        jobProcessManagerDirectory.mkdirs();
-        jobProcessManagerDirectory.deleteOnExit();
-
-        // Find the JobManager resource
-        InputStream jobManagerStream = getClass().getResourceAsStream(
-                JOB_PROCESS_MANAGER_ZIP);
-        if (jobManagerStream == null) {
-            throw new UnsatisfiedLinkError(JOB_PROCESS_MANAGER_ZIP
-                    + " not found in classpath");
-        }
-
-        // Extract the JobManager resources
-        ZipInputStream input = new ZipInputStream(jobManagerStream);
-        ZipEntry entry = input.getNextEntry();
-        while (entry != null) {
-            File entryFile = new File(jobProcessManagerDirectory,
-                    entry.getName());
-            if (!entry.isDirectory()) {
-                logger.debug("Extracting to " + entryFile);
-                entryFile.getParentFile().mkdirs();
-                FileOutputStream output = new FileOutputStream(entryFile);
-                byte[] buffer = new byte[8196];
-                int bytesRead = input.read(buffer);
-                while (bytesRead != -1) {
-                    output.write(buffer, 0, bytesRead);
-                    bytesRead = input.read(buffer);
-                }
-                output.close();
-                entryFile.deleteOnExit();
-
-                if (entryFile.getName().endsWith(".jar")) {
-                    jobProcessManagerClasspath.add(entryFile);
-                }
-            } else {
-                logger.debug(entryFile + " is directory");
-            }
-            entry = input.getNextEntry();
-        }
-        input.close();
+        this.jobExecuterFactory = jobExecuterFactory;
 
         // Start the queue manager
         queueManager.addListener(this);
@@ -126,99 +72,55 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
-    public void addJob(int id, String experimentDescription, String command,
-            List<String> inputData, Map<String, Object> hardwareConfig,
-            boolean deleteJobOnExit) throws IOException {
-        logger.info("New job " + id);
+    public void addJob(Job job, boolean deleteJobOnExit) throws IOException {
+        logger.info("New job " + job.getId());
+
+        // Add the job to the set of jobs to be run
+        synchronized (jobExecuters) {
+            synchronized (jobsToRun) {
+                jobsToRun.add(job);
+                jobsToRun.notifyAll();
+            }
+
+            // Start an executer for the job
+            String uuid = UUID.randomUUID().toString();
+            JobExecuter executer = jobExecuterFactory.createJobExecuter(
+                this, baseUrl, uuid);
+            jobExecuters.put(uuid, executer);
+            executer.start();
+        }
+    }
+
+    @Override
+    public Job getNextJob(String executerId) {
+        synchronized (jobsToRun) {
+            while (jobsToRun.isEmpty()) {
+                try {
+                    jobsToRun.wait();
+                } catch (InterruptedException e) {
+
+                    // Does Nothing
+                }
+            }
+            Job job = jobsToRun.poll();
+            executorJobId.put(executerId, job);
+            logger.info(
+                "Executer " + executerId + " is running " + job.getId());
+            return job;
+        }
+    }
+
+    @Override
+    public SpinnakerMachine getJobMachine(int id, int n_chips) {
 
         // Get a machine to run the job on
-        SpinnakerMachine machine = machineManager.getNextAvailableMachine();
+        SpinnakerMachine machine = machineManager.getNextAvailableMachine(
+            n_chips);
         synchronized (allocatedMachines) {
             allocatedMachines.put(id, machine);
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
-
-        try {
-
-            // Get job parameters if possible
-            File workingDirectory = File.createTempFile("job", ".tmp");
-            workingDirectory.delete();
-            workingDirectory.mkdirs();
-            JobParameters parameters = null;
-            Map<String, JobParametersFactoryException> errors =
-                    new HashMap<String, JobParametersFactoryException>();
-            for (JobParametersFactory factory : jobParametersFactories) {
-                try {
-                    parameters = factory.getJobParameters(experimentDescription,
-                            command, inputData, hardwareConfig, workingDirectory,
-                            deleteJobOnExit);
-                    break;
-                } catch (UnsupportedJobException e) {
-
-                    // Do Nothing
-                } catch (JobParametersFactoryException e) {
-                    errors.put(factory.getClass().getSimpleName(), e);
-                }
-            }
-            if (parameters == null) {
-                if (!errors.isEmpty()) {
-                    StringBuilder problemBuilder = new StringBuilder();
-                    problemBuilder.append(
-                        "The job type was recognised by at least"
-                        + " one factory, but could not be decoded.  The errors "
-                        + " are as follows:\n");
-                    for (String key : errors.keySet()) {
-                        JobParametersFactoryException error = errors.get(key);
-                        problemBuilder.append(key);
-                        problemBuilder.append(": ");
-                        problemBuilder.append(error.getMessage());
-                        problemBuilder.append('\n');
-                    }
-                    throw new IOException(problemBuilder.toString());
-                }
-                throw new IOException(
-                    "The job did not appear to be supported on this system");
-            }
-
-            // Get any requested input files
-            if (inputData != null) {
-                for (String input : inputData) {
-                    URL inputUrl = new URL(input);
-                    FileDownloader.downloadFile(
-                        inputUrl, workingDirectory, null);
-                }
-            }
-
-            JobExecuter executer = new JobExecuter(this, id, getJavaExec(),
-                    jobProcessManagerClasspath,
-                    JOB_PROCESS_MANAGER_MAIN_CLASS,
-                    new ArrayList<String>(), workingDirectory);
-            executer.start();
-            OutputStream output = new UnclosableOutputStream(
-                    executer.getProcessOutputStream());
-
-            // Send the job executed the details of what to run
-            ObjectMapper mapper = new ObjectMapper();
-            JobParametersSerializer serializer =
-                    new JobParametersSerializer("jobType");
-            SimpleModule serializerModule = new SimpleModule();
-            serializerModule.addSerializer(JobParameters.class, serializer);
-            mapper.registerModule(serializerModule);
-
-            logger.debug("Writing specification");
-            mapper.writeValue(output, new JobSpecification(
-                    machine, parameters, id, baseUrl.toString()));
-            output.flush();
-            logger.debug("Finished writing");
-        } catch (IOException|RuntimeException e) {
-
-            // Ensure that the allocated machine is released
-            synchronized (allocatedMachines) {
-                allocatedMachines.remove(id);
-                machineManager.releaseMachine(machine);
-            }
-            throw e;
-        }
+        return machine;
     }
 
     @Override
@@ -228,19 +130,66 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
+    public void addOutput(int id, String output, InputStream input) {
+        if (!jobOutputTempFiles.containsKey(id)) {
+            try {
+                File tempOutputDir = File.createTempFile("jobOutput", ".tmp");
+                tempOutputDir.delete();
+                tempOutputDir.mkdirs();
+                jobOutputTempFiles.put(id, tempOutputDir);
+            } catch (IOException e) {
+                logger.error(
+                    "Error creating temporary output directory for " + id, e);
+                throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        File outputFile = new File(jobOutputTempFiles.get(id), output);
+        try {
+            FileOutputStream outputStream = new FileOutputStream(outputFile);
+            byte[] buffer = new byte[8096];
+            int bytesRead = input.read(buffer);
+            while (bytesRead != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+                bytesRead = input.read(buffer);
+            }
+            outputStream.close();
+        } catch (IOException e) {
+            logger.error("Error writing file " + outputFile + " for job " + id,
+                e);
+            throw new WebApplicationException(Status.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private List<File> getOutputFiles(int id, List<String> outputs) {
+        List<File> outputFiles = new ArrayList<File>();
+        if (outputs != null) {
+            for (String filename : outputs) {
+                outputFiles.add(new File(filename));
+            }
+        }
+        if (jobOutputTempFiles.containsKey(id)) {
+            for (File file : jobOutputTempFiles.get(id).listFiles()) {
+                outputFiles.add(file);
+            }
+        }
+        return outputFiles;
+    }
+
+    @Override
     public void setJobFinished(int id, String logToAppend,
             List<String> outputs) {
         logger.debug("Marking job " + id + " as finished");
         synchronized (allocatedMachines) {
             SpinnakerMachine machine = allocatedMachines.remove(id);
-            machineManager.releaseMachine(machine);
+            if (machine != null) {
+                machineManager.releaseMachine(machine);
+            }
         }
-        List<File> outputFiles = new ArrayList<File>();
-        for (String filename : outputs) {
-            outputFiles.add(new File(filename));
-        }
+
         try {
-            queueManager.setJobFinished(id, logToAppend, outputFiles);
+            queueManager.setJobFinished(id, logToAppend,
+                getOutputFiles(id, outputs));
         } catch (MalformedURLException e) {
             logger.error("Error creating URLs while updating job", e);
         }
@@ -252,7 +201,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         logger.debug("Marking job " + id + " as error");
         synchronized (allocatedMachines) {
             SpinnakerMachine machine = allocatedMachines.remove(id);
-            machineManager.releaseMachine(machine);
+            if (machine != null) {
+                machineManager.releaseMachine(machine);
+            }
         }
         StackTraceElement[] elements =
                 new StackTraceElement[stackTrace.getElements().size()];
@@ -262,40 +213,63 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                     element.getMethodName(), element.getFileName(),
                     element.getLineNumber());
         }
-        List<File> outputFiles = new ArrayList<File>();
-        for (String filename : outputs) {
-            outputFiles.add(new File(filename));
-        }
 
         Exception exception = new Exception(error);
         exception.setStackTrace(elements);
         try {
-            queueManager.setJobError(id, logToAppend, outputFiles, exception);
+            queueManager.setJobError(id, logToAppend,
+                getOutputFiles(id, outputs), exception);
         } catch (MalformedURLException e) {
             logger.error("Error creating URLs while updating job", e);
         }
     }
 
-    public void setJobExited(int id, String logToAppend) {
-        logger.debug("Job " + id + " has exited ");
+    public void setExecutorExited(String executorId, String logToAppend) {
+        Job job = executorJobId.remove(executorId);
+        jobExecuters.remove(executorId);
+        if (job != null) {
+            logger.debug("Job " + job.getId() + " has exited");
 
-        boolean alreadyGone = false;
-        synchronized (allocatedMachines) {
-            if (allocatedMachines.containsKey(id)) {
-                SpinnakerMachine machine = allocatedMachines.remove(id);
-                machineManager.releaseMachine(machine);
-            } else {
-                alreadyGone = true;
+            boolean alreadyGone = false;
+            synchronized (allocatedMachines) {
+                SpinnakerMachine machine = allocatedMachines.remove(
+                    job.getId());
+                if (machine != null) {
+                    machineManager.releaseMachine(machine);
+                } else {
+                    alreadyGone = true;
+                }
             }
-        }
 
-        if (!alreadyGone) {
-            logger.debug("Job " + id + " has not exited cleanly");
-            try {
-                queueManager.setJobError(id, logToAppend, null,
-                    new Exception("Job did not finish cleanly"));
-            } catch (MalformedURLException e) {
-                logger.error("Error creating URLs while updating job", e);
+            if (!alreadyGone) {
+                logger.debug("Job " + job.getId() + " has not exited cleanly");
+                try {
+                    queueManager.setJobError(job.getId(), logToAppend,
+                        getOutputFiles(job.getId(), null),
+                        new Exception("Job did not finish cleanly"));
+                } catch (MalformedURLException e) {
+                    logger.error("Error creating URLs while updating job", e);
+                }
+            }
+        } else {
+            logger.error(
+                "An executer has exited.  This could indicate an error!");
+            logger.error(logToAppend);
+
+            synchronized (jobsToRun) {
+                synchronized (jobExecuters) {
+                    if (jobsToRun.size() > jobExecuters.size()) {
+                        try {
+                            JobExecuter executer =
+                                jobExecuterFactory.createJobExecuter(
+                                    this, baseUrl, executorId);
+                            jobExecuters.put(executorId, executer);
+                            executer.start();
+                        } catch (IOException e) {
+                            logger.error("Could not launch a new executer", e);
+                        }
+                    }
+                }
             }
         }
     }

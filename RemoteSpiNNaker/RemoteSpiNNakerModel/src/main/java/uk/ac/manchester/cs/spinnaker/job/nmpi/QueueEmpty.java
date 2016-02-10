@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.nmpi.model;
+package uk.ac.manchester.cs.spinnaker.job.nmpi;
 
 /**
  * A message indicating that the queue is empty

@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.jobmanager;
+package uk.ac.manchester.cs.spinnaker.job_parameters;
 
 /**
  * Indicates that the job is unsupported

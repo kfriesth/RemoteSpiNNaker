@@ -8,9 +8,9 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.APIKeyResponse;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
 
 @Path("/api/v1")
 public interface NMPIQueue {

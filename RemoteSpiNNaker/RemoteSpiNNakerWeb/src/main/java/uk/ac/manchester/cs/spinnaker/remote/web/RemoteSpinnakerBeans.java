@@ -18,11 +18,9 @@ import org.springframework.context.support.ConversionServiceFactoryBean;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.core.convert.converter.Converter;
 
+import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories.DirectPyNNJobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories.GitPyNNJobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories.ZipPyNNJobParametersFactory;
+import uk.ac.manchester.cs.spinnaker.jobmanager.impl.LocalJobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
@@ -87,14 +85,14 @@ public class RemoteSpinnakerBeans {
     }
 
     @Bean
+    public JobExecuterFactory jobExecuterFactory() throws IOException {
+        return new LocalJobExecuterFactory();
+    }
+
+    @Bean
     public JobManager jobManager() throws IOException,
             NoSuchAlgorithmException, KeyManagementException {
-        List<JobParametersFactory> factories =
-                new ArrayList<JobParametersFactory>();
-        factories.add(new ZipPyNNJobParametersFactory());
-        factories.add(new GitPyNNJobParametersFactory());
-        factories.add(new DirectPyNNJobParametersFactory());
         return new JobManager(machineManager(), queueManager(),
-                factories, baseServerUrl);
+                baseServerUrl, jobExecuterFactory());
     }
 }

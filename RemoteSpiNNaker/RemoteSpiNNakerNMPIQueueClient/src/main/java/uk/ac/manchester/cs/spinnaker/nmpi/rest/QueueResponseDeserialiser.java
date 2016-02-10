@@ -1,8 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.rest;
 
-import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 
 public class QueueResponseDeserialiser
         extends PropertyBasedDeserialiser<QueueNextResponse>{

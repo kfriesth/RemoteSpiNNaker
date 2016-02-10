@@ -51,11 +51,11 @@ import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
+import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.APIKeyResponse;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.DataItem;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.Job;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueEmpty;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.APIKeyScheme;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.ErrorCaptureResponseFilter;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.IgnoreSSLCertificateTrustManager;
@@ -292,17 +292,8 @@ public class NMPIQueueManager extends Thread {
                     }
                     logger.debug("Job " + job.getId() + " received");
                     try {
-                        List<String> inputDataUrls = new ArrayList<String>();
-                        for (DataItem item : job.getInputData()) {
-                            inputDataUrls.add(item.getUrl());
-                        }
                         for (NMPIQueueListener listener: listeners) {
-                            listener.addJob(job.getId(),
-                                    job.getExperimentDescription(),
-                                    job.getCommand(),
-                                    inputDataUrls,
-                                    job.getHardwareConfig(),
-                                    deleteJobsOnExit);
+                            listener.addJob(job, deleteJobsOnExit);
                         }
                         logger.debug("Setting job status to running");
                         job.setTimestampSubmission(job.getTimestampSubmission()
@@ -379,7 +370,6 @@ public class NMPIQueueManager extends Thread {
     public void setJobFinished(int id, String logToAppend, List<File> outputs)
             throws MalformedURLException {
         logger.debug("Job " + id + " is finished");
-
 
         Job job = getJob(id);
         job.setStatus("finished");

@@ -1,12 +1,11 @@
-package uk.ac.manchester.cs.spinnaker.nmpi.model;
+package uk.ac.manchester.cs.spinnaker.job.nmpi;
 
 import java.util.List;
 import java.util.Map;
 
 import org.joda.time.DateTime;
 
-import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIDateSerialiser;
-
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**
@@ -37,9 +36,11 @@ public class Job implements QueueNextResponse {
     private String command = null;
 
     @JsonSerialize(using=NMPIDateSerialiser.class)
+    @JsonDeserialize(using=NMPIDateDeserialiser.class)
     private DateTime timestampCompletion = null;
 
     @JsonSerialize(using=NMPIDateSerialiser.class)
+    @JsonDeserialize(using=NMPIDateDeserialiser.class)
     private DateTime timestampSubmission = null;
 
     private String user = null;

@@ -1,16 +1,15 @@
-package uk.ac.manchester.cs.spinnaker.jobmanager.jobparametersfactories;
+package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.List;
-import java.util.Map;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobParametersFactoryException;
-import uk.ac.manchester.cs.spinnaker.jobmanager.UnsupportedJobException;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
+import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
+import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
  * A JobParametersFactory that uses the experimentDescription itself as a PyNN
@@ -21,23 +20,19 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
     private static final String SCRIPT_NAME = "run.py";
 
     @Override
-    public JobParameters getJobParameters(String experimentDescription,
-            String command, List<String> inputData,
-            Map<String, Object> hardwareConfiguration,
-            File workingDirectory, boolean deleteJobOnExit)
+    public JobParameters getJobParameters(Job job, File workingDirectory)
             throws UnsupportedJobException, JobParametersFactoryException {
-        if (!experimentDescription.contains("import")) {
+        if (!job.getExperimentDescription().contains("import")) {
             throw new UnsupportedJobException();
         }
         try {
             File scriptFile = new File(workingDirectory, SCRIPT_NAME);
             PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
-            writer.print(experimentDescription);
+            writer.print(job.getExperimentDescription());
             writer.close();
 
             return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
-                    SCRIPT_NAME + SYSTEM_ARG, hardwareConfiguration,
-                    deleteJobOnExit);
+                    SCRIPT_NAME + SYSTEM_ARG, job.getHardwareConfig());
         } catch (IOException e) {
             throw new JobParametersFactoryException("Error storing script", e);
         } catch (Throwable e) {

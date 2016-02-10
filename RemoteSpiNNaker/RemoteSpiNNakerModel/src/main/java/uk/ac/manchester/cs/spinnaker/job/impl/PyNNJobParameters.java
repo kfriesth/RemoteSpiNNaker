@@ -17,20 +17,16 @@ public class PyNNJobParameters implements JobParameters {
 
     private Map<String, Object> hardwareConfiguration = null;
 
-    private boolean deleteOnCompletion = false;
-
     public PyNNJobParameters() {
 
         // Does Nothing
     }
 
     public PyNNJobParameters(String workingDirectory, String script,
-            Map<String, Object> hardwareConfiguration,
-            boolean deleteOnCompletion) {
+            Map<String, Object> hardwareConfiguration) {
         this.workingDirectory = workingDirectory;
         this.script = script;
         this.hardwareConfiguration = hardwareConfiguration;
-        this.deleteOnCompletion = deleteOnCompletion;
     }
 
     public String getWorkingDirectory() {
@@ -56,13 +52,5 @@ public class PyNNJobParameters implements JobParameters {
     public void setHardwareConfiguration(
             Map<String, Object> hardwareConfiguration) {
         this.hardwareConfiguration = hardwareConfiguration;
-    }
-
-    public boolean isDeleteOnCompletion() {
-        return deleteOnCompletion;
-    }
-
-    public void setDeleteOnCompletion(boolean deleteOnCompletion) {
-        this.deleteOnCompletion = deleteOnCompletion;
     }
 }

@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.jobmanager;
+package uk.ac.manchester.cs.spinnaker.jobprocessmanager;
 
 import java.io.File;
 import java.io.IOException;

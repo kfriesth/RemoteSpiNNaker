@@ -1,16 +1,13 @@
 package uk.ac.manchester.cs.spinnaker.nmpi;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 
 /**
  * An interface for things that listen for new jobs
  */
 public interface NMPIQueueListener {
 
-    void addJob(int id, String experimentDescription, String command,
-            List<String> inputDataUrls, Map<String, Object> hardwareConfig,
-            boolean deleteJobOnExit)
-                    throws IOException;
+    void addJob(Job job, boolean deleteJobOnExit) throws IOException;
 }

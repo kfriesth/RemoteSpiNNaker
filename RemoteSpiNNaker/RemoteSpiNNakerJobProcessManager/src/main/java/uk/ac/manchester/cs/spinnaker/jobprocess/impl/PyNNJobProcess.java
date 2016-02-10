@@ -29,9 +29,14 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
                 add(".pyc");
             }};
 
-    private File workingDirectory = null;
+    @SuppressWarnings("serial")
+    private static final Set<String> IGNORED_DIRECTORIES =
+            new HashSet<String>(){{
+                add("application_generated_data_files");
+                add("reports");
+            }};
 
-    private boolean deleteOnCleanup = false;
+    private File workingDirectory = null;
 
     private Status status = null;
 
@@ -42,7 +47,9 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
     private void gatherFiles(File directory, Collection<File> files) {
         for (File file : directory.listFiles()) {
             if (file.isDirectory()) {
-                gatherFiles(file, files);
+                if (!IGNORED_DIRECTORIES.contains(file.getName())) {
+                    gatherFiles(file, files);
+                }
             } else {
                 files.add(file);
             }
@@ -64,7 +71,6 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
         try {
             status = Status.Running;
             workingDirectory = new File(parameters.getWorkingDirectory());
-            deleteOnCleanup = parameters.isDeleteOnCompletion();
 
             // TODO: Deal with hardware configuration
             File cfgFile = new File(workingDirectory, "spynnaker.cfg");
@@ -98,6 +104,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
                     "{system}", "spiNNaker"));
             }
             ProcessBuilder builder = new ProcessBuilder(command);
+            System.err.println("Running " + command + " in " + workingDirectory);
             builder.directory(workingDirectory);
             builder.redirectErrorStream(true);
             Process process = builder.start();
@@ -149,21 +156,9 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
         return outputs;
     }
 
-    private void deleteDirectory(File directory) {
-        for (File file : directory.listFiles()) {
-            if (file.isDirectory()) {
-                deleteDirectory(file);
-            } else {
-                file.delete();
-            }
-        }
-        directory.delete();
-    }
-
     @Override
     public void cleanup() {
-        if (deleteOnCleanup) {
-            deleteDirectory(workingDirectory);
-        }
+
+        // Does Nothing
     }
 }

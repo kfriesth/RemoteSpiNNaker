@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.nmpi;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -19,9 +20,11 @@ import java.util.Set;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -51,6 +54,8 @@ import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
+import uk.ac.manchester.cs.spinnaker.common.IgnoreSSLCertificateTrustManager;
+import uk.ac.manchester.cs.spinnaker.common.MyAuthCache;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
@@ -58,11 +63,10 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.APIKeyResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.APIKeyScheme;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.ErrorCaptureResponseFilter;
-import uk.ac.manchester.cs.spinnaker.nmpi.rest.IgnoreSSLCertificateTrustManager;
-import uk.ac.manchester.cs.spinnaker.nmpi.rest.MyAuthCache;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIJacksonJsonProvider;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
+import uk.ac.manchester.cs.spinnaker.unicore.UnicoreFileManager;
 
 /**
  * Manages the NMPI queue, receiving jobs and submitting them to be run
@@ -239,6 +243,48 @@ public class NMPIQueueManager extends Thread {
                 .header("Content-Disposition",
                         "attachment; filename=" + filename)
                 .build();
+    }
+
+    @POST
+    @Path("{id}")
+    public Response uploadResultsToHPCServer(
+            @PathParam("id") int id, @QueryParam("url") String serverUrl,
+            @QueryParam("storageId") String storageId,
+            @QueryParam("filePath") String filePath,
+            @QueryParam("userId") String userId,
+            @QueryParam("token") String token) {
+        try {
+            URL url = new URL(serverUrl);
+            UnicoreFileManager fileManager = new UnicoreFileManager(
+                url, userId, token);
+            File idDirectory = new File(resultsDirectory, String.valueOf(id));
+            if (!idDirectory.canRead()) {
+                logger.debug(idDirectory + " was not found");
+                return Response.status(Status.NOT_FOUND).build();
+            }
+            for (File file : idDirectory.listFiles()) {
+                if (!file.isDirectory()) {
+                    FileInputStream input = new FileInputStream(file);
+                    try {
+                        fileManager.uploadFile(storageId, filePath, input);
+                    } finally {
+                        input.close();
+                    }
+                }
+            }
+            return Response.ok().build();
+        } catch (MalformedURLException e) {
+            logger.error(e);
+            return Response.status(Status.BAD_REQUEST).entity(
+                "The URL specified was malformed").build();
+        } catch (IOException e) {
+            logger.error(e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).entity(
+                "General error reading or uploading a file").build();
+        } catch (Throwable e) {
+            logger.error(e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     /**

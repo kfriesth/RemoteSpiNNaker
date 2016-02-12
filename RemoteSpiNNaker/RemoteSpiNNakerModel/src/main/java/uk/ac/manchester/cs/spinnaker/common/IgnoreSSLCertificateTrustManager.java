@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.nmpi.rest;
+package uk.ac.manchester.cs.spinnaker.common;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;

@@ -3,6 +3,7 @@ package uk.ac.manchester.cs.spinnaker.nmpi.rest;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
+import uk.ac.manchester.cs.spinnaker.rest.PropertyBasedDeserialiser;
 
 public class QueueResponseDeserialiser
         extends PropertyBasedDeserialiser<QueueNextResponse>{

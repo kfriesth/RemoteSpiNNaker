@@ -23,11 +23,13 @@ import org.apache.commons.logging.LogFactory;
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTrace;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTraceElement;
+import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueListener;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
+import uk.ac.manchester.cs.spinnaker.output.OutputManager;
 
 /**
  * The manager of jobs; synchronises and manages all the ongoing and future
@@ -58,11 +60,14 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     private Map<Integer, File> jobOutputTempFiles =
         new HashMap<Integer, File>();
 
+    private OutputManager outputManager = null;
+
     public JobManager(MachineManager machineManager,
-            NMPIQueueManager queueManager, URL baseUrl,
-            JobExecuterFactory jobExecuterFactory) {
+            NMPIQueueManager queueManager, OutputManager outputManager,
+            URL baseUrl, JobExecuterFactory jobExecuterFactory) {
         this.machineManager = machineManager;
         this.queueManager = queueManager;
+        this.outputManager = outputManager;
         this.baseUrl = baseUrl;
         this.jobExecuterFactory = jobExecuterFactory;
 
@@ -161,7 +166,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         }
     }
 
-    private List<File> getOutputFiles(int id, List<String> outputs) {
+    private List<DataItem> getOutputFiles(int id, List<String> outputs)
+            throws MalformedURLException {
         List<File> outputFiles = new ArrayList<File>();
         if (outputs != null) {
             for (String filename : outputs) {
@@ -173,7 +179,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 outputFiles.add(file);
             }
         }
-        return outputFiles;
+        return outputManager.addOutputs(id, outputFiles);
     }
 
     @Override

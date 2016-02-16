@@ -5,6 +5,9 @@ import java.util.Map;
 
 import org.joda.time.DateTime;
 
+import uk.ac.manchester.cs.spinnaker.rest.DateTimeDeserialiser;
+import uk.ac.manchester.cs.spinnaker.rest.DateTimeSerialiser;
+
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
@@ -35,12 +38,12 @@ public class Job implements QueueNextResponse {
 
     private String command = null;
 
-    @JsonSerialize(using=NMPIDateSerialiser.class)
-    @JsonDeserialize(using=NMPIDateDeserialiser.class)
+    @JsonSerialize(using=DateTimeSerialiser.class)
+    @JsonDeserialize(using=DateTimeDeserialiser.class)
     private DateTime timestampCompletion = null;
 
-    @JsonSerialize(using=NMPIDateSerialiser.class)
-    @JsonDeserialize(using=NMPIDateDeserialiser.class)
+    @JsonSerialize(using=DateTimeSerialiser.class)
+    @JsonDeserialize(using=DateTimeDeserialiser.class)
     private DateTime timestampSubmission = null;
 
     private String user = null;

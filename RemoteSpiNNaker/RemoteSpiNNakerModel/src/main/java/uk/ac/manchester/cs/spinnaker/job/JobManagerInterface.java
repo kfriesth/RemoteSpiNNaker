@@ -16,7 +16,7 @@ import javax.ws.rs.core.MediaType;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
-@Path("job")
+@Path("/job")
 public interface JobManagerInterface {
 
     @GET

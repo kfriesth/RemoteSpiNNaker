@@ -51,14 +51,15 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.2.1</version>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>RemoteSpiNNakerOutputService</artifactId>
+            <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>net.java.dev.vcc.thirdparty</groupId>
             <artifactId>xen-api</artifactId>
-            <version>6.2.0-3.1</version>
+            <version>${xen.version}</version>
         </dependency>
     </dependencies>
 </project>

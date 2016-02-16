@@ -14,6 +14,8 @@ import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
 
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTrace;
@@ -57,6 +59,7 @@ public class JobProcessManager {
 
     private static JobManagerInterface createJobManager(String url) {
         ResteasyClient client = new ResteasyClientBuilder().build();
+        client.register(new JacksonJsonProvider());
         ResteasyWebTarget target = client.target(url);
         return target.proxy(JobManagerInterface.class);
     }

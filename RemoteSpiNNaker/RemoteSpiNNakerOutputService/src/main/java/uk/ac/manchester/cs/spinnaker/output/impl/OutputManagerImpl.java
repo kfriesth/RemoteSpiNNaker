@@ -36,20 +36,34 @@ public class OutputManagerImpl implements OutputManager {
     }
 
     @Override
-    public List<DataItem> addOutputs(int id, List<File> outputs)
-            throws MalformedURLException {
+    public List<DataItem> addOutputs(
+            int id, File baseDirectory, List<File> outputs)
+            throws IOException {
         if (outputs != null) {
+            int pathStart = baseDirectory.getAbsolutePath().length();
             File idDirectory = new File(resultsDirectory, String.valueOf(id));
-            idDirectory.mkdirs();
             List<DataItem> outputData = new ArrayList<DataItem>();
             for (File output : outputs) {
-                File newOutput = new File(idDirectory, output.getName());
+                if (!output.getAbsolutePath().startsWith(
+                        baseDirectory.getAbsolutePath())) {
+                    throw new IOException(
+                        "Output file " + output +
+                        " is outside base directory " + baseDirectory);
+                }
+
+                String outputPath = output.getAbsolutePath().substring(
+                    pathStart).replace('\\', '/');
+                if (outputPath.startsWith("/")) {
+                    outputPath = outputPath.substring(1);
+                }
+                File newOutput = new File(idDirectory, outputPath);
+                newOutput.getParentFile().mkdirs();
                 output.renameTo(newOutput);
-                URL outputUrl = new URL(baseServerUrl,
-                        "output/" + id + "/" + output.getName());
+                URL outputUrl = new URL(
+                    baseServerUrl, "output/" + id + "/" + outputPath);
                 outputData.add(new DataItem(outputUrl.toExternalForm()));
-                logger.debug("New output " + newOutput + " mapped to "
-                    + outputUrl);
+                logger.debug(
+                    "New output " + newOutput + " mapped to " + outputUrl);
             }
 
             return outputData;

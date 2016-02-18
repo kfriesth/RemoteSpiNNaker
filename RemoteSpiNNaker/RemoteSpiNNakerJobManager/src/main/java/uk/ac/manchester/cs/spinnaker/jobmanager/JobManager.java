@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -166,25 +165,41 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         }
     }
 
-    private List<DataItem> getOutputFiles(int id, List<String> outputs)
-            throws MalformedURLException {
-        List<File> outputFiles = new ArrayList<File>();
+    private void getFilesRecursively(File directory, List<File> files) {
+        for (File file : directory.listFiles()) {
+            if (file.isDirectory()) {
+                getFilesRecursively(file, files);
+            } else {
+                files.add(file);
+            }
+        }
+    }
+
+    private List<DataItem> getOutputFiles(
+            int id, String baseFile, List<String> outputs)
+            throws IOException {
+        List<DataItem> outputItems = new ArrayList<DataItem>();
         if (outputs != null) {
+            List<File> outputFiles = new ArrayList<File>();
             for (String filename : outputs) {
                 outputFiles.add(new File(filename));
             }
+            outputItems.addAll(outputManager.addOutputs(
+                id, new File(baseFile), outputFiles));
         }
         if (jobOutputTempFiles.containsKey(id)) {
-            for (File file : jobOutputTempFiles.get(id).listFiles()) {
-                outputFiles.add(file);
-            }
+            List<File> outputFiles = new ArrayList<File>();
+            File directory = jobOutputTempFiles.get(id);
+            getFilesRecursively(directory, outputFiles);
+            outputItems.addAll(outputManager.addOutputs(
+                id, directory, outputFiles));
         }
-        return outputManager.addOutputs(id, outputFiles);
+        return outputItems;
     }
 
     @Override
     public void setJobFinished(int id, String logToAppend,
-            List<String> outputs) {
+            String baseDirectory, List<String> outputs) {
         logger.debug("Marking job " + id + " as finished");
         synchronized (allocatedMachines) {
             SpinnakerMachine machine = allocatedMachines.remove(id);
@@ -195,15 +210,16 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
         try {
             queueManager.setJobFinished(id, logToAppend,
-                getOutputFiles(id, outputs));
-        } catch (MalformedURLException e) {
+                getOutputFiles(id, baseDirectory, outputs));
+        } catch (IOException e) {
             logger.error("Error creating URLs while updating job", e);
         }
     }
 
     @Override
     public void setJobError(int id, String error, String logToAppend,
-            List<String> outputs, RemoteStackTrace stackTrace) {
+            String baseDirectory, List<String> outputs,
+            RemoteStackTrace stackTrace) {
         logger.debug("Marking job " + id + " as error");
         synchronized (allocatedMachines) {
             SpinnakerMachine machine = allocatedMachines.remove(id);
@@ -224,8 +240,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         exception.setStackTrace(elements);
         try {
             queueManager.setJobError(id, logToAppend,
-                getOutputFiles(id, outputs), exception);
-        } catch (MalformedURLException e) {
+                getOutputFiles(id, baseDirectory, outputs), exception);
+        } catch (IOException e) {
             logger.error("Error creating URLs while updating job", e);
         }
     }
@@ -251,9 +267,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 logger.debug("Job " + job.getId() + " has not exited cleanly");
                 try {
                     queueManager.setJobError(job.getId(), logToAppend,
-                        getOutputFiles(job.getId(), null),
+                        getOutputFiles(job.getId(), null, null),
                         new Exception("Job did not finish cleanly"));
-                } catch (MalformedURLException e) {
+                } catch (IOException e) {
                     logger.error("Error creating URLs while updating job", e);
                 }
             }

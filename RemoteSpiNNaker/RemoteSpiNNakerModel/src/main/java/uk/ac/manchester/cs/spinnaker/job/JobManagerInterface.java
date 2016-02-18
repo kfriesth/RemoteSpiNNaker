@@ -45,6 +45,7 @@ public interface JobManagerInterface {
     @Path("{id}/finished")
     @Consumes("text/plain")
     public void setJobFinished(@PathParam("id") int id, String logToAppend,
+            @QueryParam("baseFilename") String baseFilename,
             @QueryParam("outputFilename") List<String> outputs);
 
     @POST
@@ -53,6 +54,7 @@ public interface JobManagerInterface {
     public void setJobError(@PathParam("id") int id,
             @QueryParam("error") String error,
             @QueryParam("logToAppend") String logToAppend,
+            @QueryParam("baseFilename") String baseFilename,
             @QueryParam("outputFilename") List<String> outputs,
             RemoteStackTrace stackTrace);
 }

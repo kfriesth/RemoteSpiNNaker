@@ -197,10 +197,14 @@ public class JobProcessManager {
             }
             if (status == Status.Error) {
                 Throwable error = process.getError();
-                jobManager.setJobError(job.getId(), error.getMessage(), log,
-                        outputsAsStrings, new RemoteStackTrace(error));
+                jobManager.setJobError(
+                    job.getId(), error.getMessage(), log,
+                    workingDirectory.getAbsolutePath(), outputsAsStrings,
+                    new RemoteStackTrace(error));
             } else if (status == Status.Finished) {
-                jobManager.setJobFinished(job.getId(), log, outputsAsStrings);
+                jobManager.setJobFinished(
+                    job.getId(), log, workingDirectory.getAbsolutePath(),
+                    outputsAsStrings);
 
                 // Clean up
                 process.cleanup();
@@ -220,7 +224,8 @@ public class JobProcessManager {
                     }
                     jobManager.setJobError(
                         job.getId(), error.getMessage(), log,
-                        new ArrayList<String>(), new RemoteStackTrace(error));
+                        "", new ArrayList<String>(),
+                        new RemoteStackTrace(error));
                 } catch (Throwable t) {
                     t.printStackTrace();
                     error.printStackTrace();

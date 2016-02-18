@@ -1,7 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.output;
 
 import java.io.File;
-import java.net.MalformedURLException;
+import java.io.IOException;
 import java.util.List;
 
 import javax.ws.rs.DefaultValue;
@@ -26,14 +26,10 @@ public interface OutputManager {
      * @param id
      * @param files
      * @return
-     * @throws MalformedURLException
+     * @throws IOException
      */
-    @POST
-    @Path("{id}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<DataItem> addOutputs(
-            @PathParam("id") int id, @QueryParam("output") List<File> outputs)
-            throws MalformedURLException;
+    public List<DataItem> addOutputs(int id, File rootFile, List<File> outputs)
+            throws IOException;
 
     /**
     * Gets a results file

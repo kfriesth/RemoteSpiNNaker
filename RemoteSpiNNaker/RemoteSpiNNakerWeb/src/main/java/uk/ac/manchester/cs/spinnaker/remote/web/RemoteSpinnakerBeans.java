@@ -43,6 +43,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.oauth2.sdk.ParseException;
 
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
@@ -150,12 +151,22 @@ public class RemoteSpinnakerBeans {
     }
 
     @Bean
-    public Clients clients() {
-        return new Clients(oidcRedirectUri, hbpAuthenticationClient());
+    public BearerOidcClient hbpBearerClient()
+            throws ParseException, MalformedURLException, IOException {
+        BearerOidcClient client = new BearerOidcClient(oidcDiscoveryUri, "");
+        return client;
     }
 
     @Bean
-    public ClientAuthenticationProvider clientProvider() {
+    public Clients clients()
+            throws ParseException, MalformedURLException, IOException {
+        return new Clients(
+            oidcRedirectUri, hbpAuthenticationClient(), hbpBearerClient());
+    }
+
+    @Bean
+    public ClientAuthenticationProvider clientProvider()
+            throws ParseException, MalformedURLException, IOException {
         ClientAuthenticationProvider provider =
             new ClientAuthenticationProvider();
         provider.setClients(clients());
@@ -176,6 +187,9 @@ public class RemoteSpinnakerBeans {
         OidcClient hbpAuthenticationClient;
 
         @Autowired
+        BearerOidcClient hbpBearerClient;
+
+        @Autowired
         Clients clients;
 
         @Override
@@ -189,13 +203,17 @@ public class RemoteSpinnakerBeans {
         protected void configure(HttpSecurity http) throws Exception {
             Path path = AnnotationUtils.findAnnotation(
                 OutputManager.class, Path.class);
-            http.addFilterBefore(callbackFilter(),
+            http.addFilterBefore(
+                    directAuthFilter(),
+                    UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(
+                    callbackFilter(),
                     UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling().authenticationEntryPoint(
-                    hbpAuthenticationEntryPoint()).and()
+                        hbpAuthenticationEntryPoint()).and()
                 .authorizeRequests().antMatchers(
-                        restServicePath + path.value() + "/**").authenticated()
-                                    .anyRequest().permitAll();
+                    restServicePath + path.value() + "/**").authenticated()
+                                   .anyRequest().permitAll();
         }
 
         @Bean
@@ -204,6 +222,16 @@ public class RemoteSpinnakerBeans {
                 new ClientAuthenticationFilter(callbackPath);
             filter.setClients(clients);
             filter.setAuthenticationManager(authenticationManagerBean());
+            return filter;
+        }
+
+        @Bean
+        public DirectClientAuthenticationFilter directAuthFilter()
+                throws Exception {
+            DirectClientAuthenticationFilter filter =
+                new DirectClientAuthenticationFilter(
+                    authenticationManagerBean());
+            filter.setClient(hbpBearerClient);
             return filter;
         }
 

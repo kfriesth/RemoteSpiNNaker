@@ -134,7 +134,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
-    public void addOutput(int id, String output, InputStream input) {
+    public void addOutput(
+            String projectId, int id, String output, InputStream input) {
         if (!jobOutputTempFiles.containsKey(id)) {
             try {
                 File tempOutputDir = File.createTempFile("jobOutput", ".tmp");
@@ -176,7 +177,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     private List<DataItem> getOutputFiles(
-            int id, String baseFile, List<String> outputs)
+            String projectId, int id, String baseFile, List<String> outputs)
             throws IOException {
         List<DataItem> outputItems = new ArrayList<DataItem>();
         if (outputs != null) {
@@ -185,20 +186,21 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 outputFiles.add(new File(filename));
             }
             outputItems.addAll(outputManager.addOutputs(
-                id, new File(baseFile), outputFiles));
+                projectId, id, new File(baseFile), outputFiles));
         }
         if (jobOutputTempFiles.containsKey(id)) {
             List<File> outputFiles = new ArrayList<File>();
             File directory = jobOutputTempFiles.get(id);
             getFilesRecursively(directory, outputFiles);
             outputItems.addAll(outputManager.addOutputs(
-                id, directory, outputFiles));
+                projectId, id, directory, outputFiles));
         }
         return outputItems;
     }
 
     @Override
-    public void setJobFinished(int id, String logToAppend,
+    public void setJobFinished(
+            String projectId, int id, String logToAppend,
             String baseDirectory, List<String> outputs) {
         logger.debug("Marking job " + id + " as finished");
         synchronized (allocatedMachines) {
@@ -210,15 +212,15 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
         try {
             queueManager.setJobFinished(id, logToAppend,
-                getOutputFiles(id, baseDirectory, outputs));
+                getOutputFiles(projectId, id, baseDirectory, outputs));
         } catch (IOException e) {
             logger.error("Error creating URLs while updating job", e);
         }
     }
 
     @Override
-    public void setJobError(int id, String error, String logToAppend,
-            String baseDirectory, List<String> outputs,
+    public void setJobError(String projectId, int id, String error,
+            String logToAppend, String baseDirectory, List<String> outputs,
             RemoteStackTrace stackTrace) {
         logger.debug("Marking job " + id + " as error");
         synchronized (allocatedMachines) {
@@ -240,7 +242,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         exception.setStackTrace(elements);
         try {
             queueManager.setJobError(id, logToAppend,
-                getOutputFiles(id, baseDirectory, outputs), exception);
+                getOutputFiles(
+                    projectId, id, baseDirectory, outputs), exception);
         } catch (IOException e) {
             logger.error("Error creating URLs while updating job", e);
         }
@@ -266,8 +269,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             if (!alreadyGone) {
                 logger.debug("Job " + job.getId() + " has not exited cleanly");
                 try {
+                    String projectId = new File(job.getProject()).getName();
                     queueManager.setJobError(job.getId(), logToAppend,
-                        getOutputFiles(job.getId(), null, null),
+                        getOutputFiles(projectId, job.getId(), null, null),
                         new Exception("Job did not finish cleanly"));
                 } catch (IOException e) {
                     logger.error("Error creating URLs while updating job", e);

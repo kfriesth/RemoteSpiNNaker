@@ -37,11 +37,13 @@ public class OutputManagerImpl implements OutputManager {
 
     @Override
     public List<DataItem> addOutputs(
-            int id, File baseDirectory, List<File> outputs)
+            String projectId, int id, File baseDirectory, List<File> outputs)
             throws IOException {
         if (outputs != null) {
+            String pId = new File(projectId).getName();
             int pathStart = baseDirectory.getAbsolutePath().length();
-            File idDirectory = new File(resultsDirectory, String.valueOf(id));
+            File projectDirectory = new File(resultsDirectory, pId);
+            File idDirectory = new File(projectDirectory, String.valueOf(id));
             List<DataItem> outputData = new ArrayList<DataItem>();
             for (File output : outputs) {
                 if (!output.getAbsolutePath().startsWith(
@@ -60,7 +62,8 @@ public class OutputManagerImpl implements OutputManager {
                 newOutput.getParentFile().mkdirs();
                 output.renameTo(newOutput);
                 URL outputUrl = new URL(
-                    baseServerUrl, "output/" + id + "/" + outputPath);
+                    baseServerUrl,
+                    "output/" + pId + "/" + id + "/" + outputPath);
                 outputData.add(new DataItem(outputUrl.toExternalForm()));
                 logger.debug(
                     "New output " + newOutput + " mapped to " + outputUrl);
@@ -72,9 +75,12 @@ public class OutputManagerImpl implements OutputManager {
     }
 
     @Override
-    public Response getResultFile(int id, String filename, boolean download) {
-        logger.debug("Retrieving " + filename + " from " + id);
-        File idDirectory = new File(resultsDirectory, String.valueOf(id));
+    public Response getResultFile(
+            String projectId, int id, String filename, boolean download) {
+        logger.debug(
+            "Retrieving " + filename + " from " + projectId + "/" + id);
+        File projectDirectory = new File(resultsDirectory, projectId);
+        File idDirectory = new File(projectDirectory, String.valueOf(id));
         File resultFile = new File(idDirectory, filename);
 
         if (!resultFile.canRead()) {
@@ -84,15 +90,16 @@ public class OutputManagerImpl implements OutputManager {
 
         if (!download) {
             try {
-                String contentType = Files.probeContentType(resultFile.toPath());
+                String contentType = Files.probeContentType(
+                    resultFile.toPath());
                 if (contentType != null) {
                     logger.debug("File has content type " + contentType);
                     return Response.ok(resultFile, contentType).build();
                 }
             } catch (IOException e) {
                 logger.debug(
-                    "Content type of " + resultFile + " could not be determined",
-                    e);
+                    "Content type of " + resultFile +
+                    " could not be determined", e);
             }
         }
 
@@ -102,29 +109,46 @@ public class OutputManagerImpl implements OutputManager {
                 .build();
     }
 
+    private void recursivelyUploadFiles(
+            File directory, UnicoreFileManager fileManager, String storageId,
+            String filePath) throws IOException {
+        for (File file : directory.listFiles()) {
+            String uploadFileName = filePath + "/" + file.getName();
+            if (file.isDirectory()) {
+                recursivelyUploadFiles(
+                    file, fileManager, storageId, uploadFileName);
+            } else {
+                FileInputStream input = new FileInputStream(file);
+                try {
+                    fileManager.uploadFile(storageId, uploadFileName, input);
+                } finally {
+                    input.close();
+                }
+            }
+        }
+    }
+
     @Override
     public Response uploadResultsToHPCServer(
-            int id, String serverUrl, String storageId, String filePath,
-            String userId, String token) {
+            String projectId, int id, String serverUrl, String storageId,
+            String filePath, String userId, String token) {
         try {
             URL url = new URL(serverUrl);
             UnicoreFileManager fileManager = new UnicoreFileManager(
                 url, userId, token);
-            File idDirectory = new File(resultsDirectory, String.valueOf(id));
+            File projectDirectory = new File(resultsDirectory, projectId);
+            File idDirectory = new File(projectDirectory, String.valueOf(id));
             if (!idDirectory.canRead()) {
                 logger.debug(idDirectory + " was not found");
                 return Response.status(Status.NOT_FOUND).build();
             }
-            for (File file : idDirectory.listFiles()) {
-                if (!file.isDirectory()) {
-                    FileInputStream input = new FileInputStream(file);
-                    try {
-                        fileManager.uploadFile(storageId, filePath, input);
-                    } finally {
-                        input.close();
-                    }
-                }
+            String uploadFilePath = filePath;
+            if (uploadFilePath.endsWith("/")) {
+                uploadFilePath = uploadFilePath.substring(
+                    0, uploadFilePath.length() - 1);
             }
+            recursivelyUploadFiles(
+                idDirectory, fileManager, storageId, uploadFilePath);
             return Response.ok().build();
         } catch (MalformedURLException e) {
             logger.error(e);

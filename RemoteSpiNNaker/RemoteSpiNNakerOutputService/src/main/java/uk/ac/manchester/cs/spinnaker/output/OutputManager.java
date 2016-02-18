@@ -23,13 +23,16 @@ public interface OutputManager {
      * Adds outputs to be hosted for a given id, returning a matching list of
      * URLs on which the files are hosted
      *
-     * @param id
-     * @param files
-     * @return
+     * @param projectId The id of the project
+     * @param id The id of the job
+     * @param rootFile The root directory containing all the files
+     * @param files The files to add
+     * @return A list of DataItem instances for adding to the job
      * @throws IOException
      */
-    public List<DataItem> addOutputs(int id, File rootFile, List<File> outputs)
-            throws IOException;
+    public List<DataItem> addOutputs(
+        String projectId, int id, File rootFile, List<File> outputs)
+        throws IOException;
 
     /**
     * Gets a results file
@@ -39,21 +42,26 @@ public interface OutputManager {
     *         file does not exist
     */
     // TODO: Enable authentication based on collab id
-    //@PreAuthorize("@collabSecurityService.canRead(#collabId)")
+    //@PreAuthorize("@collabSecurityService.canRead(#projectId)")
     @GET
-    @Path("{id}/{filename:.*}")
+    @Path("{projectId}/{id}/{filename:.*}")
     @Produces(MediaType.MEDIA_TYPE_WILDCARD)
-    public Response getResultFile(@PathParam("id") int id,
-            @PathParam("filename") String filename,
-            @QueryParam("download") @DefaultValue("true") boolean download);
+    public Response getResultFile(
+        @PathParam("projectId") String projectId,
+        @PathParam("id") int id,
+        @PathParam("filename") String filename,
+        @QueryParam("download") @DefaultValue("true") boolean download);
 
     @POST
-    @Path("{id}/uploadToHPC")
+    @Path("{projectId}/{id}/uploadToHPC")
+    // TODO: Enable authentication based on collab id
+    //@PreAuthorize("@collabSecurityService.canWrite(#projectId)")
     public Response uploadResultsToHPCServer(
-            @PathParam("id") int id, @QueryParam("url") String serverUrl,
-            @QueryParam("storageId") String storageId,
-            @QueryParam("filePath") String filePath,
-            @QueryParam("userId") String userId,
-            @QueryParam("token") String token);
+        @PathParam("projectId") String projectId,
+        @PathParam("id") int id, @QueryParam("url") String serverUrl,
+        @QueryParam("storageId") String storageId,
+        @QueryParam("filePath") String filePath,
+        @QueryParam("userId") String userId,
+        @QueryParam("token") String token);
 
 }

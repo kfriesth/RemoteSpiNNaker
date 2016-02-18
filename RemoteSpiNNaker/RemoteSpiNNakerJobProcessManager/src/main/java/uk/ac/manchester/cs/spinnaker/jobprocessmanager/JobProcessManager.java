@@ -80,6 +80,7 @@ public class JobProcessManager {
         JobManagerInterface jobManager = null;
         JobManagerLogWriter logWriter = null;
         Job job = null;
+        String projectId = null;
         try {
 
             String serverUrl = null;
@@ -108,6 +109,7 @@ public class JobProcessManager {
 
             // Read the job
             job = jobManager.getNextJob(executerId);
+            projectId = new File(job.getProject()).getName();
 
             // Create a temporary location for the job
             File workingDirectory = File.createTempFile("job", ".tmp");
@@ -191,19 +193,20 @@ public class JobProcessManager {
             } else {
                 for (File output : outputs) {
                     InputStream input = new FileInputStream(output);
-                    jobManager.addOutput(job.getId(), output.getName(), input);
+                    jobManager.addOutput(
+                        projectId, job.getId(), output.getName(), input);
                     input.close();
                 }
             }
             if (status == Status.Error) {
                 Throwable error = process.getError();
                 jobManager.setJobError(
-                    job.getId(), error.getMessage(), log,
+                    projectId, job.getId(), error.getMessage(), log,
                     workingDirectory.getAbsolutePath(), outputsAsStrings,
                     new RemoteStackTrace(error));
             } else if (status == Status.Finished) {
                 jobManager.setJobFinished(
-                    job.getId(), log, workingDirectory.getAbsolutePath(),
+                    projectId, job.getId(), log, workingDirectory.getAbsolutePath(),
                     outputsAsStrings);
 
                 // Clean up
@@ -216,14 +219,14 @@ public class JobProcessManager {
             }
 
         } catch (Throwable error) {
-            if (jobManager != null) {
+            if (jobManager != null && job != null) {
                 try {
                     String log = "";
                     if (logWriter != null) {
                         log = logWriter.getLog();
                     }
                     jobManager.setJobError(
-                        job.getId(), error.getMessage(), log,
+                        projectId, job.getId(), error.getMessage(), log,
                         "", new ArrayList<String>(),
                         new RemoteStackTrace(error));
                 } catch (Throwable t) {

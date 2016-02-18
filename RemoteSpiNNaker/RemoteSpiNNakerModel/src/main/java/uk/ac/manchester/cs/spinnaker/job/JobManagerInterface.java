@@ -27,8 +27,9 @@ public interface JobManagerInterface {
     @GET
     @Path("{id}/machine")
     @Produces(MediaType.APPLICATION_JSON)
-    public SpinnakerMachine getJobMachine(@PathParam("id") int id,
-            @QueryParam("n_chips") @DefaultValue("-1") int n_chips);
+    public SpinnakerMachine getJobMachine(
+        @PathParam("id") int id,
+        @QueryParam("n_chips") @DefaultValue("-1") int n_chips);
 
     @POST
     @Path("{id}/log")
@@ -36,25 +37,29 @@ public interface JobManagerInterface {
     public void appendLog(@PathParam("id") int id, String logToAppend);
 
     @POST
-    @Path("{id}/addoutput")
+    @Path("{projectId}/{id}/addoutput")
     @Consumes("application/octet-stream")
-    public void addOutput(@PathParam("id") int id,
-            @QueryParam("outputFilename") String output, InputStream input);
+    public void addOutput(
+        @PathParam("projectId") String projectId, @PathParam("id") int id,
+        @QueryParam("outputFilename") String output, InputStream input);
 
     @POST
-    @Path("{id}/finished")
+    @Path("{projectId}/{id}/finished")
     @Consumes("text/plain")
-    public void setJobFinished(@PathParam("id") int id, String logToAppend,
-            @QueryParam("baseFilename") String baseFilename,
-            @QueryParam("outputFilename") List<String> outputs);
+    public void setJobFinished(
+        @PathParam("projectId") String projectId,
+        @PathParam("id") int id, String logToAppend,
+        @QueryParam("baseFilename") String baseFilename,
+        @QueryParam("outputFilename") List<String> outputs);
 
     @POST
-    @Path("{id}/error")
+    @Path("{projectId}/{id}/error")
     @Consumes(MediaType.APPLICATION_JSON)
-    public void setJobError(@PathParam("id") int id,
-            @QueryParam("error") String error,
-            @QueryParam("logToAppend") String logToAppend,
-            @QueryParam("baseFilename") String baseFilename,
-            @QueryParam("outputFilename") List<String> outputs,
-            RemoteStackTrace stackTrace);
+    public void setJobError(
+        @PathParam("projectId") String projectId, @PathParam("id") int id,
+        @QueryParam("error") String error,
+        @QueryParam("logToAppend") String logToAppend,
+        @QueryParam("baseFilename") String baseFilename,
+        @QueryParam("outputFilename") List<String> outputs,
+        RemoteStackTrace stackTrace);
 }

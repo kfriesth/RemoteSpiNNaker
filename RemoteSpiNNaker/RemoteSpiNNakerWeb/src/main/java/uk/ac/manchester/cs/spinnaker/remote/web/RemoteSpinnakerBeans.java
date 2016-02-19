@@ -127,6 +127,9 @@ public class RemoteSpinnakerBeans {
     @Value("${collab.service.uri}")
     private String collabServiceUri;
 
+    @Value("${results.purge.days}")
+    private long nDaysToKeepResults;
+
     @Autowired
     public void configureGlobal(AuthenticationManagerBuilder auth)
             throws Exception {
@@ -264,7 +267,8 @@ public class RemoteSpinnakerBeans {
 
     @Bean
     public OutputManager outputManager() {
-        return new OutputManagerImpl(baseServerUrl, resultsDirectory);
+        return new OutputManagerImpl(
+            baseServerUrl, resultsDirectory, nDaysToKeepResults);
     }
 
     @Bean

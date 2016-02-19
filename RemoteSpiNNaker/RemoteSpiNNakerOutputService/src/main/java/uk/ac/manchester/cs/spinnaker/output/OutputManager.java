@@ -52,6 +52,14 @@ public interface OutputManager {
         @PathParam("filename") String filename,
         @QueryParam("download") @DefaultValue("true") boolean download);
 
+    @GET
+    @Path("{id}/{filename:.*}")
+    @Produces(MediaType.MEDIA_TYPE_WILDCARD)
+    public Response getResultFile(
+        @PathParam("id") int id,
+        @PathParam("filename") String filename,
+        @QueryParam("download") @DefaultValue("true") boolean download);
+
     @POST
     @Path("{projectId}/{id}/uploadToHPC")
     // TODO: Enable authentication based on collab id

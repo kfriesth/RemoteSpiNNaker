@@ -80,13 +80,13 @@ public class OutputManagerImpl implements OutputManager {
 
         ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(1);
-        scheduler.schedule(new Runnable() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
 
             @Override
             public void run() {
                 removeOldFiles();
             }
-        }, 1, TimeUnit.DAYS);
+        }, 0, 1, TimeUnit.DAYS);
     }
 
     private void startJobOperation(File directory) {
@@ -289,13 +289,18 @@ public class OutputManagerImpl implements OutputManager {
     }
 
     private void removeOldFiles() {
+        long startTime = System.currentTimeMillis();
         for (File projectDirectory : resultsDirectory.listFiles()) {
             if (projectDirectory.isDirectory()) {
                 boolean allJobsRemoved = true;
                 for (File jobDirectory : projectDirectory.listFiles()) {
+                    logger.debug(
+                        "Determining whether to remove " + jobDirectory +
+                        " which is " +
+                        (startTime - jobDirectory.lastModified()) +
+                        "ms old of " + timeToKeepResults);
                     if (jobDirectory.isDirectory() &&
-                            ((System.currentTimeMillis() -
-                                jobDirectory.lastModified()) >
+                            ((startTime - jobDirectory.lastModified()) >
                             timeToKeepResults)) {
                         logger.info(
                             "Removing results for job " +

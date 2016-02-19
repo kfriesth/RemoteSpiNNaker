@@ -279,13 +279,15 @@ public class OutputManagerImpl implements OutputManager {
         }
     }
 
-    private void emptyDirectory(File directory) {
+    private void removeDirectory(File directory) {
         for (File file : directory.listFiles()) {
             if (file.isDirectory()) {
-                emptyDirectory(file);
+                removeDirectory(file);
+            } else {
+                file.delete();
             }
-            file.delete();
         }
+        directory.delete();
     }
 
     private void removeOldFiles() {
@@ -306,7 +308,7 @@ public class OutputManagerImpl implements OutputManager {
                             "Removing results for job " +
                             jobDirectory.getName());
                         startJobOperation(jobDirectory);
-                        emptyDirectory(jobDirectory);
+                        removeDirectory(jobDirectory);
                         endJobOperation(jobDirectory);
 
                         try {

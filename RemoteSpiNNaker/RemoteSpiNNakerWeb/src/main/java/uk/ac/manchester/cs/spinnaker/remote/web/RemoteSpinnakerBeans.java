@@ -49,7 +49,9 @@ import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 import uk.ac.manchester.cs.spinnaker.jobmanager.impl.LocalJobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
+import uk.ac.manchester.cs.spinnaker.machinemanager.FixedMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
+import uk.ac.manchester.cs.spinnaker.machinemanager.SpallocMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
 import uk.ac.manchester.cs.spinnaker.output.OutputManager;
 import uk.ac.manchester.cs.spinnaker.output.impl.OutputManagerImpl;
@@ -79,8 +81,23 @@ public class RemoteSpinnakerBeans {
     @Autowired
     private ApplicationContext ctx;
 
+    @Value("${spalloc.enabled}")
+    private boolean useSpalloc;
+
     @Value("${machines}")
     private List<SpinnakerMachine> machines;
+
+    @Value("${spalloc.server}")
+    private String spallocServer;
+
+    @Value("${spalloc.port}")
+    private int spallocPort;
+
+    @Value("${spalloc.machine.name}")
+    private String spallocMachine;
+
+    @Value("${spalloc.user.name}")
+    private String spallocUser;
 
     @Value("${nmpi.url}")
     private URL nmpiUrl;
@@ -249,7 +266,11 @@ public class RemoteSpinnakerBeans {
 
     @Bean
     public MachineManager machineManager() {
-        return new MachineManager(machines);
+        if (useSpalloc) {
+            return new SpallocMachineManagerImpl(
+                spallocServer, spallocPort, spallocMachine, spallocUser);
+        }
+        return new FixedMachineManagerImpl(machines);
     }
 
     @Bean

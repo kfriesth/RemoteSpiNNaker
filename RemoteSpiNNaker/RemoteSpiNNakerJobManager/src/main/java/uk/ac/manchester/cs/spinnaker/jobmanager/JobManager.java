@@ -14,6 +14,7 @@ import java.util.Queue;
 import java.util.UUID;
 
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.commons.logging.Log;
@@ -35,6 +36,9 @@ import uk.ac.manchester.cs.spinnaker.output.OutputManager;
  * processes and machines.
  */
 public class JobManager implements NMPIQueueListener, JobManagerInterface {
+
+    public static final String JOB_PROCESS_MANAGER_ZIP =
+            "/RemoteSpiNNakerJobProcessManager.zip";
 
     private MachineManager machineManager = null;
 
@@ -298,5 +302,16 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 }
             }
         }
+    }
+
+    @Override
+    public Response getJobProcessManager() {
+        InputStream jobManagerStream = getClass().getResourceAsStream(
+            JobManager.JOB_PROCESS_MANAGER_ZIP);
+        if (jobManagerStream == null) {
+            throw new UnsatisfiedLinkError(JobManager.JOB_PROCESS_MANAGER_ZIP
+                    + " not found in classpath");
+        }
+        return Response.ok(jobManagerStream).type("application/zip").build();
     }
 }

@@ -16,9 +16,6 @@ import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 
 public class LocalJobExecuterFactory implements JobExecuterFactory {
 
-    private static final String JOB_PROCESS_MANAGER_ZIP =
-            "/RemoteSpiNNakerJobProcessManager.zip";
-
     private static final String JOB_PROCESS_MANAGER_MAIN_CLASS =
             "uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager";
 
@@ -45,9 +42,9 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
         // Find the JobManager resource
         InputStream jobManagerStream = getClass().getResourceAsStream(
-            JOB_PROCESS_MANAGER_ZIP);
+            JobManager.JOB_PROCESS_MANAGER_ZIP);
         if (jobManagerStream == null) {
-            throw new UnsatisfiedLinkError(JOB_PROCESS_MANAGER_ZIP
+            throw new UnsatisfiedLinkError(JobManager.JOB_PROCESS_MANAGER_ZIP
                     + " not found in classpath");
         }
 

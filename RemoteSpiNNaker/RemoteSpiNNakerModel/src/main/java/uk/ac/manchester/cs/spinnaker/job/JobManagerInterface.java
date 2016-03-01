@@ -12,6 +12,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
@@ -62,4 +63,9 @@ public interface JobManagerInterface {
         @QueryParam("baseFilename") String baseFilename,
         @QueryParam("outputFilename") List<String> outputs,
         RemoteStackTrace stackTrace);
+
+    @GET
+    @Path("/jobProcessManager.zip")
+    @Produces("application/zip")
+    public Response getJobProcessManager();
 }

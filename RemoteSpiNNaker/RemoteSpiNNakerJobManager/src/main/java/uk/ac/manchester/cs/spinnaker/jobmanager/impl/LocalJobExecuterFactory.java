@@ -85,6 +85,7 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
         arguments.add("--deleteOnExit");
         arguments.add("--executerId");
         arguments.add(id);
+        arguments.add("--liveUploadOutput");
         return new LocalJobExecuter(manager, getJavaExec(),
             jobProcessManagerClasspath, JOB_PROCESS_MANAGER_MAIN_CLASS,
             arguments, jobExecuterDirectory, id);

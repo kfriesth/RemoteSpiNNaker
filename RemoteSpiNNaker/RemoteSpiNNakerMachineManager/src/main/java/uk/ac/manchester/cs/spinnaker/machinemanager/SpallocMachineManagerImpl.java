@@ -5,10 +5,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -149,7 +152,9 @@ public class SpallocMachineManagerImpl extends Thread
             throws IOException {
         waitForConnection();
         logger.trace("Sending message of type " + request.getCommand());
-        writer.println(mapper.writeValueAsString(request));
+        String line = mapper.writeValueAsString(request);
+        logger.trace("Sending message: " + line);
+        writer.println(line);
         writer.flush();
         getNextResponse(null);
     }
@@ -163,12 +168,12 @@ public class SpallocMachineManagerImpl extends Thread
             info.getHeight(), "None");
     }
 
-    private void waitForState(int jobId, int state) {
+    private JobState waitForStates(int jobId, Set<Integer> states) {
         synchronized (machineState) {
             while (!machineState.containsKey(jobId) ||
-                    machineState.get(jobId).getState() != state) {
+                    !states.contains(machineState.get(jobId).getState())) {
                 logger.debug(
-                    "Waiting for job " + jobId + " to get to state " + state);
+                    "Waiting for job " + jobId + " to get to one of " + states);
                 try {
                     machineState.wait();
                 } catch (InterruptedException e) {
@@ -176,6 +181,7 @@ public class SpallocMachineManagerImpl extends Thread
                     // Does Nothing
                 }
             }
+            return machineState.get(jobId);
         }
     }
 
@@ -185,8 +191,11 @@ public class SpallocMachineManagerImpl extends Thread
         if (n_boards - (int) n_boards > 0.8) {
             n_boards += 1.0;
         }
+        if (n_boards < 1.0) {
+            n_boards = 1.0;
+        }
         n_boards = Math.ceil(n_boards);
-        if (n_boards > 1) {
+        if (n_boards > 1.0) {
             n_boards = Math.ceil(n_boards / 3) * 3;
         }
 
@@ -194,13 +203,7 @@ public class SpallocMachineManagerImpl extends Thread
         while (machineAllocated == null) {
             try {
                 int jobId = sendRequest(new CreateJobCommand(
-                    (int) nChips, machine, owner), Integer.class);
-                machineAllocated = getMachineForJob(jobId);
-                machinesAllocated.put(jobId, machineAllocated);
-                jobByMachine.put(machineAllocated, jobId);
-                if (callback != null) {
-                    callbacks.put(jobId, callback);
-                }
+                    (int) n_boards, machine, owner), Integer.class);
                 logger.debug(
                     "Got machine " + jobId + ", requesting notifications");
                 sendRequest(new NotifyJobCommand(jobId));
@@ -210,7 +213,17 @@ public class SpallocMachineManagerImpl extends Thread
                     machineState.put(jobId, state);
                 }
                 logger.debug("Notifications for " + jobId + " are on");
-                waitForState(jobId, JobState.READY);
+                state = waitForStates(jobId, new HashSet<Integer>(Arrays.asList(
+                    JobState.READY, JobState.DESTROYED)));
+                if (state.getState() == JobState.DESTROYED) {
+                    throw new RuntimeException(state.getReason());
+                }
+                machineAllocated = getMachineForJob(jobId);
+                machinesAllocated.put(jobId, machineAllocated);
+                jobByMachine.put(machineAllocated, jobId);
+                if (callback != null) {
+                    callbacks.put(jobId, callback);
+                }
             } catch (IOException e) {
                 logger.error("Error getting machine - retrying", e);
             }
@@ -239,7 +252,7 @@ public class SpallocMachineManagerImpl extends Thread
 
     @Override
     public boolean isMachineAvailable(SpinnakerMachine machine) {
-        Integer jobId = jobByMachine.remove(machine);
+        Integer jobId = jobByMachine.get(machine);
         if (jobId != null) {
             logger.debug("Job " + jobId + " still available");
             return true;
@@ -286,6 +299,8 @@ public class SpallocMachineManagerImpl extends Thread
                     try {
                         String line = reader.readLine();
                         if (line != null) {
+                            logger.trace(
+                                "Received response: " + line);
                             Response response = mapper.readValue(
                                 line, Response.class);
                             logger.trace(
@@ -416,7 +431,7 @@ public class SpallocMachineManagerImpl extends Thread
             new SpallocMachineManagerImpl(
                 "10.0.0.3", 22244, "fake-48-board-machine", "test");
         manager.start();
-        SpinnakerMachine machine = manager.getNextAvailableMachine(5);
+        SpinnakerMachine machine = manager.getNextAvailableMachine(325);
         System.err.println(
             "Machine " + machine.getMachineName() + " allocated");
         Thread.sleep(20000);

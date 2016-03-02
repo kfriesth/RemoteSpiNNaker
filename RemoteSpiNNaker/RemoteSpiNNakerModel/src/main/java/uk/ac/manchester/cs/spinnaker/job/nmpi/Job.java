@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
  */
 public class Job implements QueueNextResponse {
 
-    private String experimentDescription = null;
+    private String code = null;
 
     private Map<String, Object> hardwareConfig = null;
 
@@ -26,11 +26,9 @@ public class Job implements QueueNextResponse {
 
     private List<DataItem> inputData = null;
 
-    private String log = null;
-
     private List<DataItem> outputData = null;
 
-    private String project = null;
+    private String collabId = null;
 
     private String resourceUri = null;
 
@@ -48,12 +46,12 @@ public class Job implements QueueNextResponse {
 
     private String user = null;
 
-    public String getExperimentDescription() {
-        return experimentDescription;
+    public String getCode() {
+        return code;
     }
 
-    public void setExperimentDescription(String experimentDescription) {
-        this.experimentDescription = experimentDescription;
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public Map<String, Object> getHardwareConfig() {
@@ -88,14 +86,6 @@ public class Job implements QueueNextResponse {
         this.inputData = inputData;
     }
 
-    public String getLog() {
-        return log;
-    }
-
-    public void setLog(String log) {
-        this.log = log;
-    }
-
     public List<DataItem> getOutputData() {
         return outputData;
     }
@@ -104,12 +94,12 @@ public class Job implements QueueNextResponse {
         this.outputData = outputData;
     }
 
-    public String getProject() {
-        return project;
+    public String getCollabId() {
+        return collabId;
     }
 
-    public void setProject(String project) {
-        this.project = project;
+    public void setCollabId(String collabId) {
+        this.collabId = collabId;
     }
 
     public String getResourceUri() {

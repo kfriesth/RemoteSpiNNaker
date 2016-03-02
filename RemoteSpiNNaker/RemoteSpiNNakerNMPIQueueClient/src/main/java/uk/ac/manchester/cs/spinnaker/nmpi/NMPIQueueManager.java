@@ -25,6 +25,7 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
+import uk.ac.manchester.cs.spinnaker.nmpi.model.NMPILog;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
 import uk.ac.manchester.cs.spinnaker.rest.APIKeyScheme;
@@ -65,6 +66,11 @@ public class NMPIQueueManager extends Thread {
     * A cache of jobs that have been received
     */
     private Map<Integer, Job> jobCache = new HashMap<Integer, Job>();
+
+    /**
+     * The log of the job so far
+     */
+    private Map<Integer, NMPILog> jobLog = new HashMap<Integer, NMPILog>();
 
     /**
      * Determines whether jobs should be deleted when complete
@@ -168,11 +174,11 @@ public class NMPIQueueManager extends Thread {
                         for (NMPIQueueListener listener: listeners) {
                             listener.addJob(job, deleteJobsOnExit);
                         }
-                        logger.debug("Setting job status to running");
+                        logger.debug("Setting job status to queued");
                         job.setTimestampSubmission(job.getTimestampSubmission()
                                 .withZoneRetainFields(DateTimeZone.UTC));
                         job.setTimestampCompletion(null);
-                        job.setStatus("running");
+                        job.setStatus("queued");
                         logger.debug("Updating job status on server");
                         synchronized (queue) {
                             queue.updateJob(job.getId(), job);
@@ -199,15 +205,22 @@ public class NMPIQueueManager extends Thread {
     * @param logToAppend The messages to append
     */
     public void appendJobLog(int id, String logToAppend) {
-        Job job = getJob(id);
-        String existingLog = job.getLog();
+        NMPILog existingLog = jobLog.get(id);
         if (existingLog == null) {
-            existingLog = logToAppend;
-        } else {
-            existingLog += logToAppend;
+            existingLog = new NMPILog();
         }
-        job.setLog(existingLog);
+        existingLog.appendContent(logToAppend);
         logger.debug("Job " + id + " log is being updated");
+        synchronized (queue) {
+            queue.updateLog(id, existingLog);
+        }
+    }
+
+    public void setJobRunning(int id) {
+        logger.debug("Job " + id + " is running");
+        Job job = getJob(id);
+        job.setStatus("running");
+        logger.debug("Updating job status on server");
         synchronized (queue) {
             queue.updateJob(id, job);
         }
@@ -226,18 +239,13 @@ public class NMPIQueueManager extends Thread {
             throws MalformedURLException {
         logger.debug("Job " + id + " is finished");
 
+        if (logToAppend != null) {
+            appendJobLog(id, logToAppend);
+        }
+
         Job job = getJob(id);
         job.setStatus("finished");
         job.setOutputData(outputs);
-        if (logToAppend != null) {
-            String existingLog = job.getLog();
-            if (existingLog == null) {
-                existingLog = logToAppend;
-            } else {
-                existingLog += logToAppend;
-            }
-            job.setLog(existingLog);
-        }
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
 
         logger.debug("Updating job status on server");
@@ -260,26 +268,19 @@ public class NMPIQueueManager extends Thread {
         logger.debug("Job " + id + " finished with an error");
         StringWriter errors = new StringWriter();
         error.printStackTrace(new PrintWriter(errors));
-        String logMessage = "Error:\n";
-        logMessage += errors.toString();
+        StringBuilder logMessage = new StringBuilder();
+        if (logToAppend != null) {
+            logMessage.append(logToAppend);
+        }
+        if (jobLog.containsKey(id) || logMessage.length() > 0) {
+            logMessage.append("\n\n==================\n");
+        }
+        logMessage.append("Error:\n");
+        logMessage.append(errors.toString());
+        appendJobLog(id, logMessage.toString());
 
         Job job = getJob(id);
         job.setStatus("error");
-        String existingLog = job.getLog();
-        if (logToAppend != null) {
-            if (existingLog == null) {
-                existingLog = logToAppend;
-            } else {
-                existingLog += logToAppend;
-            }
-        }
-        if (existingLog == null || existingLog.isEmpty()) {
-            existingLog = logMessage;
-        } else {
-            existingLog += "\n\n==================\n";
-            existingLog += logMessage;
-        }
-        job.setLog(existingLog);
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
         job.setOutputData(outputs);
 

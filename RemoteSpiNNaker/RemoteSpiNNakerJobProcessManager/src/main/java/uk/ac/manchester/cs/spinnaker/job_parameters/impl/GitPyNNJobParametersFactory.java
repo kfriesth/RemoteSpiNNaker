@@ -16,7 +16,7 @@ import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryExceptio
 import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
- * A JobParametersFactory that downloads a PyNN job from github
+ * A JobParametersFactory that downloads a PyNN job from git
  */
 public class GitPyNNJobParametersFactory implements JobParametersFactory {
 
@@ -27,7 +27,7 @@ public class GitPyNNJobParametersFactory implements JobParametersFactory {
             throws UnsupportedJobException, JobParametersFactoryException {
 
         // Test that there is a URL
-        String experimentDescription = job.getExperimentDescription();
+        String experimentDescription = job.getCode();
         if (!experimentDescription.startsWith("http://")
                 && !experimentDescription.startsWith("https://")) {
             throw new UnsupportedJobException();

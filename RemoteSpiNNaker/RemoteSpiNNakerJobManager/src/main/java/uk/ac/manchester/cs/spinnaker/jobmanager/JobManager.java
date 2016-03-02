@@ -114,6 +114,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             executorJobId.put(executerId, job);
             logger.info(
                 "Executer " + executerId + " is running " + job.getId());
+            queueManager.setJobRunning(job.getId());
             return job;
         }
     }
@@ -273,7 +274,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             if (!alreadyGone) {
                 logger.debug("Job " + job.getId() + " has not exited cleanly");
                 try {
-                    String projectId = new File(job.getProject()).getName();
+                    String projectId = new File(job.getCollabId()).getName();
                     queueManager.setJobError(job.getId(), logToAppend,
                         getOutputFiles(projectId, job.getId(), null, null),
                         new Exception("Job did not finish cleanly"));

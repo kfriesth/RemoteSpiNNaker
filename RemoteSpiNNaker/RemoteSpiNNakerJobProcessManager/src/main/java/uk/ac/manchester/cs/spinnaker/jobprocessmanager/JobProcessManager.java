@@ -87,6 +87,7 @@ public class JobProcessManager {
             boolean deleteOnExit = false;
             boolean isLocal = false;
             String executerId = null;
+            boolean liveUploadOutput = false;
             for (int i = 0; i < args.length; i++) {
                 if (args[i].equals("--serverUrl")) {
                     serverUrl = args[++i];
@@ -96,6 +97,8 @@ public class JobProcessManager {
                     isLocal = true;
                 } else if (args[i].equals("--executerId")) {
                     executerId = args[++i];
+                } else if (args[i].equals("--liveUploadOutput")) {
+                    liveUploadOutput = true;
                 }
             }
 
@@ -109,7 +112,7 @@ public class JobProcessManager {
 
             // Read the job
             job = jobManager.getNextJob(executerId);
-            projectId = new File(job.getProject()).getName();
+            projectId = new File(job.getCollabId()).getName();
 
             // Create a temporary location for the job
             File workingDirectory = File.createTempFile("job", ".tmp");
@@ -166,12 +169,12 @@ public class JobProcessManager {
                     JOB_PROCESS_FACTORY.createProcess(parameters);
 
             logWriter = new JobManagerLogWriter(
-                    createJobManager(serverUrl), job.getId());
+                createJobManager(serverUrl), job.getId(), liveUploadOutput);
 
             // Read the machine
-            // (-1 to get any size of machine available just now)
+            // (get a 3 board machine just now)
             SpinnakerMachine machine = jobManager.getJobMachine(
-                job.getId(), -1);
+                job.getId(), 48 * 3);
 
             // Execute the process
             System.err.println("Running job " + job.getId() + " on "
@@ -206,8 +209,8 @@ public class JobProcessManager {
                     new RemoteStackTrace(error));
             } else if (status == Status.Finished) {
                 jobManager.setJobFinished(
-                    projectId, job.getId(), log, workingDirectory.getAbsolutePath(),
-                    outputsAsStrings);
+                    projectId, job.getId(), log,
+                    workingDirectory.getAbsolutePath(), outputsAsStrings);
 
                 // Clean up
                 process.cleanup();

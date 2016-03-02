@@ -22,13 +22,13 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
     @Override
     public JobParameters getJobParameters(Job job, File workingDirectory)
             throws UnsupportedJobException, JobParametersFactoryException {
-        if (!job.getExperimentDescription().contains("import")) {
+        if (!job.getCode().contains("import")) {
             throw new UnsupportedJobException();
         }
         try {
             File scriptFile = new File(workingDirectory, SCRIPT_NAME);
             PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
-            writer.print(job.getExperimentDescription());
+            writer.print(job.getCode());
             writer.close();
 
             return new PyNNJobParameters(workingDirectory.getAbsolutePath(),

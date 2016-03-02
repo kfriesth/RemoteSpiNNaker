@@ -267,8 +267,10 @@ public class RemoteSpinnakerBeans {
     @Bean
     public MachineManager machineManager() {
         if (useSpalloc) {
-            return new SpallocMachineManagerImpl(
+            SpallocMachineManagerImpl spalloc = new SpallocMachineManagerImpl(
                 spallocServer, spallocPort, spallocMachine, spallocUser);
+            spalloc.start();
+            return spalloc;
         }
         return new FixedMachineManagerImpl(machines);
     }

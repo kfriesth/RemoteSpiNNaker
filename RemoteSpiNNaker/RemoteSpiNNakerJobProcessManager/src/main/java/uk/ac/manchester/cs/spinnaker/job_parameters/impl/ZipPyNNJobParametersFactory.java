@@ -30,7 +30,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             throws UnsupportedJobException, JobParametersFactoryException {
 
         // Test that there is a URL
-        String experimentDescription = job.getExperimentDescription();
+        String experimentDescription = job.getCode();
         if (!experimentDescription.startsWith("http://")
                 && !experimentDescription.startsWith("https://")) {
             throw new UnsupportedJobException();
@@ -76,7 +76,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             }
 
             // If the archive was still not extracted, try again with
-            // compressors
+            // different compression types
             if (!archiveExtracted) {
                 CompressionType[] typesSupported = new CompressionType[]{
                     CompressionType.BZIP2, CompressionType.GZIP

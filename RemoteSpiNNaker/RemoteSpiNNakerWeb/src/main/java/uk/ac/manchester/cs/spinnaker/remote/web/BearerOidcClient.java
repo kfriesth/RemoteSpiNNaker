@@ -40,11 +40,17 @@ public class BearerOidcClient
             throws ParseException, MalformedURLException, IOException {
         this.discoveryURI = discoveryURI;
 
-        this.oidcProvider = OIDCProviderMetadata.parse(
-            new DefaultResourceRetriever(
-                HttpConstants.DEFAULT_CONNECT_TIMEOUT,
-                HttpConstants.DEFAULT_READ_TIMEOUT).retrieveResource(
-                    new URL(discoveryURI)).getContent());
+        try {
+            this.oidcProvider = OIDCProviderMetadata.parse(
+                new DefaultResourceRetriever(
+                    HttpConstants.DEFAULT_CONNECT_TIMEOUT,
+                    HttpConstants.DEFAULT_READ_TIMEOUT).retrieveResource(
+                        new URL(discoveryURI)).getContent());
+        } catch (Exception e) {
+            logger.error(
+                "Could not contact OIDC provider - Bearer authentication" +
+                " will not work", e);
+        }
 
         this.realmName = realmName;
     }

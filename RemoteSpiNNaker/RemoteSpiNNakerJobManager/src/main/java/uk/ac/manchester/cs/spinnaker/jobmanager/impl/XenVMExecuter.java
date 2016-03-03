@@ -39,7 +39,6 @@ public class XenVMExecuter extends Thread implements JobExecuter {
         this.connection = new Connection(xenServerUrl);
         Session.loginWithPassword(connection, username, password);
 
-        String uuid = UUID.randomUUID().toString();
         Set<VM> vmsWithLabel = VM.getByNameLabel(
             connection, templateLabel);
         if (vmsWithLabel.isEmpty()) {
@@ -48,8 +47,14 @@ public class XenVMExecuter extends Thread implements JobExecuter {
         }
         VM templateVm = vmsWithLabel.iterator().next();
         this.clonedVm = templateVm.createClone(
-            connection, templateLabel + uuid);
+            connection, templateLabel + "_" + UUID.randomUUID().toString());
         this.uuid = clonedVm.getUuid(connection);
+
+        this.clonedVm.addToXenstoreData(
+            connection, "vm-data/nmpiurl", baseServerUrl.toString());
+        this.clonedVm.addToXenstoreData(
+            connection, "vm-data/nmpiargs",
+            "--deleteOnExit --liveUploadOutput");
     }
 
     @Override

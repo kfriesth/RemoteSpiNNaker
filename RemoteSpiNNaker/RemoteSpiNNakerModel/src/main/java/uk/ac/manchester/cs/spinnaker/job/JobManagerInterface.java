@@ -65,7 +65,7 @@ public interface JobManagerInterface {
         RemoteStackTrace stackTrace);
 
     @GET
-    @Path("/jobProcessManager.zip")
+    @Path("/JobProcessManager.zip")
     @Produces("application/zip")
     public Response getJobProcessManager();
 }

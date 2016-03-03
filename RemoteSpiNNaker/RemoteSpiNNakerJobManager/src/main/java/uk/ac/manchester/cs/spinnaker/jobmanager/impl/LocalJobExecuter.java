@@ -65,6 +65,16 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
         this.id = id;
     }
 
+    @Override
+    public String getExecuterId() {
+        return id;
+    }
+
+    @Override
+    public void startExecuter() throws IOException {
+        start();
+    }
+
     /**
     * Runs the external job
     * @throws IOException If there is an error starting the job

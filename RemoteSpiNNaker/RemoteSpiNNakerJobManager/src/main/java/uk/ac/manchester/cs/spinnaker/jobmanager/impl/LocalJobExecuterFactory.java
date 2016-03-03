@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -77,18 +78,19 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
     @Override
     public JobExecuter createJobExecuter(
-            JobManager manager, URL baseUrl, String id) throws IOException {
+            JobManager manager, URL baseUrl) throws IOException {
+        String uuid = UUID.randomUUID().toString();
         List<String> arguments = new ArrayList<String>();
         arguments.add("--serverUrl");
         arguments.add(baseUrl.toString());
         arguments.add("--local");
         arguments.add("--deleteOnExit");
         arguments.add("--executerId");
-        arguments.add(id);
+        arguments.add(uuid);
         arguments.add("--liveUploadOutput");
         return new LocalJobExecuter(manager, getJavaExec(),
             jobProcessManagerClasspath, JOB_PROCESS_MANAGER_MAIN_CLASS,
-            arguments, jobExecuterDirectory, id);
+            arguments, jobExecuterDirectory, uuid);
     }
 
 }

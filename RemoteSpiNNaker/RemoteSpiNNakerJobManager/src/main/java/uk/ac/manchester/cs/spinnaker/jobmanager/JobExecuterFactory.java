@@ -17,7 +17,7 @@ public interface JobExecuterFactory {
      * @return The new executer
      * @throws IOException If there is an error creating the executer
      */
-    JobExecuter createJobExecuter(JobManager manager, URL baseUrl, String id)
+    JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
         throws IOException;
 
 }

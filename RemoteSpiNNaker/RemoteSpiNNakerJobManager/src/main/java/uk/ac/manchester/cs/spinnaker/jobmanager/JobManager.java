@@ -11,7 +11,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.UUID;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -91,11 +90,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             }
 
             // Start an executer for the job
-            String uuid = UUID.randomUUID().toString();
             JobExecuter executer = jobExecuterFactory.createJobExecuter(
-                this, baseUrl, uuid);
-            jobExecuters.put(uuid, executer);
-            executer.start();
+                this, baseUrl);
+            jobExecuters.put(executer.getExecuterId(), executer);
+            executer.startExecuter();
         }
     }
 
@@ -293,9 +291,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                         try {
                             JobExecuter executer =
                                 jobExecuterFactory.createJobExecuter(
-                                    this, baseUrl, executorId);
-                            jobExecuters.put(executorId, executer);
-                            executer.start();
+                                    this, baseUrl);
+                            jobExecuters.put(
+                                executer.getExecuterId(), executer);
+                            executer.startExecuter();
                         } catch (IOException e) {
                             logger.error("Could not launch a new executer", e);
                         }

@@ -48,6 +48,7 @@ import com.nimbusds.oauth2.sdk.ParseException;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 import uk.ac.manchester.cs.spinnaker.jobmanager.impl.LocalJobExecuterFactory;
+import uk.ac.manchester.cs.spinnaker.jobmanager.impl.XenVMExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.FixedMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
@@ -146,6 +147,21 @@ public class RemoteSpinnakerBeans {
 
     @Value("${results.purge.days}")
     private long nDaysToKeepResults;
+
+    @Value("${xen.server.enabled}")
+    private boolean useXenVms;
+
+    @Value("${xen.server.url}")
+    private URL xenServerUrl;
+
+    @Value("${xen.server.username}")
+    private String xenUsername;
+
+    @Value("${xen.server.password}")
+    private String xenPassword;
+
+    @Value("${xen.server.templateVm}")
+    private String xenTemplateVmName;
 
     @Autowired
     public void configureGlobal(AuthenticationManagerBuilder auth)
@@ -285,7 +301,11 @@ public class RemoteSpinnakerBeans {
 
     @Bean
     public JobExecuterFactory jobExecuterFactory() throws IOException {
-        return new LocalJobExecuterFactory();
+        if (!useXenVms) {
+            return new LocalJobExecuterFactory();
+        }
+        return new XenVMExecuterFactory(
+            xenServerUrl, xenUsername, xenPassword, xenTemplateVmName);
     }
 
     @Bean

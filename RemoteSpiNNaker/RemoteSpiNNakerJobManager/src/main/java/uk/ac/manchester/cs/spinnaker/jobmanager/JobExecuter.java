@@ -9,8 +9,14 @@ import java.io.IOException;
 public interface JobExecuter {
 
     /**
+    * Gets the id of the executer
+    * @return The id
+    */
+    public String getExecuterId();
+
+    /**
     * Starts the external job
     * @throws IOException If there is an error starting the job
     */
-    public void start() throws IOException;
+    public void startExecuter() throws IOException;
 }

@@ -36,6 +36,8 @@ public class Job implements QueueNextResponse {
 
     private String command = null;
 
+    private String userId = null;
+
     @JsonSerialize(using=DateTimeSerialiser.class)
     @JsonDeserialize(using=DateTimeDeserialiser.class)
     private DateTime timestampCompletion = null;
@@ -148,5 +150,13 @@ public class Job implements QueueNextResponse {
 
     public void setCommand(String command) {
         this.command = command;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 }

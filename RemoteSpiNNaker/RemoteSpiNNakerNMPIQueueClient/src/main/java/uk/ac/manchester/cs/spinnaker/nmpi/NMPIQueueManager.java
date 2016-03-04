@@ -73,11 +73,6 @@ public class NMPIQueueManager extends Thread {
     private Map<Integer, NMPILog> jobLog = new HashMap<Integer, NMPILog>();
 
     /**
-     * Determines whether jobs should be deleted when complete
-     */
-    private boolean deleteJobsOnExit = true;
-
-    /**
     * The logger
     */
     private Log logger = LogFactory.getLog(getClass());
@@ -90,13 +85,12 @@ public class NMPIQueueManager extends Thread {
     * @param password The password or API key to log in to the server with
     * @param passwordIsKey True if the password is an API key, False if the
     *         password should be used to obtain the key
-    * @param deleteJobsOnExit True if jobs should be deleted when complete
     * @throws NoSuchAlgorithmException
     * @throws KeyManagementException
     */
     public NMPIQueueManager(
             URL url, String hardware, String username, String password,
-            boolean passwordIsKey, boolean deleteJobsOnExit) {
+            boolean passwordIsKey) {
 
         String apiKey = password;
         if (!passwordIsKey) {
@@ -117,7 +111,6 @@ public class NMPIQueueManager extends Thread {
         queue = target.proxy(NMPIQueue.class);
 
         this.hardware = hardware;
-        this.deleteJobsOnExit = deleteJobsOnExit;
     }
 
     /**
@@ -172,7 +165,7 @@ public class NMPIQueueManager extends Thread {
                     logger.debug("Job " + job.getId() + " received");
                     try {
                         for (NMPIQueueListener listener: listeners) {
-                            listener.addJob(job, deleteJobsOnExit);
+                            listener.addJob(job);
                         }
                         logger.debug("Setting job status to queued");
                         job.setTimestampSubmission(job.getTimestampSubmission()

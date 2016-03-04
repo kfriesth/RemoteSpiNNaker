@@ -20,6 +20,7 @@
         <pac4j.springsecurity.version>1.4.1</pac4j.springsecurity.version>
         <pac4j.oidc.version>1.8.5</pac4j.oidc.version>
         <j2ee.version>6.0</j2ee.version>
+        <commons.lang.version>3.4</commons.lang.version>
     </properties>
 
     <build>

@@ -68,4 +68,10 @@ public class JobManagerLogWriter implements LogWriter {
         }
     }
 
+    public void stop() {
+        if (sendTimer != null) {
+            sendTimer.stop();
+        }
+    }
+
 }

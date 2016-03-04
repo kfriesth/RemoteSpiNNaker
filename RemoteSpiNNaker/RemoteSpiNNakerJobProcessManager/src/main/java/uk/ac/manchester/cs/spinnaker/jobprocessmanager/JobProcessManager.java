@@ -88,6 +88,7 @@ public class JobProcessManager {
             boolean isLocal = false;
             String executerId = null;
             boolean liveUploadOutput = false;
+            boolean requestMachine = false;
             for (int i = 0; i < args.length; i++) {
                 if (args[i].equals("--serverUrl")) {
                     serverUrl = args[++i];
@@ -99,6 +100,8 @@ public class JobProcessManager {
                     executerId = args[++i];
                 } else if (args[i].equals("--liveUploadOutput")) {
                     liveUploadOutput = true;
+                } else if (args[i].equals("--requestMachine")) {
+                    requestMachine = true;
                 }
             }
 
@@ -173,15 +176,21 @@ public class JobProcessManager {
 
             // Read the machine
             // (get a 3 board machine just now)
-            SpinnakerMachine machine = jobManager.getJobMachine(
-                job.getId(), 48 * 3);
+            SpinnakerMachine machine = null;
+            String machineUrl = null;
+            if (requestMachine) {
+                machine = jobManager.getJobMachine(job.getId(), -1, -1, -1);
+            } else {
+                machineUrl = serverUrl + "job/" + job.getId() + "/machine";
+            }
 
             // Execute the process
             System.err.println("Running job " + job.getId() + " on "
-                    + machine.getMachineName() + " using "
+                    + machine + " using "
                     + parameters.getClass()
                     + " reporting to " + serverUrl);
-            process.execute(machine, parameters, logWriter);
+            process.execute(machineUrl, machine, parameters, logWriter);
+            logWriter.stop();
             String log = logWriter.getLog();
 
             // Get the exit status
@@ -226,6 +235,7 @@ public class JobProcessManager {
                 try {
                     String log = "";
                     if (logWriter != null) {
+                        logWriter.stop();
                         log = logWriter.getLog();
                     }
                     jobManager.setJobError(

@@ -20,6 +20,9 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 @Path("/job")
 public interface JobManagerInterface {
 
+    public static final String JOB_PROCESS_MANAGER_ZIP =
+            "RemoteSpiNNakerJobProcessManager.zip";
+
     @GET
     @Path("next")
     @Produces(MediaType.APPLICATION_JSON)
@@ -30,7 +33,11 @@ public interface JobManagerInterface {
     @Produces(MediaType.APPLICATION_JSON)
     public SpinnakerMachine getJobMachine(
         @PathParam("id") int id,
-        @QueryParam("n_chips") @DefaultValue("-1") int n_chips);
+        @QueryParam("nChips") @DefaultValue("-1") int nChips,
+        @QueryParam("nMachineTimeSteps") @DefaultValue("-1")
+            int nMachineTimeSteps,
+        @QueryParam("timescaleFactor") @DefaultValue("-1")
+            double timescaleFactor);
 
     @POST
     @Path("{id}/log")
@@ -65,7 +72,7 @@ public interface JobManagerInterface {
         RemoteStackTrace stackTrace);
 
     @GET
-    @Path("/JobProcessManager.zip")
+    @Path(JOB_PROCESS_MANAGER_ZIP)
     @Produces("application/zip")
     public Response getJobProcessManager();
 }

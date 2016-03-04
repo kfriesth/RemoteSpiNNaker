@@ -71,7 +71,7 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
     }
 
     @Override
-    public void startExecuter() throws IOException {
+    public void startExecuter() {
         start();
     }
 

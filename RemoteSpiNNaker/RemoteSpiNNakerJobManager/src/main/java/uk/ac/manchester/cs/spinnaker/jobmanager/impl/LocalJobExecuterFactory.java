@@ -33,7 +33,19 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
     private File jobExecuterDirectory = null;
 
-    public LocalJobExecuterFactory() throws IOException {
+    private boolean deleteOnExit;
+
+    private boolean liveUploadOutput;
+
+    private boolean requestSpiNNakerMachine;
+
+    public LocalJobExecuterFactory(
+            boolean deleteOnExit, boolean liveUploadOutput,
+            boolean requestSpiNNakerMachine) throws IOException {
+
+        this.deleteOnExit = deleteOnExit;
+        this.liveUploadOutput = liveUploadOutput;
+        this.requestSpiNNakerMachine = requestSpiNNakerMachine;
 
         // Create a temporary folder
         jobExecuterDirectory = File.createTempFile("jobExecuter", "tmp");
@@ -43,10 +55,11 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
         // Find the JobManager resource
         InputStream jobManagerStream = getClass().getResourceAsStream(
-            JobManager.JOB_PROCESS_MANAGER_ZIP);
+            "/" + JobManager.JOB_PROCESS_MANAGER_ZIP);
         if (jobManagerStream == null) {
-            throw new UnsatisfiedLinkError(JobManager.JOB_PROCESS_MANAGER_ZIP
-                    + " not found in classpath");
+            throw new UnsatisfiedLinkError(
+                "/" + JobManager.JOB_PROCESS_MANAGER_ZIP
+                + " not found in classpath");
         }
 
         // Extract the JobManager resources
@@ -84,10 +97,17 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
         arguments.add("--serverUrl");
         arguments.add(baseUrl.toString());
         arguments.add("--local");
-        arguments.add("--deleteOnExit");
         arguments.add("--executerId");
         arguments.add(uuid);
-        arguments.add("--liveUploadOutput");
+        if (deleteOnExit) {
+            arguments.add("--deleteOnExit");
+        }
+        if (liveUploadOutput) {
+            arguments.add("--liveUploadOutput");
+        }
+        if (requestSpiNNakerMachine) {
+            arguments.add("--requestMachine");
+        }
         return new LocalJobExecuter(manager, getJavaExec(),
             jobProcessManagerClasspath, JOB_PROCESS_MANAGER_MAIN_CLASS,
             arguments, jobExecuterDirectory, uuid);

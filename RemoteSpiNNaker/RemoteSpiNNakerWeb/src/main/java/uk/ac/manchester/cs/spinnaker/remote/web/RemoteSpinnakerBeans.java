@@ -130,6 +130,12 @@ public class RemoteSpinnakerBeans {
     @Value("${deleteJobsOnExit}")
     private boolean deleteJobsOnExit;
 
+    @Value("${liveUploadOutput}")
+    private boolean liveUploadOutput;
+
+    @Value("${requestSpiNNakerMachine}")
+    private boolean requestSpiNNakerMachine;
+
     @Value("${oidc.clientId}")
     private String oidcClientId;
 
@@ -162,6 +168,9 @@ public class RemoteSpinnakerBeans {
 
     @Value("${xen.server.templateVm}")
     private String xenTemplateVmName;
+
+    @Value("${xen.server.diskspaceInGbs}")
+    private long xenDiskSizeInGbs;
 
     @Autowired
     public void configureGlobal(AuthenticationManagerBuilder auth)
@@ -296,16 +305,19 @@ public class RemoteSpinnakerBeans {
             KeyManagementException {
         return new NMPIQueueManager(
             nmpiUrl, nmpiHardware, nmpiUsername, nmpiPassword,
-            nmpiPasswordIsApiKey, deleteJobsOnExit);
+            nmpiPasswordIsApiKey);
     }
 
     @Bean
     public JobExecuterFactory jobExecuterFactory() throws IOException {
         if (!useXenVms) {
-            return new LocalJobExecuterFactory();
+            return new LocalJobExecuterFactory(
+                deleteJobsOnExit, liveUploadOutput, requestSpiNNakerMachine);
         }
         return new XenVMExecuterFactory(
-            xenServerUrl, xenUsername, xenPassword, xenTemplateVmName);
+            xenServerUrl, xenUsername, xenPassword, xenTemplateVmName,
+            xenDiskSizeInGbs, deleteJobsOnExit, liveUploadOutput,
+            requestSpiNNakerMachine);
     }
 
     @Bean

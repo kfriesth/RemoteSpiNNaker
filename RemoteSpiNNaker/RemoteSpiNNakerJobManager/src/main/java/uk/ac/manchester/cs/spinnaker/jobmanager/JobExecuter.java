@@ -18,5 +18,5 @@ public interface JobExecuter {
     * Starts the external job
     * @throws IOException If there is an error starting the job
     */
-    public void startExecuter() throws IOException;
+    public void startExecuter();
 }

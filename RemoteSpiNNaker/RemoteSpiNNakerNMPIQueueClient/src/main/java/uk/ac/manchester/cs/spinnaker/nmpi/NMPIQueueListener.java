@@ -9,5 +9,5 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
  */
 public interface NMPIQueueListener {
 
-    void addJob(Job job, boolean deleteJobOnExit) throws IOException;
+    void addJob(Job job) throws IOException;
 }

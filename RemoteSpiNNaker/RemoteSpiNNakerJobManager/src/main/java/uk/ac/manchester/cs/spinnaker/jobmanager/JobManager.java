@@ -36,8 +36,8 @@ import uk.ac.manchester.cs.spinnaker.output.OutputManager;
  */
 public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
-    public static final String JOB_PROCESS_MANAGER_ZIP =
-            "/RemoteSpiNNakerJobProcessManager.zip";
+    public static final String JOB_PROCESS_MANAGER_JAR =
+            "RemoteSpiNNakerJobProcessManager.jar";
 
     private MachineManager machineManager = null;
 
@@ -79,7 +79,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
-    public void addJob(Job job, boolean deleteJobOnExit) throws IOException {
+    public void addJob(Job job) throws IOException {
         logger.info("New job " + job.getId());
 
         // Add the job to the set of jobs to be run
@@ -118,11 +118,17 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
-    public SpinnakerMachine getJobMachine(int id, int n_chips) {
+    public SpinnakerMachine getJobMachine(
+            int id, int nChips, int nMachineTimeSteps, double timescaleFactor) {
+
+        int nChipsToRequest = nChips;
+        if (nChips <= 0) {
+            nChipsToRequest = 48 * 3;
+        }
 
         // Get a machine to run the job on
         SpinnakerMachine machine = machineManager.getNextAvailableMachine(
-            n_chips);
+            nChipsToRequest);
         synchronized (allocatedMachines) {
             allocatedMachines.put(id, machine);
         }
@@ -307,7 +313,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     @Override
     public Response getJobProcessManager() {
         InputStream jobManagerStream = getClass().getResourceAsStream(
-            JobManager.JOB_PROCESS_MANAGER_ZIP);
+            "/" + JobManager.JOB_PROCESS_MANAGER_ZIP);
         if (jobManagerStream == null) {
             throw new UnsatisfiedLinkError(JobManager.JOB_PROCESS_MANAGER_ZIP
                     + " not found in classpath");

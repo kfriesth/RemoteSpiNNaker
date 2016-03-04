@@ -66,7 +66,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
     }
 
     @Override
-    public void execute(SpinnakerMachine machine,
+    public void execute(String machineUrl, SpinnakerMachine machine,
             PyNNJobParameters parameters, LogWriter logWriter) {
         try {
             status = Status.Running;
@@ -80,14 +80,19 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
             if (cfgFile.exists()) {
                 parser.read(cfgFile);
             }
+
             if (!parser.hasSection("Machine")) {
                 parser.addSection("Machine");
             }
-            parser.set("Machine", "machineName", machine.getMachineName());
-            parser.set("Machine", "version", machine.getVersion());
-            parser.set("Machine", "width", machine.getWidth());
-            parser.set("Machine", "height", machine.getHeight());
-            parser.set("Machine", "bmp_names", machine.getBmpDetails());
+            if (machine != null) {
+                parser.set("Machine", "machineName", machine.getMachineName());
+                parser.set("Machine", "version", machine.getVersion());
+                parser.set("Machine", "width", machine.getWidth());
+                parser.set("Machine", "height", machine.getHeight());
+                parser.set("Machine", "bmp_names", machine.getBmpDetails());
+            } else {
+                parser.set("Machine", "remote_spinnaker_url", machineUrl);
+            }
             parser.write(cfgFile);
 
             // Keep existing files to compare to later

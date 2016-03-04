@@ -136,7 +136,6 @@ public class XenVMExecuter extends Thread implements JobExecuter {
             if (deleteOnExit) {
                 clonedVm.destroy(connection);
                 vdi.destroy(connection);
-                disk.destroy(connection);
             }
         } catch (Exception e) {
             logger.error("Error setting up VM", e);

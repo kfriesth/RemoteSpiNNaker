@@ -201,6 +201,7 @@ public class NMPIQueueManager extends Thread {
         NMPILog existingLog = jobLog.get(id);
         if (existingLog == null) {
             existingLog = new NMPILog();
+            jobLog.put(id, existingLog);
         }
         existingLog.appendContent(logToAppend);
         logger.debug("Job " + id + " log is being updated");

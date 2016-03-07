@@ -139,6 +139,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     @Override
     public void appendLog(int id, String logToAppend) {
         logger.debug("Updating log for " + id);
+        logger.trace(id + ": " + logToAppend);
         queueManager.appendJobLog(id, logToAppend);
     }
 

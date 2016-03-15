@@ -65,14 +65,18 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     private OutputManager outputManager = null;
 
+    private boolean restartJobExecuterOnFailure;
+
     public JobManager(MachineManager machineManager,
             NMPIQueueManager queueManager, OutputManager outputManager,
-            URL baseUrl, JobExecuterFactory jobExecuterFactory) {
+            URL baseUrl, JobExecuterFactory jobExecuterFactory,
+            boolean restartJobExecutorOnFailure) {
         this.machineManager = machineManager;
         this.queueManager = queueManager;
         this.outputManager = outputManager;
         this.baseUrl = baseUrl;
         this.jobExecuterFactory = jobExecuterFactory;
+        this.restartJobExecuterOnFailure = restartJobExecutorOnFailure;
 
         // Start the queue manager
         queueManager.addListener(this);
@@ -334,18 +338,21 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
                 "An executer has exited.  This could indicate an error!");
             logger.error(logToAppend);
 
-            synchronized (jobsToRun) {
-                synchronized (jobExecuters) {
-                    if (jobsToRun.size() > jobExecuters.size()) {
-                        try {
-                            JobExecuter executer =
-                                jobExecuterFactory.createJobExecuter(
-                                    this, baseUrl);
-                            jobExecuters.put(
-                                executer.getExecuterId(), executer);
-                            executer.startExecuter();
-                        } catch (IOException e) {
-                            logger.error("Could not launch a new executer", e);
+            if (this.restartJobExecuterOnFailure) {
+                synchronized (jobsToRun) {
+                    synchronized (jobExecuters) {
+                        if (jobsToRun.size() > jobExecuters.size()) {
+                            try {
+                                JobExecuter executer =
+                                    jobExecuterFactory.createJobExecuter(
+                                        this, baseUrl);
+                                jobExecuters.put(
+                                    executer.getExecuterId(), executer);
+                                executer.startExecuter();
+                            } catch (IOException e) {
+                                logger.error(
+                                    "Could not launch a new executer", e);
+                            }
                         }
                     }
                 }

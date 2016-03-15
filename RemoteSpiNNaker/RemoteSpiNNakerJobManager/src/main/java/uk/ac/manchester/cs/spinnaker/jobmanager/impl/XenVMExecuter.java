@@ -11,10 +11,12 @@ import org.apache.xmlrpc.XmlRpcException;
 import com.xensource.xenapi.Connection;
 import com.xensource.xenapi.SR;
 import com.xensource.xenapi.Session;
+import com.xensource.xenapi.Types.BadServerResponse;
 import com.xensource.xenapi.Types.VbdMode;
 import com.xensource.xenapi.Types.VbdType;
 import com.xensource.xenapi.Types.VdiType;
 import com.xensource.xenapi.Types.VmPowerState;
+import com.xensource.xenapi.Types.XenAPIException;
 import com.xensource.xenapi.VBD;
 import com.xensource.xenapi.VDI;
 import com.xensource.xenapi.VM;
@@ -50,6 +52,18 @@ public class XenVMExecuter extends Thread implements JobExecuter {
 
     private Log logger = LogFactory.getLog(getClass());
 
+    private Connection connection;
+
+    private VM clonedVm;
+
+    private VBD disk;
+
+    private VDI vdi;
+
+    private VDI extraVdi;
+
+    private VBD extraDisk;
+
     public XenVMExecuter(
             JobManager jobManager, String uuid, URL xenServerUrl,
             String username, String password, String templateLabel,
@@ -79,51 +93,63 @@ public class XenVMExecuter extends Thread implements JobExecuter {
         start();
     }
 
+    private void createVm() throws XmlRpcException, IOException {
+        connection = new Connection(xenServerUrl);
+        Session.loginWithPassword(connection, username, password);
+
+        Set<VM> vmsWithLabel = VM.getByNameLabel(
+            connection, templateLabel);
+        if (vmsWithLabel.isEmpty()) {
+            throw new IOException(
+                "No template with name " + templateLabel + " was found");
+        }
+        VM templateVm = vmsWithLabel.iterator().next();
+        clonedVm = templateVm.createClone(
+            connection, templateLabel + "_" + uuid);
+        Set<VBD> disks = clonedVm.getVBDs(connection);
+        if (disks.isEmpty()) {
+            throw new IOException("No disks found on " + templateLabel);
+        }
+        disk = disks.iterator().next();
+        vdi = disk.getVDI(connection);
+        String diskLabel = vdi.getNameLabel(connection);
+        vdi.setNameLabel(connection, diskLabel + "_" + uuid + "_base");
+        SR storageRepository = vdi.getSR(connection);
+
+        VDI.Record vdiRecord = new VDI.Record();
+        vdiRecord.nameLabel = diskLabel + "_" + uuid + "_storage";
+        vdiRecord.type = VdiType.USER;
+        vdiRecord.SR = storageRepository;
+        vdiRecord.virtualSize =
+            defaultDiskSizeInGbs * 1024L * 1024L * 1024L;
+        extraVdi = VDI.create(connection, vdiRecord);
+        VBD.Record vbdRecord = new VBD.Record();
+        vbdRecord.VM = clonedVm;
+        vbdRecord.VDI = extraVdi;
+        vbdRecord.userdevice = "1";
+        vbdRecord.mode = VbdMode.RW;
+        vbdRecord.type = VbdType.DISK;
+        extraDisk = VBD.create(connection, vbdRecord);
+
+        clonedVm.addToXenstoreData(
+            connection, "vm-data/nmpiurl", jobProcessManagerUrl);
+        clonedVm.addToXenstoreData(
+            connection, "vm-data/nmpifile", jobProcessManagerZipFile);
+        clonedVm.addToXenstoreData(connection, "vm-data/nmpiargs", args);
+    }
+
+    private void deleteVm()
+            throws BadServerResponse, XenAPIException, XmlRpcException {
+        disk.destroy(connection);
+        extraDisk.destroy(connection);
+        vdi.destroy(connection);
+        extraVdi.destroy(connection);
+        clonedVm.destroy(connection);
+    }
+
     public void run() {
         try {
-
-            Connection connection = new Connection(xenServerUrl);
-            Session.loginWithPassword(connection, username, password);
-
-            Set<VM> vmsWithLabel = VM.getByNameLabel(
-                connection, templateLabel);
-            if (vmsWithLabel.isEmpty()) {
-                throw new IOException(
-                    "No template with name " + templateLabel + " was found");
-            }
-            VM templateVm = vmsWithLabel.iterator().next();
-            VM clonedVm = templateVm.createClone(
-                connection, templateLabel + "_" + uuid);
-            Set<VBD> disks = clonedVm.getVBDs(connection);
-            if (disks.isEmpty()) {
-                throw new IOException("No disks found on " + templateLabel);
-            }
-            VBD disk = disks.iterator().next();
-            VDI vdi = disk.getVDI(connection);
-            String diskLabel = vdi.getNameLabel(connection);
-            vdi.setNameLabel(connection, diskLabel + "_" + uuid + "_base");
-            SR storageRepository = vdi.getSR(connection);
-
-            VDI.Record vdiRecord = new VDI.Record();
-            vdiRecord.nameLabel = diskLabel + "_" + uuid + "_storage";
-            vdiRecord.type = VdiType.USER;
-            vdiRecord.SR = storageRepository;
-            vdiRecord.virtualSize =
-                defaultDiskSizeInGbs * 1024L * 1024L * 1024L;
-            VDI extraVdi = VDI.create(connection, vdiRecord);
-            VBD.Record vbdRecord = new VBD.Record();
-            vbdRecord.VM = clonedVm;
-            vbdRecord.VDI = extraVdi;
-            vbdRecord.device = "/dev/xvdb";
-            vbdRecord.mode = VbdMode.RW;
-            vbdRecord.type = VbdType.DISK;
-            VBD extraDisk = VBD.create(connection, vbdRecord);
-
-            clonedVm.addToXenstoreData(
-                connection, "vm-data/nmpiurl", jobProcessManagerUrl);
-            clonedVm.addToXenstoreData(
-                connection, "vm-data/nmpifile", jobProcessManagerZipFile);
-            clonedVm.addToXenstoreData(connection, "vm-data/nmpiargs", args);
+            createVm();
             clonedVm.start(connection, false, true);
 
             boolean vmRunning = true;
@@ -150,11 +176,7 @@ public class XenVMExecuter extends Thread implements JobExecuter {
             }
 
             if (deleteOnExit) {
-                disk.unplug(connection);
-                extraDisk.unplug(connection);
-                clonedVm.destroy(connection);
-                vdi.destroy(connection);
-                extraVdi.destroy(connection);
+                deleteVm();
             }
         } catch (Exception e) {
             logger.error("Error setting up VM", e);

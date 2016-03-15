@@ -172,6 +172,9 @@ public class RemoteSpinnakerBeans {
     @Value("${xen.server.diskspaceInGbs}")
     private long xenDiskSizeInGbs;
 
+    @Value("${restartJobExecutorOnFailure}")
+    private boolean restartJobExecutorOnFailure;
+
     @Autowired
     public void configureGlobal(AuthenticationManagerBuilder auth)
             throws Exception {
@@ -331,7 +334,7 @@ public class RemoteSpinnakerBeans {
             NoSuchAlgorithmException, KeyManagementException {
         return new JobManager(
             machineManager(), queueManager(), outputManager(), baseServerUrl,
-            jobExecuterFactory());
+            jobExecuterFactory(), restartJobExecutorOnFailure);
     }
 
     @Bean

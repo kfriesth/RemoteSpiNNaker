@@ -89,7 +89,10 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
                 parser.set("Machine", "version", machine.getVersion());
                 parser.set("Machine", "width", machine.getWidth());
                 parser.set("Machine", "height", machine.getHeight());
-                parser.set("Machine", "bmp_names", machine.getBmpDetails());
+                String bmpDetails = machine.getBmpDetails();
+                if (bmpDetails != null) {
+                    parser.set("Machine", "bmp_names", bmpDetails);
+                }
             } else {
                 parser.set("Machine", "remote_spinnaker_url", machineUrl);
             }

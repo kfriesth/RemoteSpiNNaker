@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -26,11 +28,13 @@ import uk.ac.manchester.cs.spinnaker.machinemanager.commands.DestroyJobCommand;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.GetJobMachineInfoCommand;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.GetJobStateCommand;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.JobKeepAliveCommand;
+import uk.ac.manchester.cs.spinnaker.machinemanager.commands.ListMachinesCommand;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.NoNotifyJobCommand;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.NotifyJobCommand;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobMachineInfo;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobState;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobsChangedResponse;
+import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Machine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Response;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.ReturnResponse;
 
@@ -165,7 +169,7 @@ public class SpallocMachineManagerImpl extends Thread
         return new SpinnakerMachine(
             info.getConnections().get(0).getHostname(),
             MACHINE_VERSION, info.getWidth(),
-            info.getHeight(), "None");
+            info.getHeight(), null);
     }
 
     private JobState waitForStates(int jobId, Set<Integer> states) {
@@ -182,6 +186,25 @@ public class SpallocMachineManagerImpl extends Thread
                 }
             }
             return machineState.get(jobId);
+        }
+    }
+
+    @Override
+    public List<SpinnakerMachine> getMachines() {
+        try {
+            Machine[] spallocMachines = sendRequest(
+                new ListMachinesCommand(), Machine[].class);
+            List<SpinnakerMachine> machines = new ArrayList<SpinnakerMachine>();
+            for (Machine machine : spallocMachines) {
+
+                machines.add(new SpinnakerMachine(
+                    machine.getName(), MACHINE_VERSION,
+                    machine.getWidth() * 12, machine.getHeight() * 12, null));
+            }
+            return machines;
+        } catch (IOException e) {
+            logger.error("Error getting machines", e);
+            return null;
         }
     }
 
@@ -258,6 +281,25 @@ public class SpallocMachineManagerImpl extends Thread
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean waitForMachineStateChange(SpinnakerMachine machine,
+            int waitTime) {
+        Integer jobId = jobByMachine.get(machine);
+        if (jobId == null) {
+            return true;
+        }
+        synchronized (machineState) {
+            JobState state = machineState.get(jobId);
+            try {
+                machineState.wait(waitTime);
+            } catch (InterruptedException e) {
+
+                // Does Nothing
+            }
+            return machineState.get(jobId).equals(state);
+        }
     }
 
     public void close() {
@@ -427,11 +469,32 @@ public class SpallocMachineManagerImpl extends Thread
     }
 
     public static void main(String[] args) throws Exception {
-        SpallocMachineManagerImpl manager =
+        final SpallocMachineManagerImpl manager =
             new SpallocMachineManagerImpl(
-                "10.0.0.3", 22244, "fake-48-board-machine", "test");
+                "10.0.0.3", 22244, "my_4_node_board", "test");
         manager.start();
-        SpinnakerMachine machine = manager.getNextAvailableMachine(325);
+
+        for (SpinnakerMachine machine : manager.getMachines()) {
+            System.err.println(
+                machine.getWidth() + " x " + machine.getHeight());
+        }
+        final SpinnakerMachine machine = manager.getNextAvailableMachine(1);
+
+        Thread t = new Thread() {
+
+            @Override
+            public void run() {
+                boolean available = manager.isMachineAvailable(machine);
+                while (available) {
+                    System.err.println("Waiting for Machine to go");
+                    manager.waitForMachineStateChange(machine, 10000);
+                    available = manager.isMachineAvailable(machine);
+                }
+                System.err.println("Machine gone");
+            }
+        };
+        t.start();
+
         System.err.println(
             "Machine " + machine.getMachineName() + " allocated");
         Thread.sleep(20000);

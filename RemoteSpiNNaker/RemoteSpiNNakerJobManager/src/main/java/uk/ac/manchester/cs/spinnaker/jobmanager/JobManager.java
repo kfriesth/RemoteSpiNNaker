@@ -19,6 +19,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import uk.ac.manchester.cs.spinnaker.job.JobMachineAllocated;
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTrace;
 import uk.ac.manchester.cs.spinnaker.job.RemoteStackTraceElement;
@@ -118,8 +119,27 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
+    public SpinnakerMachine getLargestJobMachine(int id, double runTime) {
+
+        // TODO Check quota to get the largest machine within the quota
+
+        SpinnakerMachine largest = null;
+        for (SpinnakerMachine machine : machineManager.getMachines()) {
+            if ((largest == null) ||
+                    ((machine.getWidth() * machine.getHeight()) >
+                    (largest.getWidth() * largest.getHeight()))) {
+                largest = machine;
+            }
+        }
+
+        return largest;
+    }
+
+    @Override
     public SpinnakerMachine getJobMachine(
-            int id, int nChips, int nMachineTimeSteps, double timescaleFactor) {
+            int id, int nChips, double runTime) {
+
+        // TODO Check quota
 
         int nChipsToRequest = nChips;
         if (nChips <= 0) {
@@ -134,6 +154,28 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
         return machine;
+    }
+
+    @Override
+    public void extendJobMachineLease(int id, double runTime) {
+        // TODO Check quota that the lease can be extended
+
+    }
+
+    @Override
+    public JobMachineAllocated checkMachineLease(int id, int waitTime) {
+        SpinnakerMachine machine = null;
+        synchronized (allocatedMachines) {
+            machine = allocatedMachines.get(id);
+        }
+        if (!machineManager.isMachineAvailable(machine)) {
+            return new JobMachineAllocated(false);
+        }
+        if (!machineManager.waitForMachineStateChange(machine, waitTime)) {
+            return new JobMachineAllocated(true);
+        }
+        return new JobMachineAllocated(
+            machineManager.isMachineAvailable(machine));
     }
 
     @Override

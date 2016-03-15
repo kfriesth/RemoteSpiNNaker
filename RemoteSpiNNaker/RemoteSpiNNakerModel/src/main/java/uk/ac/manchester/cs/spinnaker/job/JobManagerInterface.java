@@ -29,15 +29,32 @@ public interface JobManagerInterface {
     public Job getNextJob(@QueryParam("executerId") String executerId);
 
     @GET
+    @Path("{id}/machine/max")
+    @Produces(MediaType.APPLICATION_JSON)
+    public SpinnakerMachine getLargestJobMachine(
+        @PathParam("id") int id,
+        @QueryParam("runTime") @DefaultValue("-1") double runTime);
+
+    @GET
     @Path("{id}/machine")
     @Produces(MediaType.APPLICATION_JSON)
     public SpinnakerMachine getJobMachine(
         @PathParam("id") int id,
         @QueryParam("nChips") @DefaultValue("-1") int nChips,
-        @QueryParam("nMachineTimeSteps") @DefaultValue("-1")
-            int nMachineTimeSteps,
-        @QueryParam("timescaleFactor") @DefaultValue("-1")
-            double timescaleFactor);
+        @QueryParam("runTime") @DefaultValue("-1") double runTime);
+
+    @GET
+    @Path("{id}/machine/checkLease")
+    @Produces(MediaType.APPLICATION_JSON)
+    public JobMachineAllocated checkMachineLease(
+        @PathParam("id") int id,
+        @QueryParam("waitTime") @DefaultValue("10000") int waitTime);
+
+    @GET
+    @Path("{id}/machine/extendLease")
+    public void extendJobMachineLease(
+        @PathParam("id") int id,
+        @QueryParam("runTime") @DefaultValue("-1") double runTime);
 
     @POST
     @Path("{id}/log")

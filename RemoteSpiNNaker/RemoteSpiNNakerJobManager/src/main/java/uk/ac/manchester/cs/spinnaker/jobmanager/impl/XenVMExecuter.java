@@ -9,7 +9,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.xmlrpc.XmlRpcException;
 
 import com.xensource.xenapi.Connection;
+import com.xensource.xenapi.SR;
 import com.xensource.xenapi.Session;
+import com.xensource.xenapi.Types.VbdMode;
+import com.xensource.xenapi.Types.VbdType;
+import com.xensource.xenapi.Types.VdiType;
 import com.xensource.xenapi.Types.VmPowerState;
 import com.xensource.xenapi.VBD;
 import com.xensource.xenapi.VDI;
@@ -96,12 +100,24 @@ public class XenVMExecuter extends Thread implements JobExecuter {
             }
             VBD disk = disks.iterator().next();
             VDI vdi = disk.getVDI(connection);
-            vdi.setNameLabel(
-                connection, vdi.getNameLabel(connection) + "_" + uuid);
-            long currentSize = vdi.getVirtualSize(connection);
-            long newSize =
-                currentSize + (defaultDiskSizeInGbs * 1024L * 1024L * 1024L);
-            vdi.resize(connection, newSize);
+            String diskLabel = vdi.getNameLabel(connection);
+            vdi.setNameLabel(connection, diskLabel + "_" + uuid + "_base");
+            SR storageRepository = vdi.getSR(connection);
+
+            VDI.Record vdiRecord = new VDI.Record();
+            vdiRecord.nameLabel = diskLabel + "_" + uuid + "_storage";
+            vdiRecord.type = VdiType.USER;
+            vdiRecord.SR = storageRepository;
+            vdiRecord.virtualSize =
+                defaultDiskSizeInGbs * 1024L * 1024L * 1024L;
+            VDI extraVdi = VDI.create(connection, vdiRecord);
+            VBD.Record vbdRecord = new VBD.Record();
+            vbdRecord.VM = clonedVm;
+            vbdRecord.VDI = extraVdi;
+            vbdRecord.device = "/dev/xvdb";
+            vbdRecord.mode = VbdMode.RW;
+            vbdRecord.type = VbdType.DISK;
+            VBD extraDisk = VBD.create(connection, vbdRecord);
 
             clonedVm.addToXenstoreData(
                 connection, "vm-data/nmpiurl", jobProcessManagerUrl);
@@ -134,8 +150,11 @@ public class XenVMExecuter extends Thread implements JobExecuter {
             }
 
             if (deleteOnExit) {
+                disk.unplug(connection);
+                extraDisk.unplug(connection);
                 clonedVm.destroy(connection);
                 vdi.destroy(connection);
+                extraVdi.destroy(connection);
             }
         } catch (Exception e) {
             logger.error("Error setting up VM", e);

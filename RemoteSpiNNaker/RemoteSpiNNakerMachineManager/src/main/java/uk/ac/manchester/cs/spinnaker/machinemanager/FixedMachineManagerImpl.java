@@ -1,8 +1,9 @@
 package uk.ac.manchester.cs.spinnaker.machinemanager;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Queue;
+import java.util.Set;
 
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
@@ -15,8 +16,13 @@ public class FixedMachineManagerImpl implements MachineManager {
     /**
      * The queue of available machines
      */
-    private Queue<SpinnakerMachine> machinesAvailable =
-            new LinkedList<SpinnakerMachine>();
+    private Set<SpinnakerMachine> machinesAvailable =
+            new HashSet<SpinnakerMachine>();
+
+    private Set<SpinnakerMachine> machinesAllocated =
+            new HashSet<SpinnakerMachine>();
+
+    private boolean done = false;
 
     /**
      * Creates a new MachineManager for a set of machines
@@ -26,6 +32,16 @@ public class FixedMachineManagerImpl implements MachineManager {
         for (SpinnakerMachine machine : machinesAvailable) {
             this.machinesAvailable.add(machine);
         }
+    }
+
+    @Override
+    public List<SpinnakerMachine> getMachines() {
+        List<SpinnakerMachine> machines = new ArrayList<SpinnakerMachine>();
+        synchronized (machinesAvailable) {
+            machines.addAll(machinesAvailable);
+            machines.addAll(machinesAllocated);
+        }
+        return machines;
     }
 
     /**
@@ -40,17 +56,34 @@ public class FixedMachineManagerImpl implements MachineManager {
 
         // TODO: Actually check the machine has n_chips!
 
+        SpinnakerMachine machine = null;
         synchronized (machinesAvailable) {
-            while (machinesAvailable.isEmpty()) {
-                try {
-                    machinesAvailable.wait();
-                } catch (InterruptedException e) {
 
-                    // Does Nothing
+            while ((machine == null) && !done) {
+
+                for (SpinnakerMachine nextMachine : machinesAvailable) {
+                    if ((nextMachine.getWidth() * nextMachine.getHeight()) >
+                            nChips) {
+                        machine = nextMachine;
+                    }
+                }
+
+                // If no machine was found, wait for something to change
+                if (machine == null) {
+                    try {
+                        machinesAvailable.wait();
+                    } catch (InterruptedException e) {
+
+                        // Does Nothing
+                    }
                 }
             }
-            return machinesAvailable.poll();
+
+            // Move the machine from available to allocated
+            machinesAvailable.remove(machine);
+            machinesAllocated.add(machine);
         }
+        return machine;
     }
 
     /**
@@ -60,6 +93,7 @@ public class FixedMachineManagerImpl implements MachineManager {
     @Override
     public void releaseMachine(SpinnakerMachine machine) {
         synchronized (machinesAvailable) {
+            machinesAllocated.remove(machine);
             machinesAvailable.add(machine);
             machinesAvailable.notifyAll();
         }
@@ -71,15 +105,31 @@ public class FixedMachineManagerImpl implements MachineManager {
     @Override
     public void close() {
         synchronized (machinesAvailable) {
-            machinesAvailable.add(null);
+            done = true;
             machinesAvailable.notifyAll();
         }
     }
 
     @Override
     public boolean isMachineAvailable(SpinnakerMachine machine) {
+        synchronized (machinesAvailable) {
+            return !machinesAvailable.contains(machine);
+        }
+    }
 
-        // The machine doesn't get taken off this manager
-        return true;
+    @Override
+    public boolean waitForMachineStateChange(SpinnakerMachine machine,
+            int waitTime) {
+
+        synchronized (machinesAvailable) {
+            boolean isAvailable = machinesAvailable.contains(machine);
+            try {
+                machinesAvailable.wait(waitTime);
+            } catch (InterruptedException e) {
+
+                // Does Nothing
+            }
+            return machinesAvailable.contains(machine) != isAvailable;
+        }
     }
 }

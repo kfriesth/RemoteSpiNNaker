@@ -20,30 +20,52 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 
     private boolean deleteOnExit;
 
+    private boolean shutdownOnExit;
+
     private boolean liveUploadOutput;
 
     private boolean requestSpiNNakerMachine;
 
     private long defaultDiskSizeInGbs;
 
+    private Integer maxNVirtualMachines;
+
+    private int nVirtualMachines = 0;
+
     public XenVMExecuterFactory(
             URL xenServerUrl, String username, String password,
             String templateLabel, long defaultDiskSizeInGbs,
-            boolean deleteOnExit, boolean liveUploadOutput,
-            boolean requestSpiNNakerMachine) {
+            boolean deleteOnExit, boolean shutdownOnExit,
+            boolean liveUploadOutput, boolean requestSpiNNakerMachine,
+            int maxNVirtualMachines) {
         this.xenServerUrl = xenServerUrl;
         this.username = username;
         this.password = password;
         this.templateLabel = templateLabel;
         this.deleteOnExit = deleteOnExit;
+        this.shutdownOnExit = shutdownOnExit;
         this.liveUploadOutput = liveUploadOutput;
         this.requestSpiNNakerMachine = requestSpiNNakerMachine;
         this.defaultDiskSizeInGbs = defaultDiskSizeInGbs;
+        this.maxNVirtualMachines = maxNVirtualMachines;
     }
 
     @Override
     public JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
             throws IOException {
+
+        synchronized (maxNVirtualMachines) {
+            while (nVirtualMachines >= maxNVirtualMachines) {
+                try {
+                    maxNVirtualMachines.wait();
+                } catch (InterruptedException e) {
+
+                    // Does Nothing
+                }
+            }
+            nVirtualMachines += 1;
+        }
+
         try {
             String uuid = UUID.randomUUID().toString();
 
@@ -67,12 +89,20 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
             }
 
             return new XenVMExecuter(
-                manager, uuid, xenServerUrl, username, password, templateLabel,
-                defaultDiskSizeInGbs, jobProcessManagerUrl.toString(),
+                manager, this, uuid, xenServerUrl, username, password,
+                templateLabel, defaultDiskSizeInGbs,
+                jobProcessManagerUrl.toString(),
                 JobManager.JOB_PROCESS_MANAGER_ZIP, args.toString(),
-                deleteOnExit);
+                deleteOnExit, shutdownOnExit);
         } catch (Exception e) {
             throw new IOException("Error creating VM", e);
+        }
+    }
+
+    protected void executorFinished() {
+        synchronized (maxNVirtualMachines) {
+            nVirtualMachines -= 1;
+            maxNVirtualMachines.notifyAll();
         }
     }
 

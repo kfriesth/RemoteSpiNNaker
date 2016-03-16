@@ -30,6 +30,8 @@ public class XenVMExecuter extends Thread implements JobExecuter {
 
     private JobManager jobManager;
 
+    private XenVMExecuterFactory factory;
+
     private URL xenServerUrl;
 
     private String username;
@@ -45,6 +47,8 @@ public class XenVMExecuter extends Thread implements JobExecuter {
     private String jobProcessManagerZipFile;
 
     private boolean deleteOnExit;
+
+    private boolean shutdownOnExit;
 
     private String args;
 
@@ -65,12 +69,14 @@ public class XenVMExecuter extends Thread implements JobExecuter {
     private VBD extraDisk;
 
     public XenVMExecuter(
-            JobManager jobManager, String uuid, URL xenServerUrl,
-            String username, String password, String templateLabel,
-            long defaultDiskSizeInGbs, String jobProcessManagerUrl,
-            String jobProcessManagerZipFile, String args, boolean deleteOnExit)
+            JobManager jobManager, XenVMExecuterFactory factory, String uuid,
+            URL xenServerUrl, String username, String password,
+            String templateLabel, long defaultDiskSizeInGbs,
+            String jobProcessManagerUrl, String jobProcessManagerZipFile,
+            String args, boolean deleteOnExit, boolean shutdownOnExit)
                 throws XmlRpcException, IOException {
         this.jobManager = jobManager;
+        this.factory = factory;
         this.uuid = uuid;
         this.xenServerUrl = xenServerUrl;
         this.username = username;
@@ -81,6 +87,7 @@ public class XenVMExecuter extends Thread implements JobExecuter {
         this.jobProcessManagerZipFile = jobProcessManagerZipFile;
         this.args = args;
         this.deleteOnExit = deleteOnExit;
+        this.shutdownOnExit = shutdownOnExit;
     }
 
     @Override
@@ -136,6 +143,9 @@ public class XenVMExecuter extends Thread implements JobExecuter {
         clonedVm.addToXenstoreData(
             connection, "vm-data/nmpifile", jobProcessManagerZipFile);
         clonedVm.addToXenstoreData(connection, "vm-data/nmpiargs", args);
+        if (shutdownOnExit) {
+            clonedVm.addToXenstoreData(connection, "vm-data/shutdown", "true");
+        }
     }
 
     private void deleteVm()
@@ -178,11 +188,13 @@ public class XenVMExecuter extends Thread implements JobExecuter {
             if (deleteOnExit) {
                 deleteVm();
             }
+
+            jobManager.setExecutorExited(uuid, null);
         } catch (Exception e) {
             logger.error("Error setting up VM", e);
             jobManager.setExecutorExited(uuid, e.getMessage());
         }
 
-        jobManager.setExecutorExited(uuid, null);
+        factory.executorFinished();
     }
 }

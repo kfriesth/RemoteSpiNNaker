@@ -172,6 +172,12 @@ public class RemoteSpinnakerBeans {
     @Value("${xen.server.diskspaceInGbs}")
     private long xenDiskSizeInGbs;
 
+    @Value("${xen.server.shutdownOnExit}")
+    private boolean xenShutdownOnExit;
+
+    @Value("${xen.server.maxVms}")
+    private int xenMaxVms;
+
     @Value("${restartJobExecutorOnFailure}")
     private boolean restartJobExecutorOnFailure;
 
@@ -319,8 +325,8 @@ public class RemoteSpinnakerBeans {
         }
         return new XenVMExecuterFactory(
             xenServerUrl, xenUsername, xenPassword, xenTemplateVmName,
-            xenDiskSizeInGbs, deleteJobsOnExit, liveUploadOutput,
-            requestSpiNNakerMachine);
+            xenDiskSizeInGbs, deleteJobsOnExit, xenShutdownOnExit,
+            liveUploadOutput, requestSpiNNakerMachine, xenMaxVms);
     }
 
     @Bean

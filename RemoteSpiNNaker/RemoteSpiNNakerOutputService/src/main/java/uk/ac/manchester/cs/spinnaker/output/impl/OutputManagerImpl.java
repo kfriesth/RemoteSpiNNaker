@@ -139,7 +139,7 @@ public class OutputManagerImpl implements OutputManager {
                     }
                     File newOutput = new File(idDirectory, outputPath);
                     newOutput.getParentFile().mkdirs();
-                    output.renameTo(newOutput);
+                    Files.move(output.toPath(), newOutput.toPath());
                     URL outputUrl = new URL(
                         baseServerUrl,
                         "output/" + pId + "/" + id + "/" + outputPath);

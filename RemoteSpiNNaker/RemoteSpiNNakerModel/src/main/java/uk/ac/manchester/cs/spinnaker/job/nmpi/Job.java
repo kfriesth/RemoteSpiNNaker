@@ -50,7 +50,7 @@ public class Job implements QueueNextResponse {
 
     private String user = null;
 
-    private Map<String, String> provenance = null;
+    private String provenance = null;
 
     public String getCode() {
         return code;
@@ -172,11 +172,11 @@ public class Job implements QueueNextResponse {
         this.resourceUsage = resourceUsage;
     }
 
-    public Map<String, String> getProvenance() {
+    public String getProvenance() {
         return provenance;
     }
 
-    public void setProvenance(Map<String, String> provenance) {
+    public void setProvenance(String provenance) {
         this.provenance = provenance;
     }
 }

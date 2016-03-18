@@ -38,6 +38,8 @@ public class Job implements QueueNextResponse {
 
     private String userId = null;
 
+    private long resourceUsage = 0;
+
     @JsonSerialize(using=DateTimeSerialiser.class)
     @JsonDeserialize(using=DateTimeDeserialiser.class)
     private DateTime timestampCompletion = null;
@@ -47,6 +49,8 @@ public class Job implements QueueNextResponse {
     private DateTime timestampSubmission = null;
 
     private String user = null;
+
+    private Map<String, String> provenance = null;
 
     public String getCode() {
         return code;
@@ -158,5 +162,21 @@ public class Job implements QueueNextResponse {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    public long getResourceUsage() {
+        return resourceUsage;
+    }
+
+    public void setResourceUsage(long resourceUsage) {
+        this.resourceUsage = resourceUsage;
+    }
+
+    public Map<String, String> getProvenance() {
+        return provenance;
+    }
+
+    public void setProvenance(Map<String, String> provenance) {
+        this.provenance = provenance;
     }
 }

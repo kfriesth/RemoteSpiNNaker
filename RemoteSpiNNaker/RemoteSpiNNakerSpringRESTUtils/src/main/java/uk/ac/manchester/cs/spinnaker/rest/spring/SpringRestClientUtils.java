@@ -22,7 +22,7 @@ public class SpringRestClientUtils {
             if (profile instanceof OidcProfile) {
                 OidcProfile oidcProfile = (OidcProfile) profile;
                 return RestClientUtils.createBearerClient(
-                    url, oidcProfile.getAccessToken().getValue(), clazz);
+                    url, oidcProfile.getIdTokenString(), clazz);
             }
         }
         throw new RuntimeException("Current Authentication is not OIDC");

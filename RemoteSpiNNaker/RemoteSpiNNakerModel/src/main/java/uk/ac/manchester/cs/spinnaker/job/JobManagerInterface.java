@@ -62,6 +62,12 @@ public interface JobManagerInterface {
     public void appendLog(@PathParam("id") int id, String logToAppend);
 
     @POST
+    @Path("{id}/provenance")
+    public void addProvenance(
+        @PathParam("id") int id, @QueryParam("name") String name,
+        @QueryParam("value") String value);
+
+    @POST
     @Path("{projectId}/{id}/addoutput")
     @Consumes("application/octet-stream")
     public void addOutput(

@@ -178,7 +178,7 @@ public class NMPIQueueManager extends Thread {
                         }
                     } catch (IOException e) {
                         logger.error("Error in executing job", e);
-                        setJobError(job.getId(), null, null, e);
+                        setJobError(job.getId(), null, null, e, 0, null);
                     }
                 }
             } catch (Exception e) {
@@ -229,7 +229,8 @@ public class NMPIQueueManager extends Thread {
     * @throws MalformedURLException
     */
     public void setJobFinished(
-            int id, String logToAppend, List<DataItem> outputs)
+            int id, String logToAppend, List<DataItem> outputs,
+            long resourceUsage, Map<String, String> provenance)
             throws MalformedURLException {
         logger.debug("Job " + id + " is finished");
 
@@ -241,6 +242,8 @@ public class NMPIQueueManager extends Thread {
         job.setStatus("finished");
         job.setOutputData(outputs);
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
+        job.setResourceUsage(resourceUsage);
+        job.setProvenance(provenance);
 
         logger.debug("Updating job status on server");
         synchronized (queue) {
@@ -257,8 +260,10 @@ public class NMPIQueueManager extends Thread {
     * @param error The error details
      * @throws MalformedURLException
     */
-    public void setJobError(int id, String logToAppend, List<DataItem> outputs,
-                            Throwable error) throws MalformedURLException {
+    public void setJobError(
+            int id, String logToAppend, List<DataItem> outputs,
+            Throwable error, long resourceUsage,
+            Map<String, String> provenance) throws MalformedURLException {
         logger.debug("Job " + id + " finished with an error");
         StringWriter errors = new StringWriter();
         error.printStackTrace(new PrintWriter(errors));
@@ -277,6 +282,8 @@ public class NMPIQueueManager extends Thread {
         job.setStatus("error");
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
         job.setOutputData(outputs);
+        job.setResourceUsage(resourceUsage);
+        job.setProvenance(provenance);
 
         logger.debug("Updating job on server");
         synchronized (queue) {

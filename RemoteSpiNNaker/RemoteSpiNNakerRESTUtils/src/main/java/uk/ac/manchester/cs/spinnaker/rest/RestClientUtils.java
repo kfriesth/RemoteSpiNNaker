@@ -50,8 +50,12 @@ public class RestClientUtils {
             schemeRegistry.register(httpsScheme);
 
             // Set up authentication
+            int port = url.getPort();
+            if (port == -1) {
+                port = url.getDefaultPort();
+            }
             HttpHost targetHost = new HttpHost(
-                url.getHost(), url.getPort(), url.getProtocol());
+                url.getHost(), port, url.getProtocol());
             CredentialsProvider credsProvider = new BasicCredentialsProvider();
             credsProvider.setCredentials(
                 new AuthScope(targetHost.getHostName(), targetHost.getPort()),

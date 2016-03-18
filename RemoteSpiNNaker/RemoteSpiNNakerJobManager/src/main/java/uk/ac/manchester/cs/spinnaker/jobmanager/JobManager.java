@@ -63,6 +63,15 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     private Map<Integer, File> jobOutputTempFiles =
         new HashMap<Integer, File>();
 
+    private Map<Integer, Integer> jobNCores =
+        new HashMap<Integer, Integer>();
+
+    private Map<Integer, Long> jobResourceUsage =
+        new HashMap<Integer, Long>();
+
+    private Map<Integer, Map<String, String>> jobProvenance =
+        new HashMap<Integer, Map<String,String>>();
+
     private OutputManager outputManager = null;
 
     private boolean restartJobExecuterOnFailure;
@@ -157,12 +166,20 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             allocatedMachines.put(id, machine);
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
+
+        jobResourceUsage.put(id, (long) (runTime * nChips * 16));
+        jobNCores.put(id, nChips * 16);
+
         return machine;
     }
 
     @Override
     public void extendJobMachineLease(int id, double runTime) {
         // TODO Check quota that the lease can be extended
+
+        jobResourceUsage.put(
+            id,
+            jobResourceUsage.get(id) + (long) (jobNCores.get(id) * runTime));
 
     }
 
@@ -255,6 +272,14 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
+    public void addProvenance(int id, String item, String value) {
+        if (!jobProvenance.containsKey(id)) {
+            jobProvenance.put(id, new HashMap<String, String>());
+        }
+        jobProvenance.get(id).put(item, value);
+    }
+
+    @Override
     public void setJobFinished(
             String projectId, int id, String logToAppend,
             String baseDirectory, List<String> outputs) {
@@ -266,9 +291,19 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             }
         }
 
+        long resourceUsage = 0;
+        if (jobResourceUsage.containsKey(id)) {
+            resourceUsage = jobResourceUsage.remove(id);
+            jobNCores.remove(id);
+        }
+
+        Map<String, String> provenance = jobProvenance.remove(id);
+
         try {
-            queueManager.setJobFinished(id, logToAppend,
-                getOutputFiles(projectId, id, baseDirectory, outputs));
+            queueManager.setJobFinished(
+                id, logToAppend,
+                getOutputFiles(projectId, id, baseDirectory, outputs),
+                resourceUsage, provenance);
         } catch (IOException e) {
             logger.error("Error creating URLs while updating job", e);
         }
@@ -296,10 +331,20 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
         Exception exception = new Exception(error);
         exception.setStackTrace(elements);
+
+        long resourceUsage = 0;
+        if (jobResourceUsage.containsKey(id)) {
+            resourceUsage = jobResourceUsage.remove(id);
+            jobNCores.remove(id);
+        }
+
+        Map<String, String> provenance = jobProvenance.remove(id);
+
         try {
-            queueManager.setJobError(id, logToAppend,
-                getOutputFiles(
-                    projectId, id, baseDirectory, outputs), exception);
+            queueManager.setJobError(
+                id, logToAppend,
+                getOutputFiles(projectId, id, baseDirectory, outputs),
+                exception, resourceUsage, provenance);
         } catch (IOException e) {
             logger.error("Error creating URLs while updating job", e);
         }
@@ -325,10 +370,22 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             if (!alreadyGone) {
                 logger.debug("Job " + job.getId() + " has not exited cleanly");
                 try {
+
+                    long resourceUsage = 0;
+                    if (jobResourceUsage.containsKey(job.getId())) {
+                        resourceUsage = jobResourceUsage.remove(job.getId());
+                        jobNCores.remove(job.getId());
+                    }
+
+                    Map<String, String> provenance = jobProvenance.remove(
+                        job.getId());
+
                     String projectId = new File(job.getCollabId()).getName();
-                    queueManager.setJobError(job.getId(), logToAppend,
+                    queueManager.setJobError(
+                        job.getId(), logToAppend,
                         getOutputFiles(projectId, job.getId(), null, null),
-                        new Exception("Job did not finish cleanly"));
+                        new Exception("Job did not finish cleanly"),
+                        resourceUsage, provenance);
                 } catch (IOException e) {
                     logger.error("Error creating URLs while updating job", e);
                 }

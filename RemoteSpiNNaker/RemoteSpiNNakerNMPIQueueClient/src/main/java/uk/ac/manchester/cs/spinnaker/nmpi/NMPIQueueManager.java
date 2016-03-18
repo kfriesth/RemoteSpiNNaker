@@ -243,7 +243,9 @@ public class NMPIQueueManager extends Thread {
         job.setOutputData(outputs);
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
         job.setResourceUsage(resourceUsage);
-        job.setProvenance(provenance);
+
+        // TODO: Make provenance work
+        //job.setProvenance(provenance);
 
         logger.debug("Updating job status on server");
         synchronized (queue) {
@@ -283,7 +285,9 @@ public class NMPIQueueManager extends Thread {
         job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
         job.setOutputData(outputs);
         job.setResourceUsage(resourceUsage);
-        job.setProvenance(provenance);
+
+        // TODO: Make provenance work
+        // job.setProvenance(provenance);
 
         logger.debug("Updating job on server");
         synchronized (queue) {

@@ -46,6 +46,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 public class SpallocMachineManagerImpl extends Thread
         implements MachineManager {
 
+    private static final double CORES_PER_CHIP = 15.0;
+
     private static final double CHIPS_PER_BOARD = 48.0;
 
     private static final String MACHINE_VERSION = "5";
@@ -209,24 +211,22 @@ public class SpallocMachineManagerImpl extends Thread
     }
 
     @Override
-    public SpinnakerMachine getNextAvailableMachine(int nChips) {
-        double n_boards = (double) nChips / CHIPS_PER_BOARD;
-        if (n_boards - (int) n_boards > 0.8) {
-            n_boards += 1.0;
+    public SpinnakerMachine getNextAvailableMachine(int nCores) {
+        double nChips = (double) nCores / CORES_PER_CHIP;
+        double nBoards = nChips / CHIPS_PER_BOARD;
+        if (Math.ceil(nBoards) - nBoards < 0.1) {
+            nBoards += 1.0;
         }
-        if (n_boards < 1.0) {
-            n_boards = 1.0;
+        if (nBoards < 1.0) {
+            nBoards = 1.0;
         }
-        n_boards = Math.ceil(n_boards);
-        if (n_boards > 1.0) {
-            n_boards = Math.ceil(n_boards / 3) * 3;
-        }
+        nBoards = Math.ceil(nBoards);
 
         SpinnakerMachine machineAllocated = null;
         while (machineAllocated == null) {
             try {
                 int jobId = sendRequest(new CreateJobCommand(
-                    (int) n_boards, machine, owner), Integer.class);
+                    (int) nBoards, machine, owner), Integer.class);
                 logger.debug(
                     "Got machine " + jobId + ", requesting notifications");
                 sendRequest(new NotifyJobCommand(jobId));

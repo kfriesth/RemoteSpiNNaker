@@ -150,25 +150,25 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     @Override
     public SpinnakerMachine getJobMachine(
-            int id, int nChips, double runTime) {
+            int id, int nCores, double runTime) {
 
         // TODO Check quota
 
-        int nChipsToRequest = nChips;
-        if (nChips <= 0) {
-            nChipsToRequest = 48 * 3;
+        int nCoresToRequest = nCores;
+        if (nCores <= 0) {
+            nCoresToRequest = 48 * 3 * 15;
         }
 
         // Get a machine to run the job on
         SpinnakerMachine machine = machineManager.getNextAvailableMachine(
-            nChipsToRequest);
+            nCoresToRequest);
         synchronized (allocatedMachines) {
             allocatedMachines.put(id, machine);
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
 
-        jobResourceUsage.put(id, (long) (runTime * nChips * 16));
-        jobNCores.put(id, nChips * 16);
+        jobResourceUsage.put(id, (long) (runTime * nCores));
+        jobNCores.put(id, nCores);
 
         return machine;
     }

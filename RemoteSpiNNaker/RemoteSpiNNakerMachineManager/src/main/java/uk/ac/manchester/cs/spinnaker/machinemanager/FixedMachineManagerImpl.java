@@ -13,6 +13,8 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
  */
 public class FixedMachineManagerImpl implements MachineManager {
 
+    private static final double CORES_PER_CHIP = 15.0;
+
     /**
      * The queue of available machines
      */
@@ -52,9 +54,9 @@ public class FixedMachineManagerImpl implements MachineManager {
      *         before a machine becomes available
      */
     @Override
-    public SpinnakerMachine getNextAvailableMachine(int nChips) {
+    public SpinnakerMachine getNextAvailableMachine(int nCores) {
 
-        // TODO: Actually check the machine has n_chips!
+        double nChips = (double) nCores / CORES_PER_CHIP;
 
         SpinnakerMachine machine = null;
         synchronized (machinesAvailable) {
@@ -65,6 +67,7 @@ public class FixedMachineManagerImpl implements MachineManager {
                     if ((nextMachine.getWidth() * nextMachine.getHeight()) >
                             nChips) {
                         machine = nextMachine;
+                        break;
                     }
                 }
 

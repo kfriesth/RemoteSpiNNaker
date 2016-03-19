@@ -40,7 +40,7 @@ public interface JobManagerInterface {
     @Produces(MediaType.APPLICATION_JSON)
     public SpinnakerMachine getJobMachine(
         @PathParam("id") int id,
-        @QueryParam("nChips") @DefaultValue("-1") int nChips,
+        @QueryParam("nCores") @DefaultValue("-1") int nCores,
         @QueryParam("runTime") @DefaultValue("-1") double runTime);
 
     @GET

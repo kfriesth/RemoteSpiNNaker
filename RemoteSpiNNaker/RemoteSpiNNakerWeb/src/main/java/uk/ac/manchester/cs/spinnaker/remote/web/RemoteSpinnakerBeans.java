@@ -58,8 +58,8 @@ import uk.ac.manchester.cs.spinnaker.output.OutputManager;
 import uk.ac.manchester.cs.spinnaker.output.impl.OutputManagerImpl;
 
 @Configuration
-@EnableGlobalMethodSecurity(prePostEnabled=true, proxyTargetClass=true)
-@EnableWebSecurity
+//@EnableGlobalMethodSecurity(prePostEnabled=true, proxyTargetClass=true)
+//@EnableWebSecurity
 @Import(JaxRsConfig.class)
 public class RemoteSpinnakerBeans {
 
@@ -181,51 +181,51 @@ public class RemoteSpinnakerBeans {
     @Value("${restartJobExecutorOnFailure}")
     private boolean restartJobExecutorOnFailure;
 
-    @Autowired
-    public void configureGlobal(AuthenticationManagerBuilder auth)
-            throws Exception {
-        auth.authenticationProvider(clientProvider());
-    }
-
-    @Bean
-    public CollabSecurityService collabSecurityService()
-            throws MalformedURLException {
-        return new CollabSecurityService(new URL(collabServiceUri));
-    }
-
-    @Bean
-    public OidcClient hbpAuthenticationClient() {
-        OidcClient oidcClient = new OidcClient();
-        oidcClient.setClientID(oidcClientId);
-        oidcClient.setSecret(oidcSecret);
-        oidcClient.setDiscoveryURI(oidcDiscoveryUri);
-        oidcClient.setScope("openid profile hbp.collab");
-        oidcClient.setPreferredJwsAlgorithm(JWSAlgorithm.RS256);
-        return oidcClient;
-    }
-
-    @Bean
-    public BearerOidcClient hbpBearerClient()
-            throws ParseException, MalformedURLException, IOException {
-        BearerOidcClient client = new BearerOidcClient(oidcDiscoveryUri, "");
-        return client;
-    }
-
-    @Bean
-    public Clients clients()
-            throws ParseException, MalformedURLException, IOException {
-        return new Clients(
-            oidcRedirectUri, hbpAuthenticationClient(), hbpBearerClient());
-    }
-
-    @Bean
-    public ClientAuthenticationProvider clientProvider()
-            throws ParseException, MalformedURLException, IOException {
-        ClientAuthenticationProvider provider =
-            new ClientAuthenticationProvider();
-        provider.setClients(clients());
-        return provider;
-    }
+//    @Autowired
+//    public void configureGlobal(AuthenticationManagerBuilder auth)
+//            throws Exception {
+//        auth.authenticationProvider(clientProvider());
+//    }
+//
+//    @Bean
+//    public CollabSecurityService collabSecurityService()
+//            throws MalformedURLException {
+//        return new CollabSecurityService(new URL(collabServiceUri));
+//    }
+//
+//    @Bean
+//    public OidcClient hbpAuthenticationClient() {
+//        OidcClient oidcClient = new OidcClient();
+//        oidcClient.setClientID(oidcClientId);
+//        oidcClient.setSecret(oidcSecret);
+//        oidcClient.setDiscoveryURI(oidcDiscoveryUri);
+//        oidcClient.setScope("openid profile hbp.collab");
+//        oidcClient.setPreferredJwsAlgorithm(JWSAlgorithm.RS256);
+//        return oidcClient;
+//    }
+//
+//    @Bean
+//    public BearerOidcClient hbpBearerClient()
+//            throws ParseException, MalformedURLException, IOException {
+//        BearerOidcClient client = new BearerOidcClient(oidcDiscoveryUri, "");
+//        return client;
+//    }
+//
+//    @Bean
+//    public Clients clients()
+//            throws ParseException, MalformedURLException, IOException {
+//        return new Clients(
+//            oidcRedirectUri, hbpAuthenticationClient(), hbpBearerClient());
+//    }
+//
+//    @Bean
+//    public ClientAuthenticationProvider clientProvider()
+//            throws ParseException, MalformedURLException, IOException {
+//        ClientAuthenticationProvider provider =
+//            new ClientAuthenticationProvider();
+//        provider.setClients(clients());
+//        return provider;
+//    }
 
 //    @Configuration
 //    @Order(100)

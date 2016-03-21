@@ -36,14 +36,14 @@ public class WebApplicationConfig implements WebApplicationInitializer {
             dispatcher.addMapping(
                 properties.getProperty("cxf.path") + "/*");
 
-            DelegatingFilterProxy springSecurityFilterChain =
+            /*DelegatingFilterProxy springSecurityFilterChain =
                 new DelegatingFilterProxy("springSecurityFilterChain");
 
             FilterRegistration.Dynamic filter = container.addFilter(
                 "springSecurityFilterChain", springSecurityFilterChain);
             filter.addMappingForUrlPatterns(
                 EnumSet.of(DispatcherType.REQUEST, DispatcherType.ERROR,
-                    DispatcherType.ASYNC), false, "/*");
+                    DispatcherType.ASYNC), false, "/*"); */
         } catch (IOException e) {
             throw new ServletException(e);
         }

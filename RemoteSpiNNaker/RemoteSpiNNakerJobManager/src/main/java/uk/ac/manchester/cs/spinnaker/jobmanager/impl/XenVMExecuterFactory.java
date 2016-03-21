@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.UUID;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuter;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
@@ -32,6 +35,8 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 
     private int nVirtualMachines = 0;
 
+    private Log logger = LogFactory.getLog(getClass());
+
     public XenVMExecuterFactory(
             URL xenServerUrl, String username, String password,
             String templateLabel, long defaultDiskSizeInGbs,
@@ -55,7 +60,13 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
             throws IOException {
 
         synchronized (maxNVirtualMachines) {
+            logger.debug(
+                nVirtualMachines + " of " + maxNVirtualMachines + " in use");
             while (nVirtualMachines >= maxNVirtualMachines) {
+                logger.debug(
+                    "Waiting for a VM to become available (" +
+                    nVirtualMachines + " of " + maxNVirtualMachines +
+                    " in use)");
                 try {
                     maxNVirtualMachines.wait();
                 } catch (InterruptedException e) {
@@ -102,6 +113,9 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
     protected void executorFinished() {
         synchronized (maxNVirtualMachines) {
             nVirtualMachines -= 1;
+            logger.debug(
+                nVirtualMachines + " of " + maxNVirtualMachines +
+                " now in use");
             maxNVirtualMachines.notifyAll();
         }
     }

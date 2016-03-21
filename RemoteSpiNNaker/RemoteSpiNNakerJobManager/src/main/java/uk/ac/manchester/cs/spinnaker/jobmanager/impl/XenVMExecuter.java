@@ -150,17 +150,31 @@ public class XenVMExecuter extends Thread implements JobExecuter {
 
     private void deleteVm()
             throws BadServerResponse, XenAPIException, XmlRpcException {
-        disk.destroy(connection);
-        extraDisk.destroy(connection);
-        vdi.destroy(connection);
-        extraVdi.destroy(connection);
-        clonedVm.destroy(connection);
+        if (connection != null) {
+            if (disk != null) {
+                disk.destroy(connection);
+            }
+            if (extraDisk != null) {
+                extraDisk.destroy(connection);
+            }
+            if (vdi != null) {
+                vdi.destroy(connection);
+            }
+            if (extraVdi != null) {
+                extraVdi.destroy(connection);
+            }
+            if (clonedVm != null) {
+                clonedVm.destroy(connection);
+            }
+        }
     }
 
     public void run() {
         try {
-            createVm();
-            clonedVm.start(connection, false, true);
+            synchronized (this) {
+                createVm();
+                clonedVm.start(connection, false, true);
+            }
 
             boolean vmRunning = true;
             while (vmRunning) {
@@ -185,14 +199,20 @@ public class XenVMExecuter extends Thread implements JobExecuter {
                 }
             }
 
-            if (deleteOnExit) {
-                deleteVm();
-            }
-
             jobManager.setExecutorExited(uuid, null);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             logger.error("Error setting up VM", e);
             jobManager.setExecutorExited(uuid, e.getMessage());
+        }
+
+        if (deleteOnExit) {
+            synchronized (this) {
+                try {
+                    deleteVm();
+                } catch (Throwable e) {
+                    logger.error("Error deleting VM");
+                }
+            }
         }
 
         factory.executorFinished();

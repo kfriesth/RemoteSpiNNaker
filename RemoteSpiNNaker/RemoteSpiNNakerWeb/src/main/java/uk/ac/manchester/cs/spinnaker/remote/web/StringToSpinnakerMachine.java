@@ -15,7 +15,7 @@ public class StringToSpinnakerMachine
                     + "\" - missing start and end brackets");
         }
         String[] parts = value.substring(1, value.length() - 1).split(":");
-        if (parts.length != 5) {
+        if (parts.length != 6) {
             throw new IllegalArgumentException(
                     "Wrong number of :-separated arguments - " + parts.length
                     + " found but 4 required");
@@ -24,6 +24,7 @@ public class StringToSpinnakerMachine
         return new SpinnakerMachine(parts[0].trim(), parts[1].trim(),
                 Integer.parseInt(parts[2].trim()),
                 Integer.parseInt(parts[3].trim()),
+                Integer.parseInt(parts[4].trim()),
                 parts[4].trim());
     }
 

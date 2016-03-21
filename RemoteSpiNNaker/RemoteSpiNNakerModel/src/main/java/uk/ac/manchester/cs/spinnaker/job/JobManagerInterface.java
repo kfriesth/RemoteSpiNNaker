@@ -41,6 +41,8 @@ public interface JobManagerInterface {
     public SpinnakerMachine getJobMachine(
         @PathParam("id") int id,
         @QueryParam("nCores") @DefaultValue("-1") int nCores,
+        @QueryParam("nChips") @DefaultValue("-1") int nChips,
+        @QueryParam("nBoards") @DefaultValue("-1") int nBoards,
         @QueryParam("runTime") @DefaultValue("-1") double runTime);
 
     @GET

@@ -8,7 +8,7 @@ public interface MachineManager {
 
     public List<SpinnakerMachine> getMachines();
 
-    public SpinnakerMachine getNextAvailableMachine(int nChips);
+    public SpinnakerMachine getNextAvailableMachine(int nBoards);
 
     public boolean isMachineAvailable(SpinnakerMachine machine);
 

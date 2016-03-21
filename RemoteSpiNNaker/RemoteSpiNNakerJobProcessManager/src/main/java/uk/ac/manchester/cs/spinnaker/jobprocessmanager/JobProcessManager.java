@@ -179,7 +179,7 @@ public class JobProcessManager {
             SpinnakerMachine machine = null;
             String machineUrl = null;
             if (requestMachine) {
-                machine = jobManager.getJobMachine(job.getId(), -1, -1);
+                machine = jobManager.getJobMachine(job.getId(), -1, -1, -1, -1);
             } else {
                 machineUrl = serverUrl + "job/" + job.getId() + "/machine";
             }

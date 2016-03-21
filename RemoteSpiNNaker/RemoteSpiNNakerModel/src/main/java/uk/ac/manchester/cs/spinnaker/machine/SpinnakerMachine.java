@@ -26,6 +26,11 @@ public class SpinnakerMachine {
     private int height = 0;
 
     /**
+     * The number of boards in the machine
+     */
+    private int nBoards = 0;
+
+    /**
     * The BMP details of the machine
     */
     private String bmpDetails = null;
@@ -44,11 +49,12 @@ public class SpinnakerMachine {
     * @param machineName The name of the machine
     */
     public SpinnakerMachine(String machineName, String version, int width,
-            int height, String bmpDetails) {
+            int height, int nBoards, String bmpDetails) {
         this.machineName = machineName;
         this.version = version;
         this.width = width;
         this.height = height;
+        this.nBoards = nBoards;
         this.bmpDetails = bmpDetails;
     }
 
@@ -115,6 +121,22 @@ public class SpinnakerMachine {
     */
     public void setHeight(int height) {
         this.height = height;
+    }
+
+    /**
+     * Gets the number of boards in the machine
+     * @return The number of boards in the machine
+     */
+    public int getnBoards() {
+        return nBoards;
+    }
+
+    /**
+     * Sets the number of boards in the machine
+     * @param nBoards The number of boards in the machine
+     */
+    public void setnBoards(int nBoards) {
+        this.nBoards = nBoards;
     }
 
     /**

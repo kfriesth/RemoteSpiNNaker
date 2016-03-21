@@ -46,10 +46,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 public class SpallocMachineManagerImpl extends Thread
         implements MachineManager {
 
-    private static final double CORES_PER_CHIP = 15.0;
-
-    private static final double CHIPS_PER_BOARD = 48.0;
-
     private static final String MACHINE_VERSION = "5";
 
     private String ipAddress = null;
@@ -171,7 +167,7 @@ public class SpallocMachineManagerImpl extends Thread
         return new SpinnakerMachine(
             info.getConnections().get(0).getHostname(),
             MACHINE_VERSION, info.getWidth(),
-            info.getHeight(), null);
+            info.getHeight(), 1, null);
     }
 
     private JobState waitForStates(int jobId, Set<Integer> states) {
@@ -201,7 +197,8 @@ public class SpallocMachineManagerImpl extends Thread
 
                 machines.add(new SpinnakerMachine(
                     machine.getName(), MACHINE_VERSION,
-                    machine.getWidth() * 12, machine.getHeight() * 12, null));
+                    machine.getWidth() * 12, machine.getHeight() * 12,
+                    machine.getWidth() * machine.getHeight(), null));
             }
             return machines;
         } catch (IOException e) {
@@ -211,16 +208,7 @@ public class SpallocMachineManagerImpl extends Thread
     }
 
     @Override
-    public SpinnakerMachine getNextAvailableMachine(int nCores) {
-        double nChips = (double) nCores / CORES_PER_CHIP;
-        double nBoards = nChips / CHIPS_PER_BOARD;
-        if (Math.ceil(nBoards) - nBoards < 0.1) {
-            nBoards += 1.0;
-        }
-        if (nBoards < 1.0) {
-            nBoards = 1.0;
-        }
-        nBoards = Math.ceil(nBoards);
+    public SpinnakerMachine getNextAvailableMachine(int nBoards) {
 
         SpinnakerMachine machineAllocated = null;
         while (machineAllocated == null) {

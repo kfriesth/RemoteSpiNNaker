@@ -37,6 +37,10 @@ import uk.ac.manchester.cs.spinnaker.output.OutputManager;
  */
 public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
+    private static final double CHIPS_PER_BOARD = 48.0;
+
+    private static final double CORES_PER_CHIP = 15.0;
+
     public static final String JOB_PROCESS_MANAGER_JAR =
             "RemoteSpiNNakerJobProcessManager.jar";
 
@@ -150,18 +154,41 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     @Override
     public SpinnakerMachine getJobMachine(
-            int id, int nCores, double runTime) {
+            int id, int nCores, int nChips, int nBoards, double runTime) {
 
         // TODO Check quota
 
-        int nCoresToRequest = nCores;
-        if (nCores <= 0) {
-            nCoresToRequest = 48 * 3 * 15;
+        int nBoardsToRequest = nBoards;
+
+        // If nothing specified, use 3 boards
+        if (nBoards <= 0 && nChips <= 0 && nCores <= 0) {
+            nBoardsToRequest = 3;
+        }
+
+        // If boards not specified, use cores or chips
+        if (nBoardsToRequest <= 0) {
+            double nChipsExact = nChips;
+
+            // If chips not specified, use cores
+            if (nChipsExact <= 0) {
+                nChipsExact = nCores / CORES_PER_CHIP;
+            }
+
+            double nBoardsExact = (double) nChips / CHIPS_PER_BOARD;
+
+            if ((Math.ceil(nBoardsExact) - nBoardsExact) < 0.1) {
+                nBoardsExact += 1.0;
+            }
+            if (nBoardsExact < 1.0) {
+                nBoardsExact = 1.0;
+            }
+            nBoardsExact = Math.ceil(nBoardsExact);
+            nBoardsToRequest = (int) nBoardsExact;
         }
 
         // Get a machine to run the job on
         SpinnakerMachine machine = machineManager.getNextAvailableMachine(
-            nCoresToRequest);
+            nBoardsToRequest);
         synchronized (allocatedMachines) {
             allocatedMachines.put(id, machine);
         }

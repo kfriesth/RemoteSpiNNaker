@@ -199,7 +199,7 @@ public class RemoteSpinnakerBeans {
         oidcClient.setClientID(oidcClientId);
         oidcClient.setSecret(oidcSecret);
         oidcClient.setDiscoveryURI(oidcDiscoveryUri);
-        oidcClient.setScope("openid profile");
+        oidcClient.setScope("openid profile hbp.collab");
         oidcClient.setPreferredJwsAlgorithm(JWSAlgorithm.RS256);
         return oidcClient;
     }
@@ -227,76 +227,76 @@ public class RemoteSpinnakerBeans {
         return provider;
     }
 
-    @Configuration
-    @Order(100)
-    public static class HbpAuthentication extends WebSecurityConfigurerAdapter {
-
-        @Value("${cxf.path}${cxf.rest.path}")
-        String restServicePath;
-
-        @Value("${callback.path}")
-        private String callbackPath;
-
-        @Autowired
-        OidcClient hbpAuthenticationClient;
-
-        @Autowired
-        BearerOidcClient hbpBearerClient;
-
-        @Autowired
-        Clients clients;
-
-        @Override
-        public void configure(WebSecurity web) throws Exception {
-            Path path = AnnotationUtils.findAnnotation(
-                JobManager.class, Path.class);
-            web.ignoring().antMatchers(restServicePath + path.value() + "/**");
-        }
-
-        @Override
-        protected void configure(HttpSecurity http) throws Exception {
-            Path path = AnnotationUtils.findAnnotation(
-                OutputManager.class, Path.class);
-            http.addFilterBefore(
-                    directAuthFilter(),
-                    UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(
-                    callbackFilter(),
-                    UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling().authenticationEntryPoint(
-                        hbpAuthenticationEntryPoint()).and()
-                .authorizeRequests().antMatchers(
-                    restServicePath + path.value() + "/**").authenticated()
-                                   .anyRequest().permitAll();
-        }
-
-        @Bean
-        public ClientAuthenticationFilter callbackFilter() throws Exception {
-            ClientAuthenticationFilter filter =
-                new ClientAuthenticationFilter(callbackPath);
-            filter.setClients(clients);
-            filter.setAuthenticationManager(authenticationManagerBean());
-            return filter;
-        }
-
-        @Bean
-        public DirectClientAuthenticationFilter directAuthFilter()
-                throws Exception {
-            DirectClientAuthenticationFilter filter =
-                new DirectClientAuthenticationFilter(
-                    authenticationManagerBean());
-            filter.setClient(hbpBearerClient);
-            return filter;
-        }
-
-        @Bean
-        public ClientAuthenticationEntryPoint hbpAuthenticationEntryPoint() {
-            ClientAuthenticationEntryPoint entryPoint =
-                new ClientAuthenticationEntryPoint();
-            entryPoint.setClient(hbpAuthenticationClient);
-            return entryPoint;
-        }
-    }
+//    @Configuration
+//    @Order(100)
+//    public static class HbpAuthentication extends WebSecurityConfigurerAdapter {
+//
+//        @Value("${cxf.path}${cxf.rest.path}")
+//        String restServicePath;
+//
+//        @Value("${callback.path}")
+//        private String callbackPath;
+//
+//        @Autowired
+//        OidcClient hbpAuthenticationClient;
+//
+//        @Autowired
+//        BearerOidcClient hbpBearerClient;
+//
+//        @Autowired
+//        Clients clients;
+//
+//        @Override
+//        public void configure(WebSecurity web) throws Exception {
+//            Path path = AnnotationUtils.findAnnotation(
+//                JobManager.class, Path.class);
+//            web.ignoring().antMatchers(restServicePath + path.value() + "/**");
+//        }
+//
+//        @Override
+//        protected void configure(HttpSecurity http) throws Exception {
+//            Path path = AnnotationUtils.findAnnotation(
+//                OutputManager.class, Path.class);
+//            http.addFilterBefore(
+//                    directAuthFilter(),
+//                    UsernamePasswordAuthenticationFilter.class)
+//                .addFilterBefore(
+//                    callbackFilter(),
+//                    UsernamePasswordAuthenticationFilter.class)
+//                .exceptionHandling().authenticationEntryPoint(
+//                        hbpAuthenticationEntryPoint()).and()
+//                .authorizeRequests().antMatchers(
+//                    restServicePath + path.value() + "/**").authenticated()
+//                                   .anyRequest().permitAll();
+//        }
+//
+//        @Bean
+//        public ClientAuthenticationFilter callbackFilter() throws Exception {
+//            ClientAuthenticationFilter filter =
+//                new ClientAuthenticationFilter(callbackPath);
+//            filter.setClients(clients);
+//            filter.setAuthenticationManager(authenticationManagerBean());
+//            return filter;
+//        }
+//
+//        @Bean
+//        public DirectClientAuthenticationFilter directAuthFilter()
+//                throws Exception {
+//            DirectClientAuthenticationFilter filter =
+//                new DirectClientAuthenticationFilter(
+//                    authenticationManagerBean());
+//            filter.setClient(hbpBearerClient);
+//            return filter;
+//        }
+//
+//        @Bean
+//        public ClientAuthenticationEntryPoint hbpAuthenticationEntryPoint() {
+//            ClientAuthenticationEntryPoint entryPoint =
+//                new ClientAuthenticationEntryPoint();
+//            entryPoint.setClient(hbpAuthenticationClient);
+//            return entryPoint;
+//        }
+//    }
 
     @Bean
     public MachineManager machineManager() {

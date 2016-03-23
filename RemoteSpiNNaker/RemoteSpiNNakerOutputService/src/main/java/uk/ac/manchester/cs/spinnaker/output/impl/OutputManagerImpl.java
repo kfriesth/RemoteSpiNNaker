@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +22,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
+import uk.ac.manchester.cs.spinnaker.collab.DocumentClient;
 import uk.ac.manchester.cs.spinnaker.output.OutputManager;
 import uk.ac.manchester.cs.spinnaker.unicore.UnicoreFileManager;
 
@@ -32,6 +33,8 @@ public class OutputManagerImpl implements OutputManager {
     private File resultsDirectory = null;
 
     private URL baseServerUrl = null;
+
+    private URL collabStorageUrl = null;
 
     private long timeToKeepResults = 0;
 
@@ -72,8 +75,10 @@ public class OutputManagerImpl implements OutputManager {
     }
 
     public OutputManagerImpl(
-            URL baseServerUrl, File resultsDirectory, long nDaysToKeepResults) {
+            URL baseServerUrl, URL collabStorageUrl, File resultsDirectory,
+            long nDaysToKeepResults) {
         this.baseServerUrl = baseServerUrl;
+        this.collabStorageUrl = collabStorageUrl;
         this.resultsDirectory = resultsDirectory;
         this.timeToKeepResults = TimeUnit.MILLISECONDS.convert(
             nDaysToKeepResults, TimeUnit.DAYS);
@@ -113,7 +118,7 @@ public class OutputManagerImpl implements OutputManager {
     }
 
     @Override
-    public List<DataItem> addOutputs(
+    public List<String> addOutputs(
             String projectId, int id, File baseDirectory, List<File> outputs)
             throws IOException {
         if (outputs != null) {
@@ -123,7 +128,7 @@ public class OutputManagerImpl implements OutputManager {
             File idDirectory = new File(projectDirectory, String.valueOf(id));
             startJobOperation(idDirectory);
             try {
-                List<DataItem> outputData = new ArrayList<DataItem>();
+                List<String> outputData = new ArrayList<String>();
                 for (File output : outputs) {
                     if (!output.getAbsolutePath().startsWith(
                             baseDirectory.getAbsolutePath())) {
@@ -143,7 +148,7 @@ public class OutputManagerImpl implements OutputManager {
                     URL outputUrl = new URL(
                         baseServerUrl,
                         "output/" + pId + "/" + id + "/" + outputPath);
-                    outputData.add(new DataItem(outputUrl.toExternalForm()));
+                    outputData.add(outputUrl.toExternalForm());
                     logger.debug(
                         "New output " + newOutput + " mapped to " + outputUrl);
                 }
@@ -219,15 +224,18 @@ public class OutputManagerImpl implements OutputManager {
         return getResultFile(idDirectory, filename, download);
     }
 
-    private void recursivelyUploadFiles(
+    private void recursivelyUploadFilesToHPC(
             File directory, UnicoreFileManager fileManager, String storageId,
-            String filePath) throws IOException {
+            String filePath, String relativePath, Set<String> files)
+                throws IOException {
         for (File file : directory.listFiles()) {
             String uploadFileName = filePath + "/" + file.getName();
+            String relativeFileName = relativePath + "/" + file.getName();
             if (file.isDirectory()) {
-                recursivelyUploadFiles(
-                    file, fileManager, storageId, uploadFileName);
-            } else {
+                recursivelyUploadFilesToHPC(
+                    file, fileManager, storageId, uploadFileName,
+                    relativeFileName, files);
+            } else if (files.isEmpty() || files.contains(relativeFileName)) {
                 FileInputStream input = new FileInputStream(file);
                 try {
                     fileManager.uploadFile(storageId, uploadFileName, input);
@@ -241,11 +249,10 @@ public class OutputManagerImpl implements OutputManager {
     @Override
     public Response uploadResultsToHPCServer(
             String projectId, int id, String serverUrl, String storageId,
-            String filePath, String userId, String token) {
+            String filePath, Set<String> files) {
         try {
             URL url = new URL(serverUrl);
-            UnicoreFileManager fileManager = new UnicoreFileManager(
-                url, userId, token);
+            UnicoreFileManager fileManager = new UnicoreFileManager(url);
             File projectDirectory = new File(resultsDirectory, projectId);
             File idDirectory = new File(projectDirectory, String.valueOf(id));
             if (!idDirectory.canRead()) {
@@ -259,8 +266,107 @@ public class OutputManagerImpl implements OutputManager {
                     uploadFilePath = uploadFilePath.substring(
                         0, uploadFilePath.length() - 1);
                 }
-                recursivelyUploadFiles(
-                    idDirectory, fileManager, storageId, uploadFilePath);
+                recursivelyUploadFilesToHPC(
+                    idDirectory, fileManager, storageId, uploadFilePath,
+                    "", files);
+                return Response.ok().build();
+            } finally {
+                endJobOperation(idDirectory);
+            }
+        } catch (MalformedURLException e) {
+            logger.error(e);
+            return Response.status(Status.BAD_REQUEST).entity(
+                "The URL specified was malformed").build();
+        } catch (IOException e) {
+            logger.error(e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).entity(
+                "General error reading or uploading a file").build();
+        } catch (Throwable e) {
+            logger.error(e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private class ParentState {
+
+        private ParentState parent;
+
+        private String uuid;
+
+        private String name;
+
+        private boolean created;
+
+        public ParentState(
+                ParentState parent, String uuid, String name, boolean created) {
+            this.parent = parent;
+            this.uuid = uuid;
+            this.name = name;
+            this.created = created;
+        }
+    }
+
+    private void recursivelyUploadFilesToCollabStorage(
+            File directory, DocumentClient fileManager, ParentState parent,
+            String relativePath, Set<String> files) throws IOException {
+        for (File file : directory.listFiles()) {
+            String relativeFileName = relativePath + "/" + file.getName();
+            if (file.isDirectory()) {
+                recursivelyUploadFilesToCollabStorage(
+                    file, fileManager,
+                    new ParentState(parent, null, file.getName(), false),
+                    relativeFileName, files);
+            } else if (files.isEmpty() || files.contains(relativeFileName)) {
+
+                ParentState currentParent = parent;
+                while (currentParent != null) {
+                    if (!currentParent.created) {
+                        String uuid = fileManager.createFolder(
+                            currentParent.parent.uuid, currentParent.name);
+                        currentParent.created = true;
+                        currentParent.uuid = uuid;
+                    }
+                }
+
+                FileInputStream input = new FileInputStream(file);
+                try {
+                    fileManager.uploadFile(parent.uuid, file.getName(), input);
+                } finally {
+                    input.close();
+                }
+            }
+        }
+    }
+
+    @Override
+    public Response uploadResultsToCollabStorage(
+            String projectId, int id, String filePath, Set<String> files) {
+
+        try {
+            DocumentClient fileManager = new DocumentClient(collabStorageUrl);
+            File projectDirectory = new File(resultsDirectory, projectId);
+            File idDirectory = new File(projectDirectory, String.valueOf(id));
+            if (!idDirectory.canRead()) {
+                logger.debug(idDirectory + " was not found");
+                return Response.status(Status.NOT_FOUND).build();
+            }
+
+            // Get the collab storage folder
+            String uuid = fileManager.getProjectUuidByCollabId(projectId);
+
+            // Create the parent hierarchy, but don't create the folders yet
+            ParentState parent = new ParentState(
+                null, uuid, projectId, true);
+            for (String pathItem : filePath.split("/")) {
+                if (!pathItem.equals("")) {
+                    parent = new ParentState(parent, null, pathItem, false);
+                }
+            }
+
+            startJobOperation(idDirectory);
+            try {
+                recursivelyUploadFilesToCollabStorage(
+                    idDirectory, fileManager, parent, "", files);
                 return Response.ok().build();
             } finally {
                 endJobOperation(idDirectory);

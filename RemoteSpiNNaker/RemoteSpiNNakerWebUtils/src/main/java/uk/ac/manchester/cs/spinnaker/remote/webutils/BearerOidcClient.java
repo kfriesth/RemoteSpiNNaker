@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.remote.web;
+package uk.ac.manchester.cs.spinnaker.remote.webutils;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -29,6 +29,8 @@ public class BearerOidcClient
         extends DirectClient<BearerCredentials, OidcProfile>{
 
     private static final String BEARER_PREFIX = "Bearer ";
+
+    private static final String BEARER_PARAM = "bearer_token";
 
     private String discoveryURI = null;
 
@@ -64,14 +66,20 @@ public class BearerOidcClient
     @Override
     public BearerCredentials getCredentials(WebContext context)
             throws RequiresHttpAction {
+        String accessToken = null;
         String authorization = context.getRequestHeader(
             HttpConstants.AUTHORIZATION_HEADER);
-        if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
+        String param = context.getRequestParameter(BEARER_PARAM);
+        if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
+            accessToken = authorization.substring(BEARER_PREFIX.length());
+        } else if ((authorization == null) && (param != null)) {
+            accessToken = param;
+        }
+        if (accessToken == null) {
             return null;
         }
 
         // Verify the access token
-        String accessToken = authorization.substring(BEARER_PREFIX.length());
         try {
             UserInfo userInfo = null;
             BearerAccessToken token = new BearerAccessToken(accessToken);

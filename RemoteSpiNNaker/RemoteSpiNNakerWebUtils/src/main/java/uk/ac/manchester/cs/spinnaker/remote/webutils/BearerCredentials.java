@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.remote.web;
+package uk.ac.manchester.cs.spinnaker.remote.webutils;
 
 import org.pac4j.core.credentials.Credentials;
 import org.pac4j.oidc.profile.OidcProfile;

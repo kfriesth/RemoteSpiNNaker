@@ -8,7 +8,7 @@ import java.security.NoSuchAlgorithmException;
 
 import javax.ws.rs.WebApplicationException;
 
-import uk.ac.manchester.cs.spinnaker.rest.RestClientUtils;
+import uk.ac.manchester.cs.spinnaker.rest.spring.SpringRestClientUtils;
 import uk.ac.manchester.cs.spinnaker.unicore.rest.UnicoreFileClient;
 
 /**
@@ -18,10 +18,10 @@ public class UnicoreFileManager {
 
     private UnicoreFileClient fileClient = null;
 
-    public UnicoreFileManager(URL url, String username, String token)
+    public UnicoreFileManager(URL url)
             throws KeyManagementException, NoSuchAlgorithmException {
-        fileClient = RestClientUtils.createBearerClient(
-            url, token, UnicoreFileClient.class);
+        fileClient = SpringRestClientUtils.createOIDCClient(
+            url, UnicoreFileClient.class);
     }
 
     /**

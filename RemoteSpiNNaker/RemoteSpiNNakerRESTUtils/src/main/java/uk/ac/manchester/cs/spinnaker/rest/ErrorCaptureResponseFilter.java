@@ -1,6 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.rest;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.List;
 
 import javax.ws.rs.client.ClientRequestContext;
@@ -21,8 +23,9 @@ public class ErrorCaptureResponseFilter implements ClientResponseFilter {
         Family family = responseContext.getStatusInfo().getFamily();
         if ((family == Family.CLIENT_ERROR)
                 || (family == Family.SERVER_ERROR)) {
-            System.err.println("Error when sending request:");
-            System.err.println("    Headers:");
+            System.err.println(
+                "Error when sending request to " + requestContext.getUri());
+            System.err.println("    Request Headers:");
             MultivaluedMap<String, String> headers =
                     requestContext.getStringHeaders();
             for (String headerName : headers.keySet()) {
@@ -32,8 +35,27 @@ public class ErrorCaptureResponseFilter implements ClientResponseFilter {
                         + headerValue);
                 }
             }
-            System.err.println("    Entity:");
+            System.err.println("    Request Entity:");
             System.err.println("        " + requestContext.getEntity());
+
+            System.err.println("    Response Headers:");
+            MultivaluedMap<String, String> responseHeaders =
+                    responseContext.getHeaders();
+            for (String headerName : responseHeaders.keySet()) {
+                List<String> headerValues = responseHeaders.get(headerName);
+                for (String headerValue : headerValues) {
+                    System.err.println("        " + headerName + ": "
+                        + headerValue);
+                }
+            }
+            System.err.println("    Response Entity:");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    responseContext.getEntityStream()));
+            String line = reader.readLine();
+            while (line != null) {
+                System.err.println("        " + line);
+                line = reader.readLine();
+            }
         }
     }
 

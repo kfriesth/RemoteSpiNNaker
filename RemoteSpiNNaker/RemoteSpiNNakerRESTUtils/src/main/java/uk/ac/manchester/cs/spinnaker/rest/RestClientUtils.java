@@ -23,6 +23,7 @@ import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.LaxRedirectStrategy;
 import org.apache.http.impl.conn.BasicClientConnectionManager;
 import org.apache.http.protocol.BasicHttpContext;
 import org.jboss.resteasy.client.jaxrs.ResteasyClient;
@@ -30,6 +31,7 @@ import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
 import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
 public class RestClientUtils {
@@ -71,6 +73,7 @@ public class RestClientUtils {
             ClientConnectionManager cm = new BasicClientConnectionManager(
                 schemeRegistry);
             DefaultHttpClient httpClient = new DefaultHttpClient(cm);
+            httpClient.setRedirectStrategy(new LaxRedirectStrategy());
             ApacheHttpClient4Engine engine = new ApacheHttpClient4Engine(
                 httpClient, localContext);
 
@@ -99,6 +102,9 @@ public class RestClientUtils {
             URL url, Credentials credentials, AuthScheme authScheme,
             Class<T> clazz) {
         ResteasyClient client = createRestClient(url, credentials, authScheme);
+        JacksonJsonProvider provider = new JacksonJsonProvider();
+        provider.configure(
+            DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         client.register(new JacksonJsonProvider());
         ResteasyWebTarget target = client.target(url.toString());
         return target.proxy(clazz);

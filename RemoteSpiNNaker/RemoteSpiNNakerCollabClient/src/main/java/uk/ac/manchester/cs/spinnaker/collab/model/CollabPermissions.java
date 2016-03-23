@@ -8,6 +8,8 @@ public class CollabPermissions {
 
     private boolean update;
 
+    private boolean view;
+
     @JsonProperty("DELETE")
     public boolean isDelete() {
         return delete;
@@ -24,6 +26,15 @@ public class CollabPermissions {
 
     public void setUpdate(boolean update) {
         this.update = update;
+    }
+
+    @JsonProperty("VIEW")
+    public boolean isView() {
+        return view;
+    }
+
+    public void setView(boolean view) {
+        this.view = view;
     }
 
 }

@@ -49,5 +49,7 @@
         <module>RemoteSpiNNakerOutputService</module>
         <module>RemoteSpiNNakerRESTUtils</module>
         <module>RemoteSpiNNakerSpringRESTUtils</module>
+        <module>RemoteSpiNNakerWebUtils</module>
+        <module>RemoteSpiNNakerOutputWeb</module>
     </modules>
 </project>

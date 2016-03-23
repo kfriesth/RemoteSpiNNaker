@@ -5,29 +5,31 @@
         <artifactId>RemoteSpiNNaker</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>RemoteSpiNNakerOutputService</artifactId>
+    <artifactId>RemoteSpiNNakerWebUtils</artifactId>
 
     <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerUnicoreClient</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>RemoteSpiNNakerCollabClient</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerRESTUtils</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.pac4j</groupId>
+            <artifactId>spring-security-pac4j</artifactId>
+            <version>${pac4j.springsecurity.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.pac4j</groupId>
+            <artifactId>pac4j-oidc</artifactId>
+            <version>${pac4j.oidc.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-core</artifactId>
-            <version>${springsecurity.version}</version>
+            <groupId>javax</groupId>
+            <artifactId>javaee-api</artifactId>
+            <version>${j2ee.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>

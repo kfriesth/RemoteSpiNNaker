@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.remote.web;
+package uk.ac.manchester.cs.spinnaker.remote.webutils;
 
 import java.io.IOException;
 

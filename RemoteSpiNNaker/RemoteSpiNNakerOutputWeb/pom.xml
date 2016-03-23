@@ -5,11 +5,11 @@
         <artifactId>RemoteSpiNNaker</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>RemoteSpiNNakerWeb</artifactId>
+    <artifactId>RemoteSpiNNakerOutputWeb</artifactId>
     <packaging>war</packaging>
 
     <build>
-        <finalName>RemoteSpiNNaker</finalName>
+        <finalName>RemoteSpiNNakerOutputWeb</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -52,12 +52,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerJobManager</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerNMPIQueueClient</artifactId>
+            <artifactId>RemoteSpiNNakerOutputService</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

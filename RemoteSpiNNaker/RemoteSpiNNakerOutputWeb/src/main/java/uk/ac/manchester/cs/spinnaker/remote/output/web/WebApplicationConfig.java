@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.remote.web;
+package uk.ac.manchester.cs.spinnaker.remote.output.web;
 
 import java.io.IOException;
 import java.util.EnumSet;
@@ -25,10 +25,10 @@ public class WebApplicationConfig implements WebApplicationInitializer {
                 new AnnotationConfigWebApplicationContext();
             ResourcePropertySource properties = new ResourcePropertySource(
                 "file:" + System.getProperty(
-                    "remotespinnaker.properties.location"));
+                    "outputservice.properties.location"));
             annotationConfig.getEnvironment().getPropertySources().addFirst(
                 properties);
-            annotationConfig.register(RemoteSpinnakerBeans.class);
+            annotationConfig.register(OutputServiceBeans.class);
             container.addListener(new ContextLoaderListener(annotationConfig));
 
             ServletRegistration.Dynamic dispatcher = container.addServlet(

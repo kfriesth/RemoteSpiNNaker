@@ -279,21 +279,27 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     private List<DataItem> getOutputFiles(
             String projectId, int id, String baseFile, List<String> outputs)
             throws IOException {
-        List<DataItem> outputItems = new ArrayList<DataItem>();
+        List<String> outputUrls = new ArrayList<String>();
         if (outputs != null) {
             List<File> outputFiles = new ArrayList<File>();
             for (String filename : outputs) {
                 outputFiles.add(new File(filename));
             }
-            outputItems.addAll(outputManager.addOutputs(
+
+            outputUrls.addAll(outputManager.addOutputs(
                 projectId, id, new File(baseFile), outputFiles));
         }
         if (jobOutputTempFiles.containsKey(id)) {
             List<File> outputFiles = new ArrayList<File>();
             File directory = jobOutputTempFiles.get(id);
             getFilesRecursively(directory, outputFiles);
-            outputItems.addAll(outputManager.addOutputs(
+            outputUrls.addAll(outputManager.addOutputs(
                 projectId, id, directory, outputFiles));
+        }
+
+        List<DataItem> outputItems = new ArrayList<DataItem>();
+        for (String url : outputUrls) {
+            outputItems.add(new DataItem(url));
         }
         return outputItems;
     }

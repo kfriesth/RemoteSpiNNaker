@@ -10,12 +10,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerModel</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerRESTUtils</artifactId>
+            <artifactId>RemoteSpiNNakerSpringRESTUtils</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

@@ -70,6 +70,8 @@ public class BearerOidcClient
         String authorization = context.getRequestHeader(
             HttpConstants.AUTHORIZATION_HEADER);
         String param = context.getRequestParameter(BEARER_PARAM);
+        logger.debug("Authorization header = " + authorization);
+        logger.debug("Param = " + param);
         if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
             accessToken = authorization.substring(BEARER_PREFIX.length());
         } else if ((authorization == null) && (param != null)) {

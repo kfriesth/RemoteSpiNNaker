@@ -15,6 +15,7 @@ import javax.ws.rs.core.Response;
 
 import uk.ac.manchester.cs.spinnaker.collab.model.DocEntity;
 import uk.ac.manchester.cs.spinnaker.collab.model.DocEntityReturn;
+import uk.ac.manchester.cs.spinnaker.collab.model.DocEntityReturnList;
 
 @Path("/document/v0/api")
 public interface DocumentRestService {
@@ -22,7 +23,7 @@ public interface DocumentRestService {
     @Path("/project/")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<DocEntityReturn> getAllProjects(
+    public DocEntityReturnList getAllProjects(
         @QueryParam("filter") String filter);
 
     @Path("/entity/")
@@ -40,20 +41,24 @@ public interface DocumentRestService {
     @Path("/folder/")
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
     public DocEntityReturn createFolder(DocEntity folder);
 
     @Path("/file/")
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
     public DocEntityReturn createFile(DocEntity file);
 
     @Path("/file/{uuid}/content/upload")
     @POST
     @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-    public DocEntityReturn uploadFile(String uuid, InputStream content);
+    @Produces(MediaType.APPLICATION_JSON)
+    public DocEntityReturn uploadFile(
+        @PathParam("uuid") String uuid, InputStream content);
 
     @Path("/file/{uuid}/content/download")
     @GET
     @Produces(MediaType.MEDIA_TYPE_WILDCARD)
-    public Response downloadFile(String uuid);
+    public Response downloadFile(@PathParam("uuid") String uuid);
 }

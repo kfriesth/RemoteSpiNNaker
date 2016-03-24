@@ -1,5 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.collab.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class DocEntityReturn {
 
     private String createdBy;
@@ -20,6 +22,9 @@ public class DocEntityReturn {
 
     private String name;
 
+    private String modifiedOn;
+
+    @JsonProperty("_createdBy")
     public String getCreatedBy() {
         return createdBy;
     }
@@ -28,6 +33,7 @@ public class DocEntityReturn {
         this.createdBy = createdBy;
     }
 
+    @JsonProperty("_createdOn")
     public String getCreatedOn() {
         return createdOn;
     }
@@ -36,6 +42,7 @@ public class DocEntityReturn {
         this.createdOn = createdOn;
     }
 
+    @JsonProperty("_contentType")
     public String getContentType() {
         return contentType;
     }
@@ -44,6 +51,7 @@ public class DocEntityReturn {
         this.contentType = contentType;
     }
 
+    @JsonProperty("_description")
     public String getDescription() {
         return description;
     }
@@ -52,6 +60,7 @@ public class DocEntityReturn {
         this.description = description;
     }
 
+    @JsonProperty("_parent")
     public String getParent() {
         return parent;
     }
@@ -60,6 +69,7 @@ public class DocEntityReturn {
         this.parent = parent;
     }
 
+    @JsonProperty("_uuid")
     public String getUuid() {
         return uuid;
     }
@@ -68,6 +78,7 @@ public class DocEntityReturn {
         this.uuid = uuid;
     }
 
+    @JsonProperty("_entityType")
     public String getEntityType() {
         return entityType;
     }
@@ -76,6 +87,7 @@ public class DocEntityReturn {
         this.entityType = entityType;
     }
 
+    @JsonProperty("_contentUri")
     public String getContentUri() {
         return contentUri;
     }
@@ -84,11 +96,21 @@ public class DocEntityReturn {
         this.contentUri = contentUri;
     }
 
+    @JsonProperty("_name")
     public String getName() {
         return name;
     }
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    @JsonProperty("_modifiedOn")
+    public String getModifiedOn() {
+        return modifiedOn;
+    }
+
+    public void setModifiedOn(String modifiedOn) {
+        this.modifiedOn = modifiedOn;
     }
 }

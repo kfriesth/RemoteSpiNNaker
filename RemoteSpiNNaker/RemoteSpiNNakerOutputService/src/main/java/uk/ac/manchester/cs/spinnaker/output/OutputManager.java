@@ -61,7 +61,7 @@ public interface OutputManager {
         @QueryParam("download") @DefaultValue("true") boolean download);
 
     @POST
-    @Path("{projectId}/{id}/uploadToHPC")
+    @Path("uploadToHPC/{projectId}/{id}")
     @PreAuthorize("@collabSecurityService.canUpdate(#projectId)")
     public Response uploadResultsToHPCServer(
         @PathParam("projectId") String projectId, @PathParam("id") int id,
@@ -71,7 +71,7 @@ public interface OutputManager {
         @QueryParam("file") Set<String> files);
 
     @POST
-    @Path("{projectId}/{id}/uploadToCollabStorage")
+    @Path("uploadToCollabStorage/{projectId}/{id}")
     @PreAuthorize("@collabSecurityService.canUpdate(#projectId)")
     public Response uploadResultsToCollabStorage(
         @PathParam("projectId") String projectId, @PathParam("id") int id,

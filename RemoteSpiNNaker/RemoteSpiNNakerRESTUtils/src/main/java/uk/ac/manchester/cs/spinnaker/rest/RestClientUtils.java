@@ -105,7 +105,7 @@ public class RestClientUtils {
         JacksonJsonProvider provider = new JacksonJsonProvider();
         provider.configure(
             DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        client.register(new JacksonJsonProvider());
+        client.register(provider);
         ResteasyWebTarget target = client.target(url.toString());
         return target.proxy(clazz);
     }

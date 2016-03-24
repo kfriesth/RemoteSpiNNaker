@@ -113,7 +113,7 @@ public class OutputServiceBeans {
         oidcClient.setClientID(oidcClientId);
         oidcClient.setSecret(oidcSecret);
         oidcClient.setDiscoveryURI(oidcDiscoveryUri);
-        oidcClient.setScope("openid profile hbp.collab");
+        oidcClient.setScope("openid profile hbp.collab hbp.documents");
         oidcClient.setPreferredJwsAlgorithm(JWSAlgorithm.RS256);
         return oidcClient;
     }
@@ -170,6 +170,7 @@ public class OutputServiceBeans {
                 .addFilterBefore(
                     callbackFilter(),
                     UsernamePasswordAuthenticationFilter.class)
+                .csrf().disable()
                 .exceptionHandling().authenticationEntryPoint(
                         hbpAuthenticationEntryPoint()).and()
                 .authorizeRequests().antMatchers(

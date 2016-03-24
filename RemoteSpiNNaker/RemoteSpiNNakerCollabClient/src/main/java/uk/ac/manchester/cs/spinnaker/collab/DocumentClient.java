@@ -4,12 +4,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
-import java.util.List;
 
 import org.jboss.resteasy.client.core.BaseClientResponse;
 
 import uk.ac.manchester.cs.spinnaker.collab.model.DocEntity;
+import uk.ac.manchester.cs.spinnaker.collab.model.DocEntityFile;
 import uk.ac.manchester.cs.spinnaker.collab.model.DocEntityReturn;
+import uk.ac.manchester.cs.spinnaker.collab.model.DocEntityReturnList;
 import uk.ac.manchester.cs.spinnaker.collab.rest.DocumentRestService;
 import uk.ac.manchester.cs.spinnaker.rest.spring.SpringRestClientUtils;
 
@@ -23,9 +24,9 @@ public class DocumentClient {
     }
 
     public String getProjectUuidByCollabId(String collabId) {
-        List<DocEntityReturn> projects = client.getAllProjects(
+        DocEntityReturnList projects = client.getAllProjects(
             "managed_by_collab=" + collabId);
-        return projects.get(0).getUuid();
+        return projects.getResult().get(0).getUuid();
     }
 
     public String getFileUuidByPath(String path) {
@@ -49,8 +50,10 @@ public class DocumentClient {
         return returnValue.getUuid();
     }
 
-    public void uploadFile(String parentUuid, String name, InputStream input) {
-        DocEntity file = new DocEntity(parentUuid, name);
+    public void uploadFile(
+            String parentUuid, String name, InputStream input,
+            String contentType) {
+        DocEntityFile file = new DocEntityFile(parentUuid, name, contentType);
         DocEntityReturn response = client.createFile(file);
         client.uploadFile(response.getUuid(), input);
     }

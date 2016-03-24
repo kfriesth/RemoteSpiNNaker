@@ -9,6 +9,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,6 +22,11 @@ import javax.ws.rs.core.Response.Status;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.pac4j.oidc.profile.OidcProfile;
+import org.pac4j.springframework.security.authentication.ClientAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.nimbusds.oauth2.sdk.token.BearerAccessToken;
 
 import uk.ac.manchester.cs.spinnaker.collab.DocumentClient;
 import uk.ac.manchester.cs.spinnaker.output.OutputManager;
@@ -235,7 +241,8 @@ public class OutputManagerImpl implements OutputManager {
                 recursivelyUploadFilesToHPC(
                     file, fileManager, storageId, uploadFileName,
                     relativeFileName, files);
-            } else if (files.isEmpty() || files.contains(relativeFileName)) {
+            } else if ((files == null) || files.isEmpty() ||
+                    files.contains(relativeFileName)) {
                 FileInputStream input = new FileInputStream(file);
                 try {
                     fileManager.uploadFile(storageId, uploadFileName, input);
@@ -295,42 +302,54 @@ public class OutputManagerImpl implements OutputManager {
 
         private String name;
 
-        private boolean created;
-
         public ParentState(
-                ParentState parent, String uuid, String name, boolean created) {
+                ParentState parent, String uuid, String name) {
             this.parent = parent;
             this.uuid = uuid;
             this.name = name;
-            this.created = created;
+        }
+    }
+
+    private void recursivelyCreateFolders(
+            ParentState folder, DocumentClient fileManager) {
+        if (folder.parent != null) {
+            if (folder.parent.uuid == null) {
+                recursivelyCreateFolders(folder.parent, fileManager);
+            }
+        }
+        if (folder.uuid == null) {
+            logger.debug("Creating folder " + folder.name);
+            String uuid = fileManager.createFolder(
+                folder.parent.uuid, folder.name);
+            folder.uuid = uuid;
         }
     }
 
     private void recursivelyUploadFilesToCollabStorage(
             File directory, DocumentClient fileManager, ParentState parent,
             String relativePath, Set<String> files) throws IOException {
+
         for (File file : directory.listFiles()) {
             String relativeFileName = relativePath + "/" + file.getName();
             if (file.isDirectory()) {
                 recursivelyUploadFilesToCollabStorage(
                     file, fileManager,
-                    new ParentState(parent, null, file.getName(), false),
+                    new ParentState(parent, null, file.getName()),
                     relativeFileName, files);
-            } else if (files.isEmpty() || files.contains(relativeFileName)) {
+            } else if ((files == null) || files.isEmpty() ||
+                    files.contains(relativeFileName)) {
 
-                ParentState currentParent = parent;
-                while (currentParent != null) {
-                    if (!currentParent.created) {
-                        String uuid = fileManager.createFolder(
-                            currentParent.parent.uuid, currentParent.name);
-                        currentParent.created = true;
-                        currentParent.uuid = uuid;
-                    }
-                }
+                recursivelyCreateFolders(parent, fileManager);
+
+                String contentType = Files.probeContentType(file.toPath());
 
                 FileInputStream input = new FileInputStream(file);
                 try {
-                    fileManager.uploadFile(parent.uuid, file.getName(), input);
+                    logger.debug(
+                        "Uploading " + file.getName() + " with type " +
+                        contentType);
+                    fileManager.uploadFile(
+                        parent.uuid, file.getName(), input, contentType);
                 } finally {
                     input.close();
                 }
@@ -356,10 +375,10 @@ public class OutputManagerImpl implements OutputManager {
 
             // Create the parent hierarchy, but don't create the folders yet
             ParentState parent = new ParentState(
-                null, uuid, projectId, true);
+                null, uuid, projectId);
             for (String pathItem : filePath.split("/")) {
                 if (!pathItem.equals("")) {
-                    parent = new ParentState(parent, null, pathItem, false);
+                    parent = new ParentState(parent, null, pathItem);
                 }
             }
 
@@ -380,6 +399,7 @@ public class OutputManagerImpl implements OutputManager {
             return Response.status(Status.INTERNAL_SERVER_ERROR).entity(
                 "General error reading or uploading a file").build();
         } catch (Throwable e) {
+            e.printStackTrace();
             logger.error(e);
             return Response.status(Status.INTERNAL_SERVER_ERROR).build();
         }
@@ -440,6 +460,29 @@ public class OutputManagerImpl implements OutputManager {
                     projectDirectory.delete();
                 }
             }
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        try {
+            URL baseServerUrl = new URL("http://127.0.0.1:9090");
+            URL collabStorageUrl = new URL(
+                "https://services.humanbrainproject.eu/");
+            File resultsDirectory = new File(
+                "C:\\Users\\zzalsar4\\Documents\\APT\\remoteSpinnakerResults");
+
+            String token = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJicC1vaWRjIn0.eyJleHAiOjE0NTg5NzcyNzYsImF1ZCI6WyI5OGY2NzBiNi0xNzc1LTQxMjEtYWUyMi0yZDk3YWRiZWU5YTYiXSwiaXNzIjoiaHR0cHM6XC9cL3NlcnZpY2VzLmh1bWFuYnJhaW5wcm9qZWN0LmV1XC9vaWRjXC8iLCJqdGkiOiI2N2E5MDMxZS00MDI0LTQ2NTgtOGU3Mi1kNjgyM2QxZGVjMTgiLCJoYnBfc2lkIjoicnNoYzUwdXZqOGZ4MW9oNnRmdm12ZG9yZSIsImlhdCI6MTQ1ODgwNDQ3Nn0.pDuyIVumYElFFKhL0SYG8zQ3ifRlC59lukLV_OXvVHyiTME-30S0-G6-eV0f0qhJt4IejOegE5sgHlyOl1YkSGlnp9_Pfrb3wmADSTlhKk-LMa3E_-eCCinxVtWJuuyD1oh-1YUnClleddGxTrdKaUQjw5n3eWVr31LuOT0zNi4";
+            OutputManagerImpl outputManager = new OutputManagerImpl(
+                baseServerUrl, collabStorageUrl, resultsDirectory, 365);
+
+            SecurityContextHolder.getContext().setAuthentication(
+                    new ClientAuthenticationToken(
+                        null, null, new OidcProfile(new BearerAccessToken(token)),
+                        null));
+            outputManager.uploadResultsToCollabStorage(
+                "508", 3, "testPath", new HashSet<String>());
+        } finally {
+            System.exit(0);
         }
     }
 

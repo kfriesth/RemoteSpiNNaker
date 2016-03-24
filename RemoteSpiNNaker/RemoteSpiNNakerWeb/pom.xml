@@ -8,6 +8,10 @@
     <artifactId>RemoteSpiNNakerWeb</artifactId>
     <packaging>war</packaging>
 
+    <properties>
+        <jetty.port>9090</jetty.port>
+    </properties>
+
     <build>
         <finalName>RemoteSpiNNaker</finalName>
         <plugins>
@@ -26,7 +30,7 @@
                 <configuration>
                     <connectors>
                         <connector implementation="org.eclipse.jetty.server.nio.SelectChannelConnector">
-                            <port>9090</port>
+                            <port>${jetty.port}</port>
                             <requestBufferSize>8388608</requestBufferSize>
                             <requestHeaderSize>8388608</requestHeaderSize>
                         </connector>

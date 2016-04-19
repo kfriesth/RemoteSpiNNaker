@@ -30,7 +30,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
             throws UnsupportedJobException, JobParametersFactoryException {
 
         // Test that there is a URL
-        String experimentDescription = job.getCode();
+        String experimentDescription = job.getCode().trim();
         if (!experimentDescription.startsWith("http://")
                 && !experimentDescription.startsWith("https://")) {
             throw new UnsupportedJobException();

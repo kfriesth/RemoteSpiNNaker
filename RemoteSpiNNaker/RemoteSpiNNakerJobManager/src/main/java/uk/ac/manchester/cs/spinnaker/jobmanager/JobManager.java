@@ -251,6 +251,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
         File outputFile = new File(jobOutputTempFiles.get(id), output);
         try {
+            outputFile.getParentFile().mkdirs();
             FileOutputStream outputStream = new FileOutputStream(outputFile);
             byte[] buffer = new byte[8096];
             int bytesRead = input.read(buffer);

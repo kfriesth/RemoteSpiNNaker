@@ -97,9 +97,6 @@ public class RemoteSpinnakerBeans {
     @Value("${spalloc.port}")
     private int spallocPort;
 
-    @Value("${spalloc.machine.name}")
-    private String spallocMachine;
-
     @Value("${spalloc.user.name}")
     private String spallocUser;
 
@@ -309,7 +306,7 @@ public class RemoteSpinnakerBeans {
     public MachineManager machineManager() {
         if (useSpalloc) {
             SpallocMachineManagerImpl spalloc = new SpallocMachineManagerImpl(
-                spallocServer, spallocPort, spallocMachine, spallocUser);
+                spallocServer, spallocPort, spallocUser);
             spalloc.start();
             return spalloc;
         }

@@ -87,12 +87,10 @@ public class SpallocMachineManagerImpl extends Thread
 
     private MachineNotificationReceiver callback = null;
 
-    private String machine = null;
-
     private String owner = null;
 
-    public SpallocMachineManagerImpl(String ipAddress, int port,
-            String machine, String owner) {
+    public SpallocMachineManagerImpl(
+            String ipAddress, int port, String owner) {
         SimpleModule module = new SimpleModule();
         module.addDeserializer(Response.class, new ResponseBasedDeserializer());
         mapper.registerModule(module);
@@ -103,7 +101,6 @@ public class SpallocMachineManagerImpl extends Thread
 
         this.ipAddress = ipAddress;
         this.port = port;
-        this.machine = machine;
         this.owner = owner;
     }
 
@@ -214,7 +211,7 @@ public class SpallocMachineManagerImpl extends Thread
         while (machineAllocated == null) {
             try {
                 int jobId = sendRequest(new CreateJobCommand(
-                    (int) nBoards, machine, owner), Integer.class);
+                    (int) nBoards, owner), Integer.class);
                 logger.debug(
                     "Got machine " + jobId + ", requesting notifications");
                 sendRequest(new NotifyJobCommand(jobId));
@@ -459,7 +456,7 @@ public class SpallocMachineManagerImpl extends Thread
     public static void main(String[] args) throws Exception {
         final SpallocMachineManagerImpl manager =
             new SpallocMachineManagerImpl(
-                "10.0.0.3", 22244, "my_4_node_board", "test");
+                "10.0.0.3", 22244, "test");
         manager.start();
 
         for (SpinnakerMachine machine : manager.getMachines()) {

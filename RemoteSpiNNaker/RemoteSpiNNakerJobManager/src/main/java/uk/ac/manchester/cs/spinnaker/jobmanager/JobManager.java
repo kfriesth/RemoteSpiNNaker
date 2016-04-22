@@ -67,8 +67,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     private Map<Integer, File> jobOutputTempFiles =
         new HashMap<Integer, File>();
 
-    private Map<Integer, Integer> jobNCores =
-        new HashMap<Integer, Integer>();
+    private Map<Integer, Long> jobNCores =
+        new HashMap<Integer, Long>();
 
     private Map<Integer, Long> jobResourceUsage =
         new HashMap<Integer, Long>();
@@ -159,19 +159,23 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         // TODO Check quota
 
         int nBoardsToRequest = nBoards;
+        long quotaNCores = (long) (nBoards * CORES_PER_CHIP * CHIPS_PER_BOARD);
 
         // If nothing specified, use 3 boards
         if (nBoards <= 0 && nChips <= 0 && nCores <= 0) {
             nBoardsToRequest = 3;
+            quotaNCores = (long) (3 * CORES_PER_CHIP * CHIPS_PER_BOARD);
         }
 
         // If boards not specified, use cores or chips
         if (nBoardsToRequest <= 0) {
             double nChipsExact = nChips;
+            quotaNCores = (long) (nChipsExact * CORES_PER_CHIP);
 
             // If chips not specified, use cores
             if (nChipsExact <= 0) {
                 nChipsExact = nCores / CORES_PER_CHIP;
+                quotaNCores = nCores;
             }
 
             double nBoardsExact = (double) nChips / CHIPS_PER_BOARD;
@@ -193,9 +197,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             allocatedMachines.put(id, machine);
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
+        logger.info("Resource usage " + (runTime * quotaNCores));
 
-        jobResourceUsage.put(id, (long) (runTime * nCores));
-        jobNCores.put(id, nCores);
+        jobResourceUsage.put(id, (long) (runTime * quotaNCores));
+        jobNCores.put(id, quotaNCores);
 
         return machine;
     }
@@ -203,11 +208,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     @Override
     public void extendJobMachineLease(int id, double runTime) {
         // TODO Check quota that the lease can be extended
-
-        jobResourceUsage.put(
-            id,
-            jobResourceUsage.get(id) + (long) (jobNCores.get(id) * runTime));
-
+        long usage = jobResourceUsage.get(id);
+        usage += (long) (jobNCores.get(id) * runTime);
+        jobResourceUsage.put(id, usage);
+        logger.info("Usage for " + id + " now " + usage);
     }
 
     @Override

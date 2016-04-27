@@ -48,6 +48,8 @@ public class SpallocMachineManagerImpl extends Thread
 
     private static final String MACHINE_VERSION = "5";
 
+    private static final String DEFAULT_TAG = "default";
+
     private String ipAddress = null;
 
     private int port = -1;
@@ -192,10 +194,12 @@ public class SpallocMachineManagerImpl extends Thread
             List<SpinnakerMachine> machines = new ArrayList<SpinnakerMachine>();
             for (Machine machine : spallocMachines) {
 
-                machines.add(new SpinnakerMachine(
-                    machine.getName(), MACHINE_VERSION,
-                    machine.getWidth() * 12, machine.getHeight() * 12,
-                    machine.getWidth() * machine.getHeight(), null));
+                if (machine.getTags().contains(DEFAULT_TAG)) {
+                    machines.add(new SpinnakerMachine(
+                        machine.getName(), MACHINE_VERSION,
+                        machine.getWidth() * 12, machine.getHeight() * 12,
+                        machine.getWidth() * machine.getHeight(), null));
+                }
             }
             return machines;
         } catch (IOException e) {

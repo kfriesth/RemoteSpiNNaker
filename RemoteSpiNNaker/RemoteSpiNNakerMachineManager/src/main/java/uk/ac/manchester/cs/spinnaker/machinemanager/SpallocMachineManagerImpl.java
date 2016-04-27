@@ -249,6 +249,9 @@ public class SpallocMachineManagerImpl extends Thread
                 sendRequest(new NoNotifyJobCommand(jobId));
                 logger.debug("Notifications for " + jobId + " are off");
                 machinesAllocated.remove(jobId);
+                synchronized (machineState) {
+                    machineState.remove(jobId);
+                }
                 callbacks.remove(jobId);
                 sendRequest(new DestroyJobCommand(jobId));
                 logger.debug("Job " + jobId + " destroyed");
@@ -443,7 +446,7 @@ public class SpallocMachineManagerImpl extends Thread
 
     private class KeepAlive implements Runnable {
         public void run() {
-            for (int jobId : machinesAllocated.keySet()) {
+            for (int jobId : machineState.keySet()) {
                 try {
                     sendRequest(new JobKeepAliveCommand(jobId));
                 } catch (IOException e) {

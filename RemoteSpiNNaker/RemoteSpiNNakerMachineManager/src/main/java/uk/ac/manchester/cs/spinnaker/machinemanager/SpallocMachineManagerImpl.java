@@ -286,7 +286,8 @@ public class SpallocMachineManagerImpl extends Thread
 
                 // Does Nothing
             }
-            return machineState.get(jobId).equals(state);
+            JobState newState = machineState.get(jobId);
+            return (newState != null) && newState.equals(state);
         }
     }
 

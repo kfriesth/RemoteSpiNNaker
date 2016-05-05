@@ -158,6 +158,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
         // TODO Check quota
 
+        logger.info(
+            "Request for " + nCores + " cores or " + nChips + " chips or " +
+            nBoards + " boards for " + (runTime / 1000.0) + " seconds");
+
         int nBoardsToRequest = nBoards;
         long quotaNCores = (long) (nBoards * CORES_PER_CHIP * CHIPS_PER_BOARD);
 
@@ -197,9 +201,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             allocatedMachines.put(id, machine);
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
-        logger.info("Resource usage " + (runTime * quotaNCores));
+        long resourceUsage = (long) ((runTime / 1000.0) * quotaNCores);
+        logger.info("Resource usage " + resourceUsage);
 
-        jobResourceUsage.put(id, (long) (runTime * quotaNCores));
+        jobResourceUsage.put(id, resourceUsage);
         jobNCores.put(id, quotaNCores);
 
         return machine;
@@ -207,9 +212,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     @Override
     public void extendJobMachineLease(int id, double runTime) {
+
         // TODO Check quota that the lease can be extended
-        long usage = jobResourceUsage.get(id);
-        usage += (long) (jobNCores.get(id) * runTime);
+
+        long usage = (long) (jobNCores.get(id) * (runTime / 1000.0));
         jobResourceUsage.put(id, usage);
         logger.info("Usage for " + id + " now " + usage);
     }

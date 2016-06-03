@@ -48,8 +48,6 @@ public class Job implements QueueNextResponse {
     @JsonDeserialize(using=DateTimeDeserialiser.class)
     private DateTime timestampSubmission = null;
 
-    private String user = null;
-
     private String provenance = null;
 
     public String getCode() {
@@ -138,14 +136,6 @@ public class Job implements QueueNextResponse {
 
     public void setTimestampSubmission(DateTime timestampSubmission) {
         this.timestampSubmission = timestampSubmission;
-    }
-
-    public String getUser() {
-        return user;
-    }
-
-    public void setUser(String user) {
-        this.user = user;
     }
 
     public String getCommand() {

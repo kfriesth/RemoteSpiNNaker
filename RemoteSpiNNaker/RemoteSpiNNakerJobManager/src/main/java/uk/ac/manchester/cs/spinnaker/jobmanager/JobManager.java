@@ -52,8 +52,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
     private Log logger = LogFactory.getLog(getClass());
 
-    private Map<Integer, SpinnakerMachine> allocatedMachines =
-        new HashMap<Integer, SpinnakerMachine>();
+    private Map<Integer, List<SpinnakerMachine>> allocatedMachines =
+        new HashMap<Integer, List<SpinnakerMachine>>();
 
     private JobExecuterFactory jobExecuterFactory = null;
 
@@ -198,7 +198,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
         SpinnakerMachine machine = machineManager.getNextAvailableMachine(
             nBoardsToRequest);
         synchronized (allocatedMachines) {
-            allocatedMachines.put(id, machine);
+            if (!allocatedMachines.containsKey(id)) {
+                allocatedMachines.put(id, new ArrayList<SpinnakerMachine>());
+            }
+            allocatedMachines.get(id).add(machine);
         }
         logger.info("Running " + id + " on " + machine.getMachineName());
         long resourceUsage = (long) ((runTime / 1000.0) * quotaNCores);
@@ -221,19 +224,48 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     }
 
     @Override
-    public JobMachineAllocated checkMachineLease(int id, int waitTime) {
-        SpinnakerMachine machine = null;
+    public JobMachineAllocated checkMachineLease(int id, final int waitTime) {
+        List<SpinnakerMachine> machines = null;
         synchronized (allocatedMachines) {
-            machine = allocatedMachines.get(id);
+            machines = allocatedMachines.get(id);
         }
-        if (!machineManager.isMachineAvailable(machine)) {
-            return new JobMachineAllocated(false);
+
+        // Return false if any machine is gone
+        for (SpinnakerMachine machine : machines) {
+            if (!machineManager.isMachineAvailable(machine)) {
+                return new JobMachineAllocated(false);
+            }
         }
-        if (!machineManager.waitForMachineStateChange(machine, waitTime)) {
-            return new JobMachineAllocated(true);
+
+        // Wait for the state change of any machine
+        final Integer stateChangeSync = new Integer(0);
+        for (final SpinnakerMachine machine : machines) {
+            Thread stateThread = new Thread() {
+                public void run() {
+                    machineManager.waitForMachineStateChange(
+                        machine, waitTime);
+                    synchronized (stateChangeSync) {
+                        stateChangeSync.notify();
+                    }
+                }
+            };
+            stateThread.start();
         }
-        return new JobMachineAllocated(
-            machineManager.isMachineAvailable(machine));
+        try {
+            stateChangeSync.wait(waitTime);
+        } catch (InterruptedException e) {
+
+            // Does Nothing
+        }
+
+        // Again check for a machine which is gone
+        for (SpinnakerMachine machine : machines) {
+            if (!machineManager.isMachineAvailable(machine)) {
+                return new JobMachineAllocated(false);
+            }
+        }
+
+        return new JobMachineAllocated(true);
     }
 
     @Override
@@ -329,9 +361,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             String baseDirectory, List<String> outputs) {
         logger.debug("Marking job " + id + " as finished");
         synchronized (allocatedMachines) {
-            SpinnakerMachine machine = allocatedMachines.remove(id);
-            if (machine != null) {
-                machineManager.releaseMachine(machine);
+            List<SpinnakerMachine> machines = allocatedMachines.remove(id);
+            if (machines != null) {
+                for (SpinnakerMachine machine : machines) {
+                    machineManager.releaseMachine(machine);
+                }
             }
         }
 
@@ -359,9 +393,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             RemoteStackTrace stackTrace) {
         logger.debug("Marking job " + id + " as error");
         synchronized (allocatedMachines) {
-            SpinnakerMachine machine = allocatedMachines.remove(id);
-            if (machine != null) {
-                machineManager.releaseMachine(machine);
+            List<SpinnakerMachine> machines = allocatedMachines.remove(id);
+            if (machines != null) {
+                for (SpinnakerMachine machine : machines) {
+                    machineManager.releaseMachine(machine);
+                }
             }
         }
         StackTraceElement[] elements =
@@ -402,10 +438,12 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
             boolean alreadyGone = false;
             synchronized (allocatedMachines) {
-                SpinnakerMachine machine = allocatedMachines.remove(
+                List<SpinnakerMachine> machines = allocatedMachines.remove(
                     job.getId());
-                if (machine != null) {
-                    machineManager.releaseMachine(machine);
+                if (machines != null) {
+                    for (SpinnakerMachine machine : machines) {
+                        machineManager.releaseMachine(machine);
+                    }
                 } else {
                     alreadyGone = true;
                 }

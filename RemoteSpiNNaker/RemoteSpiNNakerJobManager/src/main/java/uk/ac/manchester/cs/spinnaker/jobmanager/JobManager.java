@@ -251,11 +251,13 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
             };
             stateThread.start();
         }
-        try {
-            stateChangeSync.wait(waitTime);
-        } catch (InterruptedException e) {
+        synchronized (stateChangeSync) {
+            try {
+                stateChangeSync.wait(waitTime);
+            } catch (InterruptedException e) {
 
-            // Does Nothing
+                // Does Nothing
+            }
         }
 
         // Again check for a machine which is gone

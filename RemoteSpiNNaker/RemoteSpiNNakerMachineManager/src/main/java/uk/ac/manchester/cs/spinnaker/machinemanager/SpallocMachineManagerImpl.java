@@ -306,7 +306,6 @@ public class SpallocMachineManagerImpl extends Thread
                 // Does Nothing
             }
         }
-
     }
 
     public void run() {
@@ -365,6 +364,26 @@ public class SpallocMachineManagerImpl extends Thread
                     } catch (IOException e) {
                         if (!done) {
                             logger.error("Error receiving", e);
+                            connected = false;
+                            try {
+                                writer.close();
+                            } catch (Exception e2) {
+
+                                // Do Nothing
+                            }
+                            try {
+                                reader.close();
+                            } catch (Exception e2) {
+
+                                // Do Nothing
+                            }
+                            try {
+                                socket.close();
+                            } catch (Exception e2) {
+
+                                // Do Nothing
+                            }
+
                         }
                     }
                 }

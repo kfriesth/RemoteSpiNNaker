@@ -1,7 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.job_parameters;
 
 /**
- * Indicates that the job is unsupported
+ * Indicates that the job is unsupported.
  */
 public class UnsupportedJobException extends Exception {
 

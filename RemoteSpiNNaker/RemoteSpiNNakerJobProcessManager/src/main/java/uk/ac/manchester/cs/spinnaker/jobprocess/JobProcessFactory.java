@@ -9,19 +9,15 @@ import uk.ac.manchester.cs.spinnaker.job.JobParameters;
  * A factory for creating JobProcess instances given a JobParameters instance
  */
 public class JobProcessFactory {
-
 	/**
-	 * A map between parameter types and process types.  Note that the type
-	 * is guaranteed by the addMapping method, which is the only place that
-	 * this map should be modified.
+	 * A map between parameter types and process types. Note that the type is
+	 * guaranteed by the {@link #addMapping(Class,Class)} method, which is the
+	 * only place that this map should be modified.
 	 */
-	private HashMap<Class<? extends JobParameters>,
-	            Class<? extends JobProcess<? extends JobParameters>>> typeMap =
-			new HashMap<Class<? extends JobParameters>,
-			    Class<? extends JobProcess<? extends JobParameters>>>();
+	private HashMap<Class<? extends JobParameters>, Class<? extends JobProcess<? extends JobParameters>>> typeMap = new HashMap<>();
 
 	/**
-	 * Adds a new type mapping
+	 * Adds a new type mapping.
 	 * @param parameterType The job parameter type
 	 * @param processType The job process type
 	 */
@@ -35,7 +31,7 @@ public class JobProcessFactory {
 	}
 
 	/**
-	 * Creates a JobProcess given a JobParameters instance
+	 * Creates a {@link JobProcess} given a {@link JobParameters} instance.
 	 *
 	 * @param parameters The parameters of the job
 	 * @return A JobProcess matching the parameters

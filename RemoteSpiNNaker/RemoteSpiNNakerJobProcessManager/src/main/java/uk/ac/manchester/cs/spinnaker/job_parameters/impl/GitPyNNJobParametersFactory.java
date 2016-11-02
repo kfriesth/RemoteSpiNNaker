@@ -1,9 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
 
+import static org.eclipse.jgit.api.Git.cloneRepository;
+
 import java.io.File;
 
 import org.eclipse.jgit.api.CloneCommand;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.TransportException;
@@ -16,51 +17,54 @@ import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryExceptio
 import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
- * A JobParametersFactory that downloads a PyNN job from git
+ * A JobParametersFactory that downloads a PyNN job from git. The git repository
+ * must be world-readable, or sufficient credentials must be present in the URL.
  */
 public class GitPyNNJobParametersFactory implements JobParametersFactory {
+	private static final String DEFAULT_SCRIPT_NAME = "run.py";
 
-    private static final String DEFAULT_SCRIPT_NAME = "run.py";
+	@Override
+	public JobParameters getJobParameters(Job job, File workingDirectory)
+			throws UnsupportedJobException, JobParametersFactoryException {
 
-    @Override
-    public JobParameters getJobParameters(Job job, File workingDirectory)
-            throws UnsupportedJobException, JobParametersFactoryException {
+		// Test that there is a URL
+		String experimentDescription = job.getCode().trim();
+		if (!experimentDescription.startsWith("http://")
+				&& !experimentDescription.startsWith("https://"))
+			throw new UnsupportedJobException();
 
-        // Test that there is a URL
-        String experimentDescription = job.getCode().trim();
-        if (!experimentDescription.startsWith("http://")
-                && !experimentDescription.startsWith("https://")) {
-            throw new UnsupportedJobException();
-        }
+		// Try to get the repository
+		try {
+			return constructParameters(job, workingDirectory,
+					experimentDescription);
+		} catch (InvalidRemoteException e) {
+			throw new JobParametersFactoryException("Remote is not valid", e);
+		} catch (TransportException e) {
+			throw new JobParametersFactoryException("Transport failed", e);
+		} catch (GitAPIException e) {
+			throw new JobParametersFactoryException("Error using Git", e);
+		} catch (Throwable e) {
+			throw new JobParametersFactoryException(
+					"General error getting git repository", e);
+		}
+	}
 
-        // Try to get the repository
-        try {
-            CloneCommand clone = Git.cloneRepository();
-            clone.setURI(experimentDescription);
-            clone.setDirectory(workingDirectory);
-            clone.setCloneSubmodules(true);
-            clone.call();
+	/** Constructs the parameters by checking out the git repository. */
+	private JobParameters constructParameters(Job job, File workingDirectory,
+			String experimentDescription) throws GitAPIException,
+			InvalidRemoteException, TransportException {
+		CloneCommand clone = cloneRepository();
+		clone.setURI(experimentDescription);
+		clone.setDirectory(workingDirectory);
+		clone.setCloneSubmodules(true);
+		clone.call();
 
-            String script = DEFAULT_SCRIPT_NAME + SYSTEM_ARG;
-            String command = job.getCommand();
-            if (command != null && !command.equals("")) {
-                script = command;
-            }
+		String script = DEFAULT_SCRIPT_NAME + SYSTEM_ARG;
+		String command = job.getCommand();
+		if (command != null && !command.isEmpty())
+			script = command;
 
-            PyNNJobParameters parameters = new PyNNJobParameters(
-                    workingDirectory.getAbsolutePath(), script,
-                    job.getHardwareConfig());
-            return parameters;
-        } catch (InvalidRemoteException e) {
-            throw new JobParametersFactoryException("Remote is not valid", e);
-        } catch (TransportException e) {
-            throw new JobParametersFactoryException("Transport failed", e);
-        } catch (GitAPIException e) {
-            throw new JobParametersFactoryException("Error using Git", e);
-        } catch (Throwable e) {
-            e.printStackTrace();
-            throw new JobParametersFactoryException(
-                "General error getting git repository", e);
-        }
-    }
+		return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
+				script, job.getHardwareConfig());
+	}
 }

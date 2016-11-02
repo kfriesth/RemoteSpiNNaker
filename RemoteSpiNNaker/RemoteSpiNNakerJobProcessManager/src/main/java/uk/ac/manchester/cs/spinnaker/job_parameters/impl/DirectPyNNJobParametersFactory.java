@@ -1,8 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
@@ -13,32 +15,38 @@ import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
  * A JobParametersFactory that uses the experimentDescription itself as a PyNN
- * script
+ * script.
  */
 public class DirectPyNNJobParametersFactory implements JobParametersFactory {
+	private static final String ENCODING = "UTF-8";
+	private static final String SCRIPT_NAME = "run.py";
 
-    private static final String SCRIPT_NAME = "run.py";
+	@Override
+	public JobParameters getJobParameters(Job job, File workingDirectory)
+			throws UnsupportedJobException, JobParametersFactoryException {
+		if (!job.getCode().contains("import"))
+			throw new UnsupportedJobException();
 
-    @Override
-    public JobParameters getJobParameters(Job job, File workingDirectory)
-            throws UnsupportedJobException, JobParametersFactoryException {
-        if (!job.getCode().contains("import")) {
-            throw new UnsupportedJobException();
-        }
-        try {
-            File scriptFile = new File(workingDirectory, SCRIPT_NAME);
-            PrintWriter writer = new PrintWriter(scriptFile, "UTF-8");
-            writer.print(job.getCode());
-            writer.close();
+		try {
+			return constructParameters(job, workingDirectory);
+		} catch (IOException e) {
+			throw new JobParametersFactoryException("Error storing script", e);
+		} catch (Throwable e) {
+			throw new JobParametersFactoryException(
+					"General error with PyNN Script", e);
+		}
+	}
 
-            return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
-                    SCRIPT_NAME + SYSTEM_ARG, job.getHardwareConfig());
-        } catch (IOException e) {
-            throw new JobParametersFactoryException("Error storing script", e);
-        } catch (Throwable e) {
-            throw new JobParametersFactoryException(
-                "General error with PyNN Script", e);
-        }
-    }
+	/** Constructs the parameters by writing the script into a local file. */
+	private JobParameters constructParameters(Job job, File workingDirectory)
+			throws FileNotFoundException, UnsupportedEncodingException {
+		File scriptFile = new File(workingDirectory, SCRIPT_NAME);
+		PrintWriter writer = new PrintWriter(scriptFile, ENCODING);
+		writer.print(job.getCode());
+		writer.close();
+
+		return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
+				SCRIPT_NAME + SYSTEM_ARG, job.getHardwareConfig());
+	}
 
 }

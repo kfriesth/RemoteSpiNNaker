@@ -7,25 +7,24 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 
 /**
- * A logger that pushes everything from a reader to a LogWriter
+ * A logger that pushes everything from a reader to a {@link LogWriter}.
  */
 public class ReaderLogWriter extends Thread {
+    private BufferedReader reader;
+    private LogWriter writer;
 
-    private BufferedReader reader = null;
+    private boolean done;
+    private boolean isRunning;
+    private boolean isWriting;
 
-    private LogWriter writer = null;
-
-    private boolean done = false;
-
-    private boolean isRunning = false;
-
-    private boolean isWriting = false;
-
-    /**
-    * Creates a new ReaderLogWriter with another reader
-    * @param reader The reader to read from
-    * @param writer The writer to write to
-    */
+	/**
+	 * Creates a new ReaderLogWriter with another reader.
+	 * 
+	 * @param reader
+	 *            The reader to read from
+	 * @param writer
+	 *            The writer to write to
+	 */
     public ReaderLogWriter(Reader reader, LogWriter writer) {
         if (reader instanceof BufferedReader) {
             this.reader = (BufferedReader) reader;
@@ -33,13 +32,18 @@ public class ReaderLogWriter extends Thread {
             this.reader = new BufferedReader(reader);
         }
         this.writer = writer;
+        this.setDaemon(true);
     }
 
     /**
-    * Creates a new ReaderLogWriter with an input stream
-    * @param input The input stream to read from
-    * @param writer The writer to write to
-    */
+	 * Creates a new ReaderLogWriter with an input stream. This will be treated
+	 * as a text stream using the system encoding.
+	 * 
+	 * @param input
+	 *            The input stream to read from.
+	 * @param writer
+	 *            The writer to write to.
+	 */
     public ReaderLogWriter(InputStream input, LogWriter writer) {
         this(new InputStreamReader(input), writer);
     }
@@ -49,28 +53,33 @@ public class ReaderLogWriter extends Thread {
         synchronized (this) {
             isRunning = true;
         }
-        while (!done) {
+		try {
+			copyStream();
+		} finally {
+			synchronized (this) {
+				isRunning = false;
+				notifyAll();
+			}
+		}
+    }
+
+	private void copyStream() {
+		while (!done) {
             try {
                 String line = reader.readLine();
-                if (line != null) {
-                    synchronized (this) {
-                        isWriting = true;
-                        writer.append(line + "\n");
-                        isWriting = false;
-                        notifyAll();
-                    }
-                } else {
-                    done = true;
-                }
+                if (line == null)
+                	return;
+				synchronized (this) {
+					isWriting = true;
+					writer.append(line + "\n");
+					isWriting = false;
+					notifyAll();
+				}
             } catch (IOException e) {
                 done = true;
             }
         }
-        synchronized (this) {
-            isRunning = false;
-            notifyAll();
-        }
-    }
+	}
 
     /**
     * Closes the reader/writer
@@ -78,22 +87,18 @@ public class ReaderLogWriter extends Thread {
     public void close() {
         synchronized (this) {
             System.err.println("Waiting for log writer to exit...");
-            while (isRunning || isWriting) {
+            while (isRunning || isWriting)
                 try {
                     wait();
                 } catch (InterruptedException e) {
-
                     // Does Nothing
                 }
-            }
             System.err.println("Log writer has exited");
         }
-
 
         try {
             reader.close();
         } catch (IOException e) {
-
             // Do Nothing
         }
     }

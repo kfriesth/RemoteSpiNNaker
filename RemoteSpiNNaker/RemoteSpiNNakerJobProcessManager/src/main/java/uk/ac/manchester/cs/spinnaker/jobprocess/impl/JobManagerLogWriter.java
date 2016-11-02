@@ -12,66 +12,55 @@ import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
  * A log writer that writes to the job manager
  */
 public class JobManagerLogWriter implements LogWriter {
+	private static final int UPDATE_INTERVAL = 500;
 
-    private JobManagerInterface jobManager = null;
+	private final JobManagerInterface jobManager;
+	private final int id;
+	private final StringBuilder cached = new StringBuilder();
+	private final Timer sendTimer;
 
-    private int id = 0;
+	public JobManagerLogWriter(JobManagerInterface jobManager, int id,
+			boolean updateLive) {
+		this.jobManager = jobManager;
+		this.id = id;
 
-    private String cached = "";
+		if (updateLive)
+			sendTimer = new Timer(UPDATE_INTERVAL, new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					sendLog();
+				}
+			});
+		else
+			sendTimer = null;
+	}
 
-    private Timer sendTimer = null;
+	private synchronized void sendLog() {
+		if (cached.length() > 0) {
+			System.err.println("Sending cached data to job manager");
+			jobManager.appendLog(id, cached.toString());
+			cached.setLength(0);
+		}
+	}
 
-    public JobManagerLogWriter(
-            JobManagerInterface jobManager, int id, boolean updateLive) {
-        this.jobManager = jobManager;
-        this.id = id;
+	@Override
+	public void append(String log) {
+		System.err.print("Process Output: " + log);
+		synchronized (this) {
+			cached.append(log);
+			if (sendTimer != null)
+				sendTimer.restart();
+		}
+	}
 
-        if (updateLive) {
-            sendTimer = new Timer(500, new ActionListener() {
+	public String getLog() {
+		synchronized (this) {
+			return cached.toString();
+		}
+	}
 
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    synchronized (this) {
-                        sendLog();
-                    }
-                }
-            });
-        }
-    }
-
-    public void sendLog() {
-        synchronized (this) {
-            if (cached != "") {
-                System.err.println(
-                        "Sending cached data to job manager");
-                JobManagerLogWriter.this.jobManager.appendLog(
-                        JobManagerLogWriter.this.id, cached);
-                cached = "";
-            }
-        }
-    }
-
-    @Override
-    public void append(String log) {
-        synchronized (this) {
-            System.err.println("Process Output: " + log);
-            cached += log;
-            if (sendTimer != null) {
-                sendTimer.restart();
-            }
-        }
-    }
-
-    public String getLog() {
-        synchronized (this) {
-            return cached;
-        }
-    }
-
-    public void stop() {
-        if (sendTimer != null) {
-            sendTimer.stop();
-        }
-    }
-
+	public void stop() {
+		if (sendTimer != null)
+			sendTimer.stop();
+	}
 }

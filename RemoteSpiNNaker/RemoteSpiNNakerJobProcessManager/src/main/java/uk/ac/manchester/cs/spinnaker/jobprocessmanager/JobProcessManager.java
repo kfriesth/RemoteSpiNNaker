@@ -1,5 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.jobprocessmanager;
 
+import static java.io.File.createTempFile;
+import static uk.ac.manchester.cs.spinnaker.jobprocessmanager.FileDownloader.downloadFile;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -37,80 +40,60 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
 /**
  * Manages a running job process.  This is run as a separate process from the
- * command line, and it assumes input is passed via System.in.
- *
+ * command line, and it assumes input is passed via {@link System#in}.
  */
 public class JobProcessManager {
+	// No instances for you!
+	private JobProcessManager(){}
 
-    // Prepare factories for converting jobs into parameters
-    @SuppressWarnings("serial")
-    private static final List<JobParametersFactory> JOB_PARAMETER_FACTORIES =
-        new ArrayList<JobParametersFactory>() {{
-            add(new GitPyNNJobParametersFactory());
-            add(new ZipPyNNJobParametersFactory());
-            add(new DirectPyNNJobParametersFactory());
-        }};
+	/** The factories for converting jobs into parameters. */
+	private static final JobParametersFactory[] JOB_PARAMETER_FACTORIES = new JobParametersFactory[] {
+			new GitPyNNJobParametersFactory(),
+			new ZipPyNNJobParametersFactory(),
+			new DirectPyNNJobParametersFactory() };
 
-    // Prepare a factory for converting parameters into processes
-    private static final JobProcessFactory JOB_PROCESS_FACTORY =
-        new JobProcessFactory() {{
-            addMapping(PyNNJobParameters.class, PyNNJobProcess.class);
-        }};
+	/** The factory for converting parameters into processes. */
+	private static final JobProcessFactory JOB_PROCESS_FACTORY = new JobProcessFactory() {
+		{
+			addMapping(PyNNJobParameters.class, PyNNJobProcess.class);
+		}
+	};
 
+	/** How to talk to the main website. */
     private static JobManagerInterface createJobManager(String url) {
         ResteasyClient client = new ResteasyClientBuilder().build();
         client.register(new JacksonJsonProvider());
+        // TODO Add auth filter
         ResteasyWebTarget target = client.target(url);
         return target.proxy(JobManagerInterface.class);
     }
 
     private static void deleteDirectory(File directory) {
         for (File file : directory.listFiles()) {
-            if (file.isDirectory()) {
+            if (file.isDirectory())
                 deleteDirectory(file);
-            } else {
+            else
                 file.delete();
-            }
         }
         directory.delete();
     }
 
+    private static String serverUrl = null;
+    private static boolean deleteOnExit = false;
+    private static boolean isLocal = false;
+    private static String executerId = null;
+    private static boolean liveUploadOutput = false;
+    private static boolean requestMachine = false;
+
     public static void main(String[] args) throws Exception {
+        parseArguments(args);
 
         JobManagerInterface jobManager = null;
         JobManagerLogWriter logWriter = null;
         Job job = null;
         String projectId = null;
+        
         try {
-
-            String serverUrl = null;
-            boolean deleteOnExit = false;
-            boolean isLocal = false;
-            String executerId = null;
-            boolean liveUploadOutput = false;
-            boolean requestMachine = false;
-            for (int i = 0; i < args.length; i++) {
-                if (args[i].equals("--serverUrl")) {
-                    serverUrl = args[++i];
-                } else if (args[i].equals("--deleteOnExit")) {
-                    deleteOnExit = true;
-                } else if (args[i].equals("--local")) {
-                    isLocal = true;
-                } else if (args[i].equals("--executerId")) {
-                    executerId = args[++i];
-                } else if (args[i].equals("--liveUploadOutput")) {
-                    liveUploadOutput = true;
-                } else if (args[i].equals("--requestMachine")) {
-                    requestMachine = true;
-                }
-            }
-
-            if (serverUrl == null) {
-                throw new IOException("--serverUrl must be specified");
-            } else if (executerId == null) {
-                throw new IOException("--executerId must be specified");
-            }
-
             jobManager = createJobManager(serverUrl);
 
             // Read the job
@@ -118,53 +101,11 @@ public class JobProcessManager {
             projectId = new File(job.getCollabId()).getName();
 
             // Create a temporary location for the job
-            File workingDirectory = File.createTempFile("job", ".tmp");
+            File workingDirectory = createTempFile("job", ".tmp");
             workingDirectory.delete();
             workingDirectory.mkdirs();
 
-            JobParameters parameters = null;
-            Map<String, JobParametersFactoryException> errors =
-                    new HashMap<String, JobParametersFactoryException>();
-            for (JobParametersFactory factory : JOB_PARAMETER_FACTORIES) {
-                try {
-                    parameters = factory.getJobParameters(
-                        job, workingDirectory);
-                    break;
-                } catch (UnsupportedJobException e) {
-
-                    // Do Nothing
-                } catch (JobParametersFactoryException e) {
-                    errors.put(factory.getClass().getSimpleName(), e);
-                }
-            }
-            if (parameters == null) {
-                if (!errors.isEmpty()) {
-                    StringBuilder problemBuilder = new StringBuilder();
-                    problemBuilder.append(
-                        "The job type was recognised by at least"
-                        + " one factory, but could not be decoded.  The errors "
-                        + " are as follows:\n");
-                    for (String key : errors.keySet()) {
-                        JobParametersFactoryException error = errors.get(key);
-                        problemBuilder.append(key);
-                        problemBuilder.append(": ");
-                        problemBuilder.append(error.getMessage());
-                        problemBuilder.append('\n');
-                    }
-                    throw new IOException(problemBuilder.toString());
-                }
-                throw new IOException(
-                    "The job did not appear to be supported on this system");
-            }
-
-            // Get any requested input files
-            if (job.getInputData() != null) {
-                for (DataItem input : job.getInputData()) {
-                    URL inputUrl = new URL(input.getUrl());
-                    FileDownloader.downloadFile(
-                        inputUrl, workingDirectory, null);
-                }
-            }
+            JobParameters parameters = getJobParameters(job, workingDirectory);
 
             // Create a process to process the request
             System.err.println("Creating process from parameters");
@@ -197,11 +138,10 @@ public class JobProcessManager {
             Status status = process.getStatus();
             System.err.println("Process has finished with status " + status);
             List<File> outputs = process.getOutputs();
-            List<String> outputsAsStrings = new ArrayList<String>();
+            List<String> outputsAsStrings = new ArrayList<>();
             if (isLocal) {
-                for (File output : outputs) {
+                for (File output : outputs)
                     outputsAsStrings.add(output.getAbsolutePath());
-                }
             } else {
                 for (File output : outputs) {
                     InputStream input = new FileInputStream(output);
@@ -210,26 +150,26 @@ public class JobProcessManager {
                     input.close();
                 }
             }
-            if (status == Status.Error) {
-                Throwable error = process.getError();
-                jobManager.setJobError(
-                    projectId, job.getId(), error.getMessage(), log,
-                    workingDirectory.getAbsolutePath(), outputsAsStrings,
-                    new RemoteStackTrace(error));
-            } else if (status == Status.Finished) {
-                jobManager.setJobFinished(
-                    projectId, job.getId(), log,
-                    workingDirectory.getAbsolutePath(), outputsAsStrings);
+			switch (status) {
+			case Error:
+				Throwable error = process.getError();
+				jobManager.setJobError(projectId, job.getId(),
+						error.getMessage(), log,
+						workingDirectory.getAbsolutePath(), outputsAsStrings,
+						new RemoteStackTrace(error));
+				break;
+			case Finished:
+				jobManager.setJobFinished(projectId, job.getId(), log,
+						workingDirectory.getAbsolutePath(), outputsAsStrings);
 
-                // Clean up
-                process.cleanup();
-                if (deleteOnExit) {
-                    deleteDirectory(workingDirectory);
-                }
-            } else {
-                throw new RuntimeException("Unknown status returned!");
-            }
-
+				// Clean up
+				process.cleanup();
+				if (deleteOnExit)
+					deleteDirectory(workingDirectory);
+				break;
+			default:
+				throw new RuntimeException("Unknown status returned!");
+			}
         } catch (Throwable error) {
             if (jobManager != null && job != null) {
                 try {
@@ -238,10 +178,10 @@ public class JobProcessManager {
                         logWriter.stop();
                         log = logWriter.getLog();
                     }
-                    jobManager.setJobError(
-                        projectId, job.getId(), error.getMessage(), log,
-                        "", new ArrayList<String>(),
-                        new RemoteStackTrace(error));
+					jobManager.setJobError(projectId, job.getId(),
+							error.getMessage(), log, "",
+							new ArrayList<String>(),
+							new RemoteStackTrace(error));
                 } catch (Throwable t) {
                     t.printStackTrace();
                     error.printStackTrace();
@@ -251,4 +191,83 @@ public class JobProcessManager {
             }
         }
     }
+
+	private static void parseArguments(String[] args) throws IOException {
+		for (int i = 0; i < args.length; i++) {
+        	if (args[i].equals("--serverUrl")) {
+        		serverUrl = args[++i];
+        	} else if (args[i].equals("--deleteOnExit")) {
+        		deleteOnExit = true;
+        	} else if (args[i].equals("--local")) {
+        		isLocal = true;
+        	} else if (args[i].equals("--executerId")) {
+        		executerId = args[++i];
+        	} else if (args[i].equals("--liveUploadOutput")) {
+        		liveUploadOutput = true;
+        	} else if (args[i].equals("--requestMachine")) {
+        		requestMachine = true;
+        	}
+        }
+        
+        if (serverUrl == null) {
+        	throw new IOException("--serverUrl must be specified");
+        } else if (executerId == null) {
+        	throw new IOException("--executerId must be specified");
+        }
+	}
+
+	/**
+	 * Sort out the parameters to a job. Includes downloading any necessary files.
+	 * 
+	 * @param job
+	 *            The job that we're assembling the parameters for.
+	 * @param workingDirectory
+	 *            The working directory for the job, used to write files.
+	 * @return Description of the parameters.
+	 * @throws IOException
+	 *             If anything goes wrong, such as the parameters being
+	 *             unreadable or the job being unsupported on the current
+	 *             architectural configuration.
+	 */
+	private static JobParameters getJobParameters(Job job, File workingDirectory)
+			throws IOException {
+		JobParameters parameters = null;
+		Map<String, JobParametersFactoryException> errors = new HashMap<>();
+
+		for (JobParametersFactory factory : JOB_PARAMETER_FACTORIES) {
+			try {
+				parameters = factory.getJobParameters(job, workingDirectory);
+				break;
+			} catch (UnsupportedJobException e) {
+				// Do Nothing
+			} catch (JobParametersFactoryException e) {
+				errors.put(factory.getClass().getSimpleName(), e);
+			}
+		}
+
+		if (parameters != null) {
+            // Get any requested input files
+			if (job.getInputData() != null)
+				for (DataItem input : job.getInputData())
+					downloadFile(new URL(input.getUrl()), workingDirectory,
+							null);
+
+			return parameters;
+		}
+
+		if (!errors.isEmpty()) {
+			StringBuilder problemBuilder = new StringBuilder();
+			problemBuilder.append("The job type was recognised by at least"
+					+ " one factory, but could not be decoded.  The errors "
+					+ " are as follows:\n");
+			for (String key : errors.keySet())
+				problemBuilder.append(key).append(": ")
+						.append(errors.get(key).getMessage()).append('\n');
+			throw new IOException(problemBuilder.toString());
+		}
+
+		// Miscellaneous other error
+		throw new IOException(
+				"The job did not appear to be supported on this system");
+	}
 }

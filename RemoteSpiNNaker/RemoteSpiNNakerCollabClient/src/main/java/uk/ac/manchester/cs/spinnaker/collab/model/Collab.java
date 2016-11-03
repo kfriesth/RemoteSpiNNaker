@@ -1,9 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.collab.model;
 
 public class Collab {
-
     private String content;
-
     private int id;
 
     public String getContent() {

@@ -28,84 +28,71 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
+	private static final Logger logger = LoggerFactory
+			.getLogger(ClientAuthenticationFilter.class);
+	private Client<?, ?> client;
+	private AuthenticationDetailsSource<HttpServletRequest, ?> authenticationDetailsSource = new WebAuthenticationDetailsSource();
+	private AuthenticationEntryPoint authenticationEntryPoint = new BearerAuthenticationEntryPoint();
+	private AuthenticationManager authenticationManager;
 
-    private static final Logger logger =
-        LoggerFactory.getLogger(ClientAuthenticationFilter.class);
+	public DirectClientAuthenticationFilter(
+			AuthenticationManager authenticationManager) {
+		this.authenticationManager = authenticationManager;
+	}
 
-    private Client<?, ?> client = null;
+	@Override
+	protected void doFilterInternal(HttpServletRequest request,
+			HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException {
+		// context
+		final WebContext context = new J2EContext(request, response);
 
-    private AuthenticationDetailsSource<HttpServletRequest, ?>
-        authenticationDetailsSource = new WebAuthenticationDetailsSource();
+		// get credentials
+		Credentials credentials = null;
+		try {
+			credentials = client.getCredentials(context);
+		} catch (RequiresHttpAction e) {
+			logger.info("Requires additionnal HTTP action", e);
+		} catch (CredentialsException ce) {
+			throw new AuthenticationCredentialsException(
+					"Error retrieving credentials", ce);
+		}
 
-    private AuthenticationEntryPoint authenticationEntryPoint =
-        new BearerAuthenticationEntryPoint();
+		logger.debug("credentials : {}", credentials);
 
-    private AuthenticationManager authenticationManager = null;
+		// if credentials/profile is not null, do more
+		if (credentials != null) {
+			try {
+				// create token from credential
+				ClientAuthenticationToken token = new ClientAuthenticationToken(
+						credentials, client.getName());
+				token.setDetails(authenticationDetailsSource
+						.buildDetails(request));
 
-    public DirectClientAuthenticationFilter(
-            AuthenticationManager authenticationManager) {
-        this.authenticationManager = authenticationManager;
-    }
+				// authenticate
+				Authentication authentication = authenticationManager
+						.authenticate(token);
+				logger.debug("authentication: {}", authentication);
+				SecurityContextHolder.getContext().setAuthentication(
+						authentication);
+			} catch (AuthenticationException e) {
+				authenticationEntryPoint.commence(request, response, e);
+			}
+		}
 
-    @Override
-    protected void doFilterInternal(
-            HttpServletRequest request, HttpServletResponse response,
-            FilterChain filterChain)
-            throws ServletException, IOException {
+		filterChain.doFilter(request, response);
+	}
 
-        // context
-        final WebContext context = new J2EContext(request, response);
+	public Client<?, ?> getClient() {
+		return client;
+	}
 
-        // get credentials
-        Credentials credentials = null;
-        try {
-            credentials = client.getCredentials(context);
-        } catch (final RequiresHttpAction e) {
-            logger.info("Requires additionnal HTTP action", e);
-        } catch (CredentialsException ce) {
-            throw new AuthenticationCredentialsException(
-                "Error retrieving credentials", ce);
-        }
+	public void setClient(final Client<?, ?> client) {
+		this.client = client;
+	}
 
-        logger.debug("credentials : {}", credentials);
-
-        // if credentials/profile is not null, do more
-        if (credentials != null) {
-
-            try {
-
-                // create token from credential
-                final ClientAuthenticationToken token =
-                    new ClientAuthenticationToken(
-                        credentials, client.getName());
-                token.setDetails(
-                    authenticationDetailsSource.buildDetails(request));
-
-                // authenticate
-                final Authentication authentication =
-                    authenticationManager.authenticate(token);
-                logger.debug("authentication: {}", authentication);
-
-                SecurityContextHolder.getContext().setAuthentication(
-                    authentication);
-            } catch (AuthenticationException e) {
-                authenticationEntryPoint.commence(request, response, e);
-            }
-        }
-
-        filterChain.doFilter(request, response);
-    }
-
-    public Client<?, ?> getClient() {
-        return this.client;
-    }
-
-    public void setClient(final Client<?, ?> client) {
-        this.client = client;
-    }
-
-    public void setAuthenticationEntryPoint(
-            AuthenticationEntryPoint authenticationEntryPoint) {
-        this.authenticationEntryPoint = authenticationEntryPoint;
-    }
+	public void setAuthenticationEntryPoint(
+			AuthenticationEntryPoint authenticationEntryPoint) {
+		this.authenticationEntryPoint = authenticationEntryPoint;
+	}
 }

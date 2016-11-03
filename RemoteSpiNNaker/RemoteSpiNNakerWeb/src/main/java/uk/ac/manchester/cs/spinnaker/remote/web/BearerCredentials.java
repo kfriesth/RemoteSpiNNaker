@@ -4,11 +4,9 @@ import org.pac4j.core.credentials.Credentials;
 import org.pac4j.oidc.profile.OidcProfile;
 
 public class BearerCredentials extends Credentials {
-
     private static final long serialVersionUID = 1L;
 
     private String accessToken = null;
-
     private OidcProfile profile = null;
 
     public BearerCredentials(String accessToken, OidcProfile profile) {
@@ -29,5 +27,4 @@ public class BearerCredentials extends Credentials {
         accessToken = null;
         profile = null;
     }
-
 }

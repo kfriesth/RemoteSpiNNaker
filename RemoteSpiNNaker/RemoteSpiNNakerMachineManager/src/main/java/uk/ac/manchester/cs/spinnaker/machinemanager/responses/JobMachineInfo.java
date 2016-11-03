@@ -3,13 +3,9 @@ package uk.ac.manchester.cs.spinnaker.machinemanager.responses;
 import java.util.List;
 
 public class JobMachineInfo {
-
     private int width;
-
     private int height;
-
     private List<Connection> connections;
-
     private String machineName;
 
     public int getWidth() {

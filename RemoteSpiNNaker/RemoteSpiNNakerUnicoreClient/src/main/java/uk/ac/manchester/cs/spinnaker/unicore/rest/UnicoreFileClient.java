@@ -9,11 +9,9 @@ import javax.ws.rs.PathParam;
 
 @Path("/storages")
 public interface UnicoreFileClient {
-
-    @PUT
-    @Path("{id}/files/{filePath}")
-    @Consumes("application/octet-stream")
-    public void upload(
-        @PathParam("id") String id, @PathParam("filePath") String filePath,
-        InputStream input);
+	@PUT
+	@Path("{id}/files/{filePath}")
+	@Consumes("application/octet-stream")
+	public void upload(@PathParam("id") String id,
+			@PathParam("filePath") String filePath, InputStream input);
 }

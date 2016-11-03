@@ -1,5 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.rest;
 
+import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
+import static com.fasterxml.jackson.databind.PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -14,9 +17,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.Provider;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.joda.JodaModule;
@@ -26,11 +27,8 @@ import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 @Consumes(MediaType.WILDCARD)
 @Produces(MediaType.WILDCARD)
 public class CustomJacksonJsonProvider extends JacksonJsonProvider {
-
-    private Set<ObjectMapper> registeredMappers = new HashSet<ObjectMapper>();
-
+    private Set<ObjectMapper> registeredMappers = new HashSet<>();
     private SimpleModule module = new SimpleModule();
-
     private JodaModule jodaModule = new JodaModule();
 
     public <T> void addDeserialiser(Class<T> type,
@@ -41,15 +39,12 @@ public class CustomJacksonJsonProvider extends JacksonJsonProvider {
     private void registerMapper(Class<?> type, MediaType mediaType) {
         ObjectMapper mapper = locateMapper(type, mediaType);
         if (!registeredMappers.contains(mapper)) {
-            mapper.registerModule(module);
-            mapper.setPropertyNamingStrategy(
-                    PropertyNamingStrategy
-                        .CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
-            mapper.configure(
-                DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-            mapper.registerModule(jodaModule);
-            registeredMappers.add(mapper);
-        }
+			mapper.registerModule(module);
+			mapper.setPropertyNamingStrategy(CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+			mapper.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
+			mapper.registerModule(jodaModule);
+			registeredMappers.add(mapper);
+		}
     }
 
     @Override

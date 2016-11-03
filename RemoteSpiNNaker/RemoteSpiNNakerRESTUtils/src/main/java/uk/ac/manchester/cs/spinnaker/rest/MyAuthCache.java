@@ -7,38 +7,36 @@ import org.apache.http.auth.AuthScheme;
 import org.apache.http.client.AuthCache;
 
 public class MyAuthCache implements AuthCache {
+	private final HashMap<HttpHost, AuthScheme> map = new HashMap<>();
 
-    private final HashMap<HttpHost, AuthScheme> map =
-    		new HashMap<HttpHost, AuthScheme>();
+	@Override
+	public void put(HttpHost host, AuthScheme authScheme) {
+		if (host == null)
+			throw new IllegalArgumentException("HTTP host may not be null");
+		map.put(host, authScheme);
+	}
 
-    public void put(final HttpHost host, final AuthScheme authScheme) {
-        if (host == null) {
-            throw new IllegalArgumentException("HTTP host may not be null");
-        }
-        this.map.put(host, authScheme);
-    }
+	@Override
+	public AuthScheme get(HttpHost host) {
+		if (host == null)
+			throw new IllegalArgumentException("HTTP host may not be null");
+		return map.get(host);
+	}
 
-    public AuthScheme get(final HttpHost host) {
-        if (host == null) {
-            throw new IllegalArgumentException("HTTP host may not be null");
-        }
-        return this.map.get(host);
-    }
+	@Override
+	public void remove(HttpHost host) {
+		if (host == null)
+			throw new IllegalArgumentException("HTTP host may not be null");
+		map.remove(host);
+	}
 
-    public void remove(final HttpHost host) {
-        if (host == null) {
-            throw new IllegalArgumentException("HTTP host may not be null");
-        }
-        this.map.remove(host);
-    }
+	@Override
+	public void clear() {
+		map.clear();
+	}
 
-    public void clear() {
-        this.map.clear();
-    }
-
-    @Override
-    public String toString() {
-        return this.map.toString();
-    }
-
+	@Override
+	public String toString() {
+		return map.toString();
+	}
 }

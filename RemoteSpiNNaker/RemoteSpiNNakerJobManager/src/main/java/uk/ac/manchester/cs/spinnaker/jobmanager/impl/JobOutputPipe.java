@@ -12,37 +12,33 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 public class JobOutputPipe extends Thread {
-
-	private BufferedReader reader = null;
-
-	private PrintWriter writer = null;
-
-	private boolean done;
-
+	private final BufferedReader reader;
+	private final PrintWriter writer;
+	private volatile boolean done;
 	private Log logger = LogFactory.getLog(getClass());
 
 	public JobOutputPipe(InputStream input, File output)
 			throws FileNotFoundException {
 		reader = new BufferedReader(new InputStreamReader(input));
 		writer = new PrintWriter(output);
+		done = false;
+		setDaemon(true);
 	}
 
+	@Override
 	public void run() {
-		String line = null;
-		try {
-			line = reader.readLine();
-		} catch (IOException e) {
-			done = true;
-		}
-		while (!done && (line != null)) {
+		while (!done) {
+			String line = null;
 			try {
-				if (!line.isEmpty()) {
-				    logger.debug(line);
-				    writer.println(line);
-				}
 				line = reader.readLine();
 			} catch (IOException e) {
-				done = true;
+				break;
+			}
+			if (line == null)
+				break;
+			if (!line.isEmpty()) {
+				logger.debug(line);
+				writer.println(line);
 			}
 		}
 		writer.close();

@@ -8,16 +8,17 @@ import java.net.URL;
  *
  */
 public interface JobExecuterFactory {
-
-    /**
-     * Creates a new JobExecuter
-     *
-     * @param manager The manager requesting the creation
-     * @param baseUrl The URL of the manager
-     * @return The new executer
-     * @throws IOException If there is an error creating the executer
-     */
-    JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
-        throws IOException;
-
+	/**
+	 * Creates a new JobExecuter
+	 *
+	 * @param manager
+	 *            The manager requesting the creation
+	 * @param baseUrl
+	 *            The URL of the manager
+	 * @return The new executer
+	 * @throws IOException
+	 *             If there is an error creating the executer
+	 */
+	JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
+			throws IOException;
 }

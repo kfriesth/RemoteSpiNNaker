@@ -1,5 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager.impl;
 
+import static java.io.File.createTempFile;
+import static java.io.File.pathSeparatorChar;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -19,30 +22,19 @@ import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
  *
  */
 public class LocalJobExecuter extends Thread implements JobExecuter {
+    private final JobManager jobManager;
+    private final File javaExec;
+    private final List<File> classPath;
+    private final String mainClass;
+    private final List<String> arguments;
+    private final String id;
 
-    private JobManager jobManager = null;
-
-    private String id = null;
-
-    private File javaExec = null;
-
-    private List<File> classPath = null;
-
-    private String mainClass = null;
-
-    private List<String> arguments = null;
-
-    private File workingDirectory = null;
-
-    private File outputLog = File.createTempFile("exec", ".log");
-
-    private JobOutputPipe pipe = null;
-
-    private Process process = null;
-
+    private File workingDirectory;
+    private File outputLog = createTempFile("exec", ".log");
+    private JobOutputPipe pipe;
+    private Process process;
     private Log logger = LogFactory.getLog(getClass());
-
-    private IOException startException = null;
+    private IOException startException;
 
     /**
     * Create a JobExecuter
@@ -75,24 +67,41 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
         start();
     }
 
-    /**
-    * Runs the external job
-    * @throws IOException If there is an error starting the job
-    */
-    public void run() {
-        List<String> command = new ArrayList<String>();
+	/**
+	 * Runs the external job
+	 * 
+	 * @throws IOException
+	 *             If there is an error starting the job
+	 */
+    @Override
+	public void run() {
+        startSubprocess(constructArguments());
+
+        logger.debug("Waiting for process to finish");
+		try {
+			process.waitFor();
+		} catch (InterruptedException e) {
+			// Do Nothing
+		}
+		logger.debug("Process finished, closing pipe");
+		pipe.close();
+
+		reportResult();
+	}
+
+	private List<String> constructArguments() {
+		List<String> command = new ArrayList<>();
         command.add(javaExec.getAbsolutePath());
 
         StringBuilder classPathBuilder = new StringBuilder();
         for (File file : classPath) {
-            if (classPathBuilder.length() != 0) {
-                classPathBuilder.append(File.pathSeparatorChar);
-            }
+            if (classPathBuilder.length() != 0)
+                classPathBuilder.append(pathSeparatorChar);
             classPathBuilder.append(file);
         }
         command.add("-cp");
         command.add(classPathBuilder.toString());
-        logger.debug("Classpath: " + classPathBuilder.toString());
+        logger.debug("Classpath: " + classPathBuilder);
 
         command.add(mainClass);
         logger.debug("Main command: " + mainClass);
@@ -100,8 +109,12 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
             command.add(argument);
             logger.debug("Argument: " + argument);
         }
+		return command;
+	}
 
-        ProcessBuilder builder = new ProcessBuilder(command);
+
+	private void startSubprocess(List<String> command) {
+		ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDirectory);
         logger.debug("Working directory: " + workingDirectory);
         builder.redirectErrorStream(true);
@@ -112,65 +125,56 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
                 logger.debug("Starting pipe from process");
                 pipe = new JobOutputPipe(process.getInputStream(), outputLog);
                 pipe.start();
-                notifyAll();
             } catch (IOException e) {
                 logger.error("Error running external job", e);
                 startException = e;
-                notifyAll();
             }
-        }
+            notifyAll();
+		}
+	}
 
-        try {
-            logger.debug("Waiting for process to finish");
-            process.waitFor();
-        } catch (InterruptedException e) {
-            // Do Nothing
-        }
-        logger.debug("Process finished, closing pipe");
-        pipe.close();
+	private void reportResult() {
+		StringBuilder logToAppend = new StringBuilder();
+		try (BufferedReader reader = new BufferedReader(new FileReader(
+				outputLog))) {
+			while (true) {
+				String line = reader.readLine();
+				while (line == null)
+					break;
+				logToAppend.append(line).append("\n");
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		jobManager.setExecutorExited(id, logToAppend.toString());
+	}
 
-        String logToAppend = "";
-        try {
-            BufferedReader reader = new BufferedReader(
-                new FileReader(outputLog));
-            String line = reader.readLine();
-            while (line != null) {
-                logToAppend += line + "\n";
-                line = reader.readLine();
-            }
-            reader.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        jobManager.setExecutorExited(id, logToAppend);
-    }
+	/**
+	 * Gets an OutputStream which writes to the process stdin.
+	 * 
+	 * @return An OutputStream
+	 */
+	public OutputStream getProcessOutputStream() throws IOException {
+		synchronized (this) {
+			while ((process == null) && (startException == null)) {
+				try {
+					wait();
+				} catch (InterruptedException e) {
+					// Do Nothing
+				}
+			}
+			if (startException != null)
+				throw startException;
+			return process.getOutputStream();
+		}
+	}
 
-    /**
-    * Gets an OutputStream which writes to the process stdin
-    * @return An OutputStream
-    */
-    public OutputStream getProcessOutputStream() throws IOException {
-        synchronized (this) {
-            while ((process == null) && (startException == null)) {
-                try {
-                    wait();
-                } catch (InterruptedException e) {
-
-                    // Do Nothing
-                }
-            }
-            if (startException != null) {
-                throw startException;
-            }
-            return process.getOutputStream();
-        }
-    }
-
-    /**
-    * Gets the location of the process log file
-    * @return The location of the log file
-    */
-    public File getLogFile() {
-        return outputLog;
-    }
+	/**
+	 * Gets the location of the process log file
+	 * 
+	 * @return The location of the log file
+	 */
+	public File getLogFile() {
+		return outputLog;
+	}
 }

@@ -1,21 +1,13 @@
 package uk.ac.manchester.cs.spinnaker.collab.model;
 
 public class CollabContext {
-
     private String appId;
-
     private Collab collab;
-
     private String context;
-
     private int id;
-
     private String name;
-
     private int orderIndex;
-
     private int parent;
-
     private String type;
 
     public String getAppId() {
@@ -81,5 +73,4 @@ public class CollabContext {
     public void setType(String type) {
         this.type = type;
     }
-
 }

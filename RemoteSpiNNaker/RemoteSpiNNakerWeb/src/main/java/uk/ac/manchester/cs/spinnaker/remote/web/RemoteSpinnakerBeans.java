@@ -57,30 +57,28 @@ import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
 import uk.ac.manchester.cs.spinnaker.output.OutputManager;
 import uk.ac.manchester.cs.spinnaker.output.impl.OutputManagerImpl;
 
+@SuppressWarnings("unused")
 @Configuration
 //@EnableGlobalMethodSecurity(prePostEnabled=true, proxyTargetClass=true)
 //@EnableWebSecurity
 @Import(JaxRsConfig.class)
 public class RemoteSpinnakerBeans {
+	@Bean
+	public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
+		return new PropertySourcesPlaceholderConfigurer();
+	}
 
-    @Bean
-    public static PropertySourcesPlaceholderConfigurer
-            propertySourcesPlaceholderConfigurer() {
-       return new PropertySourcesPlaceholderConfigurer();
-    }
+	@Bean
+	public static ConversionServiceFactoryBean conversionService() {
+		ConversionServiceFactoryBean factory = new ConversionServiceFactoryBean();
+		Set<Converter<?, ?>> converters = new HashSet<>();
+		converters.add(new StringToSpinnakerMachine());
+		factory.setConverters(converters);
+		return factory;
+	}
 
-    @Bean
-    public static ConversionServiceFactoryBean conversionService() {
-        ConversionServiceFactoryBean factory =
-                new ConversionServiceFactoryBean();
-        Set<Converter<?, ?>> converters = new HashSet<Converter<?,?>>();
-        converters.add(new StringToSpinnakerMachine());
-        factory.setConverters(converters);
-        return factory;
-    }
-
-    @Autowired
-    private ApplicationContext ctx;
+	@Autowired
+	private ApplicationContext ctx;
 
     @Value("${spalloc.enabled}")
     private boolean useSpalloc;
@@ -295,61 +293,58 @@ public class RemoteSpinnakerBeans {
 //        }
 //    }
 
-    @Bean
-    public MachineManager machineManager() {
-        if (useSpalloc) {
-            SpallocMachineManagerImpl spalloc = new SpallocMachineManagerImpl(
-                spallocServer, spallocPort, spallocUser);
-            spalloc.start();
-            return spalloc;
-        }
-        return new FixedMachineManagerImpl(machines);
-    }
+	@Bean
+	public MachineManager machineManager() {
+		if (useSpalloc) {
+			SpallocMachineManagerImpl spalloc = new SpallocMachineManagerImpl(
+					spallocServer, spallocPort, spallocUser);
+			spalloc.start();
+			return spalloc;
+		}
+		return new FixedMachineManagerImpl(machines);
+	}
 
-    @Bean
-    public NMPIQueueManager queueManager() throws NoSuchAlgorithmException,
-            KeyManagementException {
-        return new NMPIQueueManager(
-            nmpiUrl, nmpiHardware, nmpiUsername, nmpiPassword,
-            nmpiPasswordIsApiKey);
-    }
+	@Bean
+	public NMPIQueueManager queueManager() throws NoSuchAlgorithmException,
+			KeyManagementException {
+		return new NMPIQueueManager(nmpiUrl, nmpiHardware, nmpiUsername,
+				nmpiPassword, nmpiPasswordIsApiKey);
+	}
 
-    @Bean
-    public JobExecuterFactory jobExecuterFactory() throws IOException {
-        if (!useXenVms) {
-            return new LocalJobExecuterFactory(
-                deleteJobsOnExit, liveUploadOutput, requestSpiNNakerMachine);
-        }
-        return new XenVMExecuterFactory(
-            xenServerUrl, xenUsername, xenPassword, xenTemplateVmName,
-            xenDiskSizeInGbs, deleteJobsOnExit, xenShutdownOnExit,
-            liveUploadOutput, requestSpiNNakerMachine, xenMaxVms);
-    }
+	@Bean
+	public JobExecuterFactory jobExecuterFactory() throws IOException {
+		if (!useXenVms)
+			return new LocalJobExecuterFactory(deleteJobsOnExit,
+					liveUploadOutput, requestSpiNNakerMachine);
 
-    @Bean
-    public OutputManager outputManager() {
-        return new OutputManagerImpl(
-            baseServerUrl, resultsDirectory, nDaysToKeepResults);
-    }
+		return new XenVMExecuterFactory(xenServerUrl, xenUsername, xenPassword,
+				xenTemplateVmName, xenDiskSizeInGbs, deleteJobsOnExit,
+				xenShutdownOnExit, liveUploadOutput, requestSpiNNakerMachine,
+				xenMaxVms);
+	}
 
-    @Bean
-    public JobManager jobManager() throws IOException,
-            NoSuchAlgorithmException, KeyManagementException {
-        return new JobManager(
-            machineManager(), queueManager(), outputManager(), baseServerUrl,
-            jobExecuterFactory(), restartJobExecutorOnFailure);
-    }
+	@Bean
+	public OutputManager outputManager() {
+		return new OutputManagerImpl(baseServerUrl, resultsDirectory,
+				nDaysToKeepResults);
+	}
 
-    @Bean
-    public Server jaxRsServer()
-            throws KeyManagementException, NoSuchAlgorithmException,
-            IOException {
+	@Bean
+	public JobManager jobManager() throws IOException,
+			NoSuchAlgorithmException, KeyManagementException {
+		return new JobManager(machineManager(), queueManager(),
+				outputManager(), baseServerUrl, jobExecuterFactory(),
+				restartJobExecutorOnFailure);
+	}
 
-        JAXRSServerFactoryBean factory = new JAXRSServerFactoryBean();
-        factory.setAddress(restPath);
-        factory.setBus(ctx.getBean(SpringBus.class));
-        factory.setServiceBeans(Arrays.asList(outputManager(), jobManager()));
-        factory.setProviders(Arrays.asList(new JacksonJsonProvider()));
-        return factory.create();
-    }
+	@Bean
+	public Server jaxRsServer() throws KeyManagementException,
+			NoSuchAlgorithmException, IOException {
+		JAXRSServerFactoryBean factory = new JAXRSServerFactoryBean();
+		factory.setAddress(restPath);
+		factory.setBus(ctx.getBean(SpringBus.class));
+		factory.setServiceBeans(Arrays.asList(outputManager(), jobManager()));
+		factory.setProviders(Arrays.asList(new JacksonJsonProvider()));
+		return factory.create();
+	}
 }

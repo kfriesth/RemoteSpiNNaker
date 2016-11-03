@@ -15,15 +15,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * A deserialiser which deserialises classes based on unique properties that
- * they have.  The classes to be deserialised need to be registered with a
- * unique property using the "register" function
+ * they have. The classes to be deserialised need to be registered with a unique
+ * property using the "register" function.
  */
 public class PropertyBasedDeserialiser<T> extends StdDeserializer<T> {
-
 	private static final long serialVersionUID = 1L;
 
-	private Map<String, Class<? extends T>> registry =
-			new HashMap<String, Class<? extends T>>();
+	private final Map<String, Class<? extends T>> registry = new HashMap<>();
 
 	/**
 	 * Creates a new deserialiser
@@ -33,35 +31,33 @@ public class PropertyBasedDeserialiser<T> extends StdDeserializer<T> {
 	}
 
 	/**
-	 * Registers a type against a property in the deserialiser
+	 * Registers a type against a property in the deserialiser.
 	 *
-	 * @param propertyName The name of the unique property that identifies the
-	 *                     class.  This is the JSON name
-	 * @param type The class to register against the property
+	 * @param propertyName
+	 *            The name of the unique property that identifies the class.
+	 *            This is the JSON name.
+	 * @param type
+	 *            The class to register against the property.
 	 */
 	public void register(String propertyName, Class<? extends T> type) {
+		if (propertyName == null)
+			throw new IllegalArgumentException("propertyName must be non-null");
+		if (type == null)
+			throw new IllegalArgumentException("type must be non-null");
 		registry.put(propertyName, type);
 	}
 
 	@Override
-	public T deserialize(JsonParser parser,
-			DeserializationContext context) throws IOException,
-			JsonProcessingException {
+	public T deserialize(JsonParser parser, DeserializationContext context)
+			throws IOException, JsonProcessingException {
 		ObjectNode root = parser.readValueAsTree();
-		Class<? extends T> responseClass = null;
 		Iterator<Entry<String, JsonNode>> elementsIterator = root.fields();
 		while (elementsIterator.hasNext()) {
 			Entry<String, JsonNode> element = elementsIterator.next();
 			String name = element.getKey();
-			if (registry.containsKey(name)) {
-				responseClass = registry.get(name);
-				break;
-			}
+			if (registry.containsKey(name))
+				return parser.getCodec().treeToValue(root, registry.get(name));
 		}
-		if (responseClass == null) {
-			return null;
-		}
-		return parser.getCodec().treeToValue(root, responseClass);
+		return null;
 	}
-
 }

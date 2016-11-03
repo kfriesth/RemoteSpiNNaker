@@ -1,13 +1,11 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.model;
 
 public class NMPILog {
-
     private StringBuilder content;
 
     public String getContent() {
-        if (content == null) {
+        if (content == null)
             return null;
-        }
         return content.toString();
     }
 
@@ -16,10 +14,9 @@ public class NMPILog {
     }
 
     public void appendContent(String content) {
-        if (this.content == null) {
+        if (this.content == null)
             this.content = new StringBuilder(content);
-        } else {
+        else
             this.content.append(content);
-        }
     }
 }

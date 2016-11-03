@@ -3,13 +3,9 @@ package uk.ac.manchester.cs.spinnaker.machinemanager.responses;
 import java.util.List;
 
 public class Machine {
-
     private String name;
-
     private List<String> tags;
-
     private int width;
-
     private int height;
 
     public String getName() {

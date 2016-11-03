@@ -14,14 +14,10 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 public class FixedMachineManagerImpl implements MachineManager {
 
     /**
-     * The queue of available machines
-     */
-    private Set<SpinnakerMachine> machinesAvailable =
-            new HashSet<SpinnakerMachine>();
-
-    private Set<SpinnakerMachine> machinesAllocated =
-            new HashSet<SpinnakerMachine>();
-
+	 * The queue of available machines
+	 */
+	private Set<SpinnakerMachine> machinesAvailable = new HashSet<>();
+	private Set<SpinnakerMachine> machinesAllocated = new HashSet<>();
     private boolean done = false;
 
     /**
@@ -29,14 +25,12 @@ public class FixedMachineManagerImpl implements MachineManager {
      * @param machinesAvailable The machines that are to be managed
      */
     public FixedMachineManagerImpl(List<SpinnakerMachine> machinesAvailable) {
-        for (SpinnakerMachine machine : machinesAvailable) {
-            this.machinesAvailable.add(machine);
-        }
+    	this.machinesAvailable.addAll(machinesAvailable);
     }
 
     @Override
     public List<SpinnakerMachine> getMachines() {
-        List<SpinnakerMachine> machines = new ArrayList<SpinnakerMachine>();
+        List<SpinnakerMachine> machines = new ArrayList<>();
         synchronized (machinesAvailable) {
             machines.addAll(machinesAvailable);
             machines.addAll(machinesAllocated);
@@ -53,33 +47,29 @@ public class FixedMachineManagerImpl implements MachineManager {
      */
     @Override
     public SpinnakerMachine getNextAvailableMachine(int nBoards) {
-
         SpinnakerMachine machine = null;
         synchronized (machinesAvailable) {
-
             while ((machine == null) && !done) {
-
-                for (SpinnakerMachine nextMachine : machinesAvailable) {
+                for (SpinnakerMachine nextMachine : machinesAvailable)
                     if (nextMachine.getnBoards() >= nBoards) {
                         machine = nextMachine;
                         break;
                     }
-                }
 
                 // If no machine was found, wait for something to change
-                if (machine == null) {
-                    try {
-                        machinesAvailable.wait();
-                    } catch (InterruptedException e) {
-
-                        // Does Nothing
-                    }
-                }
+				try {
+					if (machine == null)
+						machinesAvailable.wait();
+				} catch (InterruptedException e) {
+					// Does Nothing
+               }
             }
 
-            // Move the machine from available to allocated
-            machinesAvailable.remove(machine);
-            machinesAllocated.add(machine);
+			if (machine != null) {
+				// Move the machine from available to allocated
+				machinesAvailable.remove(machine);
+				machinesAllocated.add(machine);
+			}
         }
         return machine;
     }
@@ -118,13 +108,11 @@ public class FixedMachineManagerImpl implements MachineManager {
     @Override
     public boolean waitForMachineStateChange(SpinnakerMachine machine,
             int waitTime) {
-
         synchronized (machinesAvailable) {
             boolean isAvailable = machinesAvailable.contains(machine);
             try {
                 machinesAvailable.wait(waitTime);
             } catch (InterruptedException e) {
-
                 // Does Nothing
             }
             return machinesAvailable.contains(machine) != isAvailable;

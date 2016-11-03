@@ -3,9 +3,7 @@ package uk.ac.manchester.cs.spinnaker.collab.model;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class CollabPermissions {
-
     private boolean delete;
-
     private boolean update;
 
     @JsonProperty("DELETE")

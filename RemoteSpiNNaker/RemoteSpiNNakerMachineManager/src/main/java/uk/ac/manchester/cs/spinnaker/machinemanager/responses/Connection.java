@@ -6,9 +6,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({"chip", "hostname"})
 @JsonFormat(shape=JsonFormat.Shape.ARRAY)
 public class Connection {
-
     private Chip chip;
-
     private String hostname;
 
     public Chip getChip() {

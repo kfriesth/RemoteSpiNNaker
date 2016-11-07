@@ -45,6 +45,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
     private List<File> outputs = new ArrayList<File>();
 
     private void gatherFiles(File directory, Collection<File> files) {
+    	
         for (File file : directory.listFiles())
             if (file.isDirectory()) {
                 if (!IGNORED_DIRECTORIES.contains(file.getName()))

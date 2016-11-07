@@ -9,7 +9,7 @@ import java.io.Reader;
 /**
  * A logger that pushes everything from a reader to a {@link LogWriter}.
  */
-public class ReaderLogWriter extends Thread {
+public class ReaderLogWriter extends Thread implements AutoCloseable {
     private BufferedReader reader;
     private LogWriter writer;
 
@@ -81,10 +81,11 @@ public class ReaderLogWriter extends Thread {
         }
 	}
 
-    /**
-    * Closes the reader/writer
-    */
-    public void close() {
+	/**
+	 * Closes the reader/writer
+	 */
+    @Override
+	public void close() {
         synchronized (this) {
             System.err.println("Waiting for log writer to exit...");
             while (isRunning || isWriting)

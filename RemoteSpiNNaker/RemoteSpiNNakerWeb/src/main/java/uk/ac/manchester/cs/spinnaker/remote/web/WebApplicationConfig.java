@@ -10,7 +10,6 @@ import java.util.EnumSet;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
 
 import org.apache.cxf.transport.servlet.CXFServlet;
 import org.springframework.core.io.support.ResourcePropertySource;
@@ -30,9 +29,8 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 			annotationConfig.register(RemoteSpinnakerBeans.class);
 			container.addListener(new ContextLoaderListener(annotationConfig));
 
-			ServletRegistration.Dynamic dispatcher = container.addServlet(
-					"cxf", CXFServlet.class);
-			dispatcher.addMapping(properties.getProperty("cxf.path") + "/*");
+			container.addServlet("cxf", CXFServlet.class).addMapping(
+					properties.getProperty("cxf.path") + "/*");
 
 			//addFilterChain(container);
 		} catch (IOException e) {

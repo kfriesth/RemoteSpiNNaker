@@ -8,6 +8,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,48 +113,46 @@ public class OutputManagerImpl implements OutputManager {
         }
     }
 
-    @Override
-    public List<DataItem> addOutputs(
-            String projectId, int id, File baseDirectory, List<File> outputs)
-            throws IOException {
-        if (outputs != null) {
-            String pId = new File(projectId).getName();
-            int pathStart = baseDirectory.getAbsolutePath().length();
-            File projectDirectory = new File(resultsDirectory, pId);
-            File idDirectory = new File(projectDirectory, String.valueOf(id));
-            startJobOperation(idDirectory);
-            try {
-                List<DataItem> outputData = new ArrayList<DataItem>();
-                for (File output : outputs) {
-                    if (!output.getAbsolutePath().startsWith(
-                            baseDirectory.getAbsolutePath())) {
-                        throw new IOException(
-                            "Output file " + output +
-                            " is outside base directory " + baseDirectory);
-                    }
+	@Override
+	public List<DataItem> addOutputs(String projectId, int id,
+			File baseDirectory, Collection<File> outputs) throws IOException {
+		if (outputs == null)
+			return null;
 
-                    String outputPath = output.getAbsolutePath().substring(
-                        pathStart).replace('\\', '/');
-                    if (outputPath.startsWith("/")) {
-                        outputPath = outputPath.substring(1);
-                    }
-                    File newOutput = new File(idDirectory, outputPath);
-                    newOutput.getParentFile().mkdirs();
-                    Files.move(output.toPath(), newOutput.toPath());
-                    URL outputUrl = new URL(
-                        baseServerUrl,
-                        "output/" + pId + "/" + id + "/" + outputPath);
-                    outputData.add(new DataItem(outputUrl.toExternalForm()));
-                    logger.debug(
-                        "New output " + newOutput + " mapped to " + outputUrl);
-                }
+		String pId = new File(projectId).getName();
+		int pathStart = baseDirectory.getAbsolutePath().length();
+		File projectDirectory = new File(resultsDirectory, pId);
+		File idDirectory = new File(projectDirectory, String.valueOf(id));
+		startJobOperation(idDirectory);
 
-                return outputData;
-            } finally {
-                endJobOperation(idDirectory);
-            }
-        }
-        return null;
+		try {
+			List<DataItem> outputData = new ArrayList<>();
+			for (File output : outputs) {
+				if (!output.getAbsolutePath().startsWith(
+						baseDirectory.getAbsolutePath())) {
+					throw new IOException("Output file " + output
+							+ " is outside base directory " + baseDirectory);
+				}
+
+				String outputPath = output.getAbsolutePath()
+						.substring(pathStart).replace('\\', '/');
+				if (outputPath.startsWith("/"))
+					outputPath = outputPath.substring(1);
+
+				File newOutput = new File(idDirectory, outputPath);
+				newOutput.getParentFile().mkdirs();
+				Files.move(output.toPath(), newOutput.toPath());
+				URL outputUrl = new URL(baseServerUrl, "output/" + pId + "/"
+						+ id + "/" + outputPath);
+				outputData.add(new DataItem(outputUrl.toExternalForm()));
+				logger.debug("New output " + newOutput + " mapped to "
+						+ outputUrl);
+			}
+
+			return outputData;
+		} finally {
+			endJobOperation(idDirectory);
+		}
     }
 
     private Response getResultFile(

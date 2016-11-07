@@ -25,9 +25,8 @@ public class CollabSecurityService {
 			service.getCollabPermissions(id);
 			return true;
 		} catch (Exception e) {
-			logger.debug(
-					"Error getting collab permissions - assumed access denied",
-					e);
+			logger.debug("Error getting collab permissions"
+					+ " - assumed access denied", e);
 			return false;
 		}
 	}

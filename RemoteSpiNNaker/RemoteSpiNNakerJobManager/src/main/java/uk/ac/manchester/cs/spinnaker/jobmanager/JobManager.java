@@ -3,23 +3,27 @@ package uk.ac.manchester.cs.spinnaker.jobmanager;
 import static java.io.File.createTempFile;
 import static java.lang.Math.ceil;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
+import static org.apache.commons.io.FileUtils.copyInputStreamToFile;
+import static org.apache.commons.io.FileUtils.forceDelete;
+import static org.apache.commons.io.FileUtils.forceMkdir;
+import static org.apache.commons.io.FileUtils.forceMkdirParent;
+import static org.apache.commons.io.FileUtils.listFiles;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -54,9 +58,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private Log logger = LogFactory.getLog(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
-	private Queue<Job> jobsToRun = new LinkedList<>();
+	private BlockingQueue<Job> jobsToRun = new LinkedBlockingQueue<>();
 	private Map<String, JobExecuter> jobExecuters = new HashMap<>();
-	private Map<String, Job> executorJobId = new HashMap<String, Job>();
+	private Map<String, Job> executorJobId = new HashMap<>();
 	private Map<Integer, File> jobOutputTempFiles = new HashMap<>();
 	private Map<Integer, Long> jobNCores = new HashMap<>();
 	private Map<Integer, Long> jobResourceUsage = new HashMap<>();
@@ -84,10 +88,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 		// Add the job to the set of jobs to be run
 		synchronized (jobExecuters) {
-			synchronized (jobsToRun) {
-				jobsToRun.add(job);
-				jobsToRun.notifyAll();
-			}
+			jobsToRun.offer(job);
 
 			// Start an executer for the job
 			launchExecuter();
@@ -107,18 +108,14 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	@Override
 	public Job getNextJob(String executerId) {
-		synchronized (jobsToRun) {
-			while (jobsToRun.isEmpty())
-				try {
-					jobsToRun.wait();
-				} catch (InterruptedException e) {
-					// Does Nothing
-				}
-			Job job = jobsToRun.poll();
+		try {
+			Job job = jobsToRun.take();
 			executorJobId.put(executerId, job);
 			logger.info("Executer " + executerId + " is running " + job.getId());
 			queueManager.setJobRunning(job.getId());
 			return job;
+		} catch (InterruptedException e) {
+			return null;
 		}
 	}
 
@@ -173,14 +170,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			nBoardsToRequest = (int) nBoardsExact;
 		}
 
-		// Get a machine to run the job on
-		SpinnakerMachine machine = machineManager
-				.getNextAvailableMachine(nBoardsToRequest);
-		synchronized (allocatedMachines) {
-			if (!allocatedMachines.containsKey(id))
-				allocatedMachines.put(id, new ArrayList<SpinnakerMachine>());
-			allocatedMachines.get(id).add(machine);
-		}
+		SpinnakerMachine machine = allocateMachineForJob(id, nBoardsToRequest);
 		logger.info("Running " + id + " on " + machine.getMachineName());
 		long resourceUsage = (long) ((runTime / 1000.0) * quotaNCores);
 		logger.info("Resource usage " + resourceUsage);
@@ -191,6 +181,24 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		return machine;
 	}
 
+	/** Get a machine to run the job on */
+	private SpinnakerMachine allocateMachineForJob(int id, int nBoardsToRequest) {
+		SpinnakerMachine machine = machineManager
+				.getNextAvailableMachine(nBoardsToRequest);
+		synchronized (allocatedMachines) {
+			if (!allocatedMachines.containsKey(id))
+				allocatedMachines.put(id, new ArrayList<SpinnakerMachine>());
+			allocatedMachines.get(id).add(machine);
+		}
+		return machine;
+	}
+
+	private List<SpinnakerMachine> getMachineForJob(int id) {
+		synchronized (allocatedMachines) {
+			return allocatedMachines.get(id);
+		}
+	}
+	
 	@Override
 	public void extendJobMachineLease(int id, double runTime) {
 		// TODO Check quota that the lease can be extended
@@ -202,10 +210,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	@Override
 	public JobMachineAllocated checkMachineLease(int id, int waitTime) {
-		List<SpinnakerMachine> machines = null;
-		synchronized (allocatedMachines) {
-			machines = allocatedMachines.get(id);
-		}
+		List<SpinnakerMachine> machines = getMachineForJob(id);
 
 		// Return false if any machine is gone
 		for (SpinnakerMachine machine : machines)
@@ -225,25 +230,22 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private void waitForAnyMachineStateChange(final int waitTime,
 			List<SpinnakerMachine> machines) {
-		final Object stateChangeSync = new Object();
+		final BlockingQueue<Object> stateChangeSync = new LinkedBlockingQueue<>();
 		for (final SpinnakerMachine machine : machines) {
-			Thread stateThread = new Thread() {
+			Thread stateThread = new Thread(new Runnable() {
 				@Override
 				public void run() {
 					machineManager.waitForMachineStateChange(machine, waitTime);
-					synchronized (stateChangeSync) {
-						stateChangeSync.notify();
-					}
+					stateChangeSync.offer(this);
 				}
-			};
+			});
+			stateThread.setDaemon(true);
 			stateThread.start();
 		}
-		synchronized (stateChangeSync) {
-			try {
-				stateChangeSync.wait(waitTime);
-			} catch (InterruptedException e) {
-				// Does Nothing
-			}
+		try {
+			stateChangeSync.take();
+		} catch (InterruptedException e) {
+			// Does Nothing
 		}
 	}
 
@@ -257,42 +259,28 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Override
 	public void addOutput(String projectId, int id, String output,
 			InputStream input) {
-		if (!jobOutputTempFiles.containsKey(id)) {
-			try {
+		try {
+			if (!jobOutputTempFiles.containsKey(id)) {
 				File tempOutputDir = createTempFile("jobOutput", ".tmp");
-				tempOutputDir.delete();
-				tempOutputDir.mkdirs();
+				forceDelete(tempOutputDir);
+				forceMkdir(tempOutputDir);
 				jobOutputTempFiles.put(id, tempOutputDir);
-			} catch (IOException e) {
-				logger.error("Error creating temporary output directory for "
-						+ id, e);
-				throw new WebApplicationException(INTERNAL_SERVER_ERROR);
 			}
+		} catch (IOException e) {
+			logger.error("Error creating temporary output directory for " + id,
+					e);
+			throw new WebApplicationException(INTERNAL_SERVER_ERROR);
 		}
 
 		File outputFile = new File(jobOutputTempFiles.get(id), output);
 		try {
-			outputFile.getParentFile().mkdirs();
-			try (OutputStream outputStream = new FileOutputStream(outputFile)) {
-				byte[] buffer = new byte[8096];
-				int bytesRead = 0;
-				while ((bytesRead = input.read(buffer)) >= 0)
-					outputStream.write(buffer, 0, bytesRead);
-			}
+			forceMkdirParent(outputFile);
+			copyInputStreamToFile(input, outputFile);
 		} catch (IOException e) {
 			logger.error("Error writing file " + outputFile + " for job " + id,
 					e);
 			throw new WebApplicationException(INTERNAL_SERVER_ERROR);
 		}
-	}
-
-	private void getFilesRecursively(File directory, List<File> files) {
-		for (File file : directory.listFiles())
-			if (file.isDirectory()) {
-				getFilesRecursively(file, files);
-			} else {
-				files.add(file);
-			}
 	}
 
 	private List<DataItem> getOutputFiles(String projectId, int id,
@@ -306,11 +294,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 					new File(baseFile), outputFiles));
 		}
 		if (jobOutputTempFiles.containsKey(id)) {
-			List<File> outputFiles = new ArrayList<>();
 			File directory = jobOutputTempFiles.get(id);
-			getFilesRecursively(directory, outputFiles);
 			outputItems.addAll(outputManager.addOutputs(projectId, id,
-					directory, outputFiles));
+					directory, listFiles(directory, null, true)));
 		}
 		return outputItems;
 	}
@@ -320,6 +306,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		if (!jobProvenance.containsKey(id))
 			jobProvenance.put(id, new HashMap<String, String>());
 		jobProvenance.get(id).put(item, value);
+	}
+
+	private Map<String, String> getProvenance(int id) {
+		return jobProvenance.remove(id);
 	}
 
 	@Override
@@ -334,7 +324,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			jobNCores.remove(id);
 		}
 
-		Map<String, String> provenance = jobProvenance.remove(id);
+		Map<String, String> provenance = getProvenance(id);
 
 		try {
 			queueManager.setJobFinished(id, logToAppend,
@@ -363,15 +353,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		logger.debug("Marking job " + id + " as error");
 		releaseAllocatedMachines(id);
 
-		Exception exception = new Exception(error);
-		StackTraceElement[] elements = new StackTraceElement[stackTrace
-				.getElements().size()];
-		int i = 0;
-		for (RemoteStackTraceElement element : stackTrace.getElements())
-			elements[i++] = new StackTraceElement(element.getClassName(),
-					element.getMethodName(), element.getFileName(),
-					element.getLineNumber());
-		exception.setStackTrace(elements);
+		Exception exception = reconstructRemoteException(error, stackTrace);
 
 		long resourceUsage = 0;
 		if (jobResourceUsage.containsKey(id)) {
@@ -379,7 +361,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			jobNCores.remove(id);
 		}
 
-		Map<String, String> provenance = jobProvenance.remove(id);
+		Map<String, String> provenance = getProvenance(id);
 
 		try {
 			queueManager.setJobError(id, logToAppend,
@@ -390,9 +372,27 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		}
 	}
 
+	private Exception reconstructRemoteException(String error,
+			RemoteStackTrace stackTrace) {
+		Exception exception = new Exception(error);
+
+		StackTraceElement[] elements = new StackTraceElement[stackTrace
+				.getElements().size()];
+		int i = 0;
+		for (RemoteStackTraceElement element : stackTrace.getElements())
+			elements[i++] = new StackTraceElement(element.getClassName(),
+					element.getMethodName(), element.getFileName(),
+					element.getLineNumber());
+		exception.setStackTrace(elements);
+
+		return exception;
+	}
+
 	public void setExecutorExited(String executorId, String logToAppend) {
 		Job job = executorJobId.remove(executorId);
-		jobExecuters.remove(executorId);
+		synchronized (jobExecuters) {
+			jobExecuters.remove(executorId);
+		}
 		if (job != null) {
 			logger.debug("Job " + job.getId() + " has exited");
 

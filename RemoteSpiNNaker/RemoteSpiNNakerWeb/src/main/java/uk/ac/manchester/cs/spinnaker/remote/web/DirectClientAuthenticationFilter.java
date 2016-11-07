@@ -61,33 +61,37 @@ public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
 		logger.debug("credentials : {}", credentials);
 
 		// if credentials/profile is not null, do more
-		if (credentials != null) {
-			try {
-				// create token from credential
-				ClientAuthenticationToken token = new ClientAuthenticationToken(
-						credentials, client.getName());
-				token.setDetails(authenticationDetailsSource
-						.buildDetails(request));
-
-				// authenticate
-				Authentication authentication = authenticationManager
-						.authenticate(token);
-				logger.debug("authentication: {}", authentication);
-				SecurityContextHolder.getContext().setAuthentication(
-						authentication);
-			} catch (AuthenticationException e) {
-				authenticationEntryPoint.commence(request, response, e);
-			}
-		}
+		if (credentials != null)
+			authenticateCredentials(request, response, credentials);
 
 		filterChain.doFilter(request, response);
+	}
+
+	private void authenticateCredentials(HttpServletRequest request,
+			HttpServletResponse response, Credentials credentials)
+			throws IOException, ServletException {
+		try {
+			// create token from credential
+			ClientAuthenticationToken token = new ClientAuthenticationToken(
+					credentials, client.getName());
+			token.setDetails(authenticationDetailsSource.buildDetails(request));
+
+			// authenticate
+			Authentication authentication = authenticationManager
+					.authenticate(token);
+			logger.debug("authentication: {}", authentication);
+			SecurityContextHolder.getContext()
+					.setAuthentication(authentication);
+		} catch (AuthenticationException e) {
+			authenticationEntryPoint.commence(request, response, e);
+		}
 	}
 
 	public Client<?, ?> getClient() {
 		return client;
 	}
 
-	public void setClient(final Client<?, ?> client) {
+	public void setClient(Client<?, ?> client) {
 		this.client = client;
 	}
 

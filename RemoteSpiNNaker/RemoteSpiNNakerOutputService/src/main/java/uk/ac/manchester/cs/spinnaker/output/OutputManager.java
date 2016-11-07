@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.output;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 
 import javax.ws.rs.DefaultValue;
@@ -31,7 +32,7 @@ public interface OutputManager {
      * @throws IOException
      */
     public List<DataItem> addOutputs(
-        String projectId, int id, File rootFile, List<File> outputs)
+        String projectId, int id, File rootFile, Collection<File> outputs)
         throws IOException;
 
     /**

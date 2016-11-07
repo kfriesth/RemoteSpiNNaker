@@ -6,6 +6,7 @@ import static org.pac4j.core.client.ClientType.HEADER_BASED;
 import static org.pac4j.core.context.HttpConstants.AUTHORIZATION_HEADER;
 import static org.pac4j.core.context.HttpConstants.DEFAULT_CONNECT_TIMEOUT;
 import static org.pac4j.core.context.HttpConstants.DEFAULT_READ_TIMEOUT;
+import static org.pac4j.core.exception.RequiresHttpAction.unauthorized;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -102,7 +103,7 @@ public class BearerOidcClient extends
 		if (userInfoResponse instanceof UserInfoErrorResponse) {
 			logger.error("Bad User Info response, error={}",
 					((UserInfoErrorResponse) userInfoResponse).getErrorObject());
-			throw RequiresHttpAction.unauthorized("", context, realmName);
+			throw unauthorized("", context, realmName);
 		}
 
 		OidcProfile profile = new OidcProfile(token);

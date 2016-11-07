@@ -1,5 +1,9 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
+import static com.nimbusds.jose.JWSAlgorithm.RS256;
+import static java.util.Arrays.asList;
+import static java.util.Collections.singleton;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -7,6 +11,7 @@ import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -71,9 +76,7 @@ public class RemoteSpinnakerBeans {
 	@Bean
 	public static ConversionServiceFactoryBean conversionService() {
 		ConversionServiceFactoryBean factory = new ConversionServiceFactoryBean();
-		Set<Converter<?, ?>> converters = new HashSet<>();
-		converters.add(new StringToSpinnakerMachine());
-		factory.setConverters(converters);
+		factory.setConverters(singleton(new StringToSpinnakerMachine()));
 		return factory;
 	}
 
@@ -176,52 +179,61 @@ public class RemoteSpinnakerBeans {
     @Value("${restartJobExecutorOnFailure}")
     private boolean restartJobExecutorOnFailure;
 
-//    @Autowired
-//    public void configureGlobal(AuthenticationManagerBuilder auth)
-//            throws Exception {
-//        auth.authenticationProvider(clientProvider());
-//    }
-//
-//    @Bean
-//    public CollabSecurityService collabSecurityService()
-//            throws MalformedURLException {
-//        return new CollabSecurityService(new URL(collabServiceUri));
-//    }
-//
-//    @Bean
-//    public OidcClient hbpAuthenticationClient() {
-//        OidcClient oidcClient = new OidcClient();
-//        oidcClient.setClientID(oidcClientId);
-//        oidcClient.setSecret(oidcSecret);
-//        oidcClient.setDiscoveryURI(oidcDiscoveryUri);
-//        oidcClient.setScope("openid profile hbp.collab");
-//        oidcClient.setPreferredJwsAlgorithm(JWSAlgorithm.RS256);
-//        return oidcClient;
-//    }
-//
-//    @Bean
-//    public BearerOidcClient hbpBearerClient()
-//            throws ParseException, MalformedURLException, IOException {
-//        BearerOidcClient client = new BearerOidcClient(oidcDiscoveryUri, "");
-//        return client;
-//    }
-//
-//    @Bean
-//    public Clients clients()
-//            throws ParseException, MalformedURLException, IOException {
-//        return new Clients(
-//            oidcRedirectUri, hbpAuthenticationClient(), hbpBearerClient());
-//    }
-//
-//    @Bean
-//    public ClientAuthenticationProvider clientProvider()
-//            throws ParseException, MalformedURLException, IOException {
-//        ClientAuthenticationProvider provider =
-//            new ClientAuthenticationProvider();
-//        provider.setClients(clients());
-//        return provider;
-//    }
+    //TODO unused
+	// @Autowired
+	public void configureGlobal(AuthenticationManagerBuilder auth)
+			throws Exception {
+		auth.authenticationProvider(clientProvider());
+	}
 
+    //TODO unused
+	// @Bean
+	public CollabSecurityService collabSecurityService()
+			throws MalformedURLException {
+		return new CollabSecurityService(new URL(collabServiceUri));
+	}
+
+    //TODO unused
+	// @Bean
+	public OidcClient hbpAuthenticationClient() {
+		OidcClient oidcClient = new OidcClient();
+		oidcClient.setClientID(oidcClientId);
+		oidcClient.setSecret(oidcSecret);
+		oidcClient.setDiscoveryURI(oidcDiscoveryUri);
+		oidcClient.setScope("openid profile hbp.collab");
+		oidcClient.setPreferredJwsAlgorithm(RS256);
+		return oidcClient;
+	}
+
+	@Value("${oidc.realm:}")
+	private String realm;
+
+	//TODO unused
+	// @Bean
+	public BearerOidcClient hbpBearerClient() throws ParseException,
+			MalformedURLException, IOException {
+		BearerOidcClient client = new BearerOidcClient(oidcDiscoveryUri, realm);
+		return client;
+	}
+
+    //TODO unused
+	// @Bean
+	public Clients clients() throws ParseException, MalformedURLException,
+			IOException {
+		return new Clients(oidcRedirectUri, hbpAuthenticationClient(),
+				hbpBearerClient());
+	}
+
+    //TODO unused
+	// @Bean
+	public ClientAuthenticationProvider clientProvider() throws ParseException,
+			MalformedURLException, IOException {
+		ClientAuthenticationProvider provider = new ClientAuthenticationProvider();
+		provider.setClients(clients());
+		return provider;
+	}
+
+    //TODO unused
 //    @Configuration
 //    @Order(100)
 //    public static class HbpAuthentication extends WebSecurityConfigurerAdapter {
@@ -343,8 +355,8 @@ public class RemoteSpinnakerBeans {
 		JAXRSServerFactoryBean factory = new JAXRSServerFactoryBean();
 		factory.setAddress(restPath);
 		factory.setBus(ctx.getBean(SpringBus.class));
-		factory.setServiceBeans(Arrays.asList(outputManager(), jobManager()));
-		factory.setProviders(Arrays.asList(new JacksonJsonProvider()));
+		factory.setServiceBeans(asList(outputManager(), jobManager()));
+		factory.setProviders(asList(new JacksonJsonProvider()));
 		return factory.create();
 	}
 }

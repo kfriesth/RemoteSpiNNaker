@@ -1,5 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.machine;
 
+import static java.lang.Integer.parseInt;
+
 /**
  * Represents a SpiNNaker machine on which jobs can be executed
  */
@@ -41,6 +43,37 @@ public class SpinnakerMachine {
 	public SpinnakerMachine() {
 
 		// Does Nothing
+	}
+
+	/**
+	 * Creates a new Spinnaker Machine by parsing the name of a machine.
+	 *
+	 * @param value
+	 *            The name of the machine to parse.
+	 */
+	public static SpinnakerMachine parse(String value) {
+		if (!value.startsWith("(") || !value.endsWith(")"))
+			throw new IllegalArgumentException("Cannot convert string \""
+					+ value + "\" - missing start and end brackets");
+
+		String[] parts = value.substring(1, value.length() - 1).split(":");
+		if (parts.length != 6)
+			throw new IllegalArgumentException(
+					"Wrong number of :-separated arguments - " + parts.length
+							+ " found but 6 required");
+
+		return new SpinnakerMachine(parts[0].trim(), parts[1].trim(),
+				parseInt(parts[2].trim()), parseInt(parts[3].trim()),
+				parseInt(parts[4].trim()), parts[4].trim());
+	}
+
+	@Override
+	public String toString() {
+		String nm = (machineName != null ? machineName.trim() : "");
+		String ver = (version != null ? version.trim() : "");
+		String bmp = (bmpDetails != null ? bmpDetails.trim() : "");
+		return "(" + nm + ":" + ver + ":" + width + ":" + height + ":"
+				+ nBoards + ":" + bmp + ")";
 	}
 
 	/**

@@ -9,19 +9,17 @@
 
     <dependencies>
         <dependency>
-            <groupId>${parent.groupId}</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>RemoteSpiNNakerRESTUtils</artifactId>
-            <version>${parent.version}</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.pac4j</groupId>
             <artifactId>spring-security-pac4j</artifactId>
-            <version>${pac4j.springsecurity.version}</version>
         </dependency>
         <dependency>
             <groupId>org.pac4j</groupId>
             <artifactId>pac4j-oidc</artifactId>
-            <version>${pac4j.oidc.version}</version>
         </dependency>
     </dependencies>
 </project>

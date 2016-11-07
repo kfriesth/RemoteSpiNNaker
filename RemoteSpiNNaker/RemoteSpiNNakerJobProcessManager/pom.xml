@@ -6,6 +6,9 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
     <artifactId>RemoteSpiNNakerJobProcessManager</artifactId>
+    <properties>
+    	<main.class>uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager</main.class>
+    </properties>
 
     <build>
         <finalName>${project.artifactId}</finalName>
@@ -16,7 +19,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager</mainClass>
+                            <mainClass>${main.class}</mainClass>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
                         </manifest>
@@ -55,12 +58,10 @@
         <dependency>
             <groupId>org.ini4j</groupId>
             <artifactId>ini4j</artifactId>
-            <version>${ini4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>${jgit.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.apache.httpcomponents</groupId>
@@ -71,7 +72,10 @@
         <dependency>
             <groupId>org.rauschig</groupId>
             <artifactId>jarchivelib</artifactId>
-            <version>${jarchivelib.version}</version>
+        </dependency>
+        <dependency>
+        	<groupId>commons-io</groupId>
+        	<artifactId>commons-io</artifactId>
         </dependency>
     </dependencies>
 </project>

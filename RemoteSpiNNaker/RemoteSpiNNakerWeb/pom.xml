@@ -7,6 +7,10 @@
     </parent>
     <artifactId>RemoteSpiNNakerWeb</artifactId>
     <packaging>war</packaging>
+	<properties>
+		<jetty.port>9090</jetty.port>
+		<jetty.buffer.size>8388608</jetty.buffer.size>
+	</properties>
 
     <build>
         <finalName>RemoteSpiNNaker</finalName>
@@ -26,9 +30,9 @@
                 <configuration>
                     <connectors>
                         <connector implementation="org.eclipse.jetty.server.nio.SelectChannelConnector">
-                            <port>9090</port>
-                            <requestBufferSize>8388608</requestBufferSize>
-                            <requestHeaderSize>8388608</requestHeaderSize>
+                            <port>${jetty.port}</port>
+                            <requestBufferSize>${jetty.buffer.size}</requestBufferSize>
+                            <requestHeaderSize>${jetty.buffer.size}</requestHeaderSize>
                         </connector>
                     </connectors>
                     <webAppConfig>
@@ -69,35 +73,30 @@
         <dependency>
             <groupId>org.apache.cxf</groupId>
             <artifactId>cxf-rt-frontend-jaxrs</artifactId>
-            <version>${cxf.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-webmvc</artifactId>
-            <version>${spring.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>${slf4j.version}</version>
+            <scope>runtime</scope>
         </dependency>
-
         <dependency>
             <groupId>org.pac4j</groupId>
             <artifactId>spring-security-pac4j</artifactId>
-            <version>${pac4j.springsecurity.version}</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.pac4j</groupId>
             <artifactId>pac4j-oidc</artifactId>
-            <version>${pac4j.oidc.version}</version>
         </dependency>
 
         <dependency>
             <groupId>javax</groupId>
             <artifactId>javaee-api</artifactId>
-            <version>${j2ee.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

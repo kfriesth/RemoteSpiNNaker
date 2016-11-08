@@ -9,10 +9,8 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
 /**
  * A manager of SpiNNaker machines
- *
  */
 public class FixedMachineManagerImpl implements MachineManager {
-
     /**
 	 * The queue of available machines
 	 */
@@ -47,32 +45,33 @@ public class FixedMachineManagerImpl implements MachineManager {
      */
     @Override
     public SpinnakerMachine getNextAvailableMachine(int nBoards) {
-        SpinnakerMachine machine = null;
-        synchronized (machinesAvailable) {
-            while ((machine == null) && !done) {
-                for (SpinnakerMachine nextMachine : machinesAvailable)
-                    if (nextMachine.getnBoards() >= nBoards) {
-                        machine = nextMachine;
-                        break;
-                    }
-
-                // If no machine was found, wait for something to change
-				try {
+        try {
+			synchronized (machinesAvailable) {
+				SpinnakerMachine machine = null;
+				while ((machine == null) && !done) {
+					machine = getLargeEnoughMachine(nBoards);
+					// If no machine was found, wait for something to change
 					if (machine == null)
 						machinesAvailable.wait();
-				} catch (InterruptedException e) {
-					// Does Nothing
-               }
-            }
-
-			if (machine != null) {
-				// Move the machine from available to allocated
-				machinesAvailable.remove(machine);
-				machinesAllocated.add(machine);
+				}
+				if (machine != null) {
+					// Move the machine from available to allocated
+					machinesAvailable.remove(machine);
+					machinesAllocated.add(machine);
+				}
+				return machine;
 			}
-        }
-        return machine;
+		} catch (InterruptedException e) {
+			return null;
+		}
     }
+
+	private SpinnakerMachine getLargeEnoughMachine(int nBoards) {
+		for (SpinnakerMachine nextMachine : machinesAvailable)
+		    if (nextMachine.getnBoards() >= nBoards)
+		        return nextMachine;
+		return null;
+	}
 
     /**
      * Releases a machine that was previously in use

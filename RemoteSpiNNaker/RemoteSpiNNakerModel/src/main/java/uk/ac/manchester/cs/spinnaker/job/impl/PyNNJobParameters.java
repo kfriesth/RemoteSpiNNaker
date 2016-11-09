@@ -6,51 +6,47 @@ import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.JobParametersTypeName;
 
 /**
- * Represents the parameters required for a PyNN job
+ * Represents the parameters required for a PyNN job.
  */
 @JobParametersTypeName("PyNNJobParameters")
 public class PyNNJobParameters implements JobParameters {
+	private String workingDirectory;
+	private String script;
+	private Map<String, Object> hardwareConfiguration;
 
-    private String workingDirectory = null;
+	public PyNNJobParameters() {
+		// Does Nothing
+	}
 
-    private String script = null;
+	public PyNNJobParameters(String workingDirectory, String script,
+			Map<String, Object> hardwareConfiguration) {
+		this.workingDirectory = workingDirectory;
+		this.script = script;
+		this.hardwareConfiguration = hardwareConfiguration;
+	}
 
-    private Map<String, Object> hardwareConfiguration = null;
+	public String getWorkingDirectory() {
+		return workingDirectory;
+	}
 
-    public PyNNJobParameters() {
+	public void setWorkingDirectory(String workingDirectory) {
+		this.workingDirectory = workingDirectory;
+	}
 
-        // Does Nothing
-    }
+	public String getScript() {
+		return script;
+	}
 
-    public PyNNJobParameters(String workingDirectory, String script,
-            Map<String, Object> hardwareConfiguration) {
-        this.workingDirectory = workingDirectory;
-        this.script = script;
-        this.hardwareConfiguration = hardwareConfiguration;
-    }
+	public void setScript(String script) {
+		this.script = script;
+	}
 
-    public String getWorkingDirectory() {
-        return workingDirectory;
-    }
+	public Map<String, Object> getHardwareConfiguration() {
+		return hardwareConfiguration;
+	}
 
-    public void setWorkingDirectory(String workingDirectory) {
-        this.workingDirectory = workingDirectory;
-    }
-
-    public String getScript() {
-        return script;
-    }
-
-    public void setScript(String script) {
-        this.script = script;
-    }
-
-    public Map<String, Object> getHardwareConfiguration() {
-        return hardwareConfiguration;
-    }
-
-    public void setHardwareConfiguration(
-            Map<String, Object> hardwareConfiguration) {
-        this.hardwareConfiguration = hardwareConfiguration;
-    }
+	public void setHardwareConfiguration(
+			Map<String, Object> hardwareConfiguration) {
+		this.hardwareConfiguration = hardwareConfiguration;
+	}
 }

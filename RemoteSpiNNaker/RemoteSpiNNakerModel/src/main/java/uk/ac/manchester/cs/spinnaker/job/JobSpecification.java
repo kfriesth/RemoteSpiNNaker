@@ -3,57 +3,52 @@ package uk.ac.manchester.cs.spinnaker.job;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
 public class JobSpecification {
+	private SpinnakerMachine machine;
+	private JobParameters parameters;
+	private int id;
+	private String url;
 
-    private SpinnakerMachine machine = null;
+	public JobSpecification() {
+		// Does Nothing
+	}
 
-    private JobParameters parameters = null;
+	public JobSpecification(SpinnakerMachine machine, JobParameters parameters,
+			int id, String url) {
+		this.machine = machine;
+		this.parameters = parameters;
+		this.id = id;
+		this.url = url;
+	}
 
-    private int id = 0;
+	public SpinnakerMachine getMachine() {
+		return machine;
+	}
 
-    private String url = null;
+	public void setMachine(SpinnakerMachine machine) {
+		this.machine = machine;
+	}
 
-    public JobSpecification() {
+	public JobParameters getParameters() {
+		return parameters;
+	}
 
-        // Does Nothing
-    }
+	public void setParameters(JobParameters parameters) {
+		this.parameters = parameters;
+	}
 
-    public JobSpecification(SpinnakerMachine machine, JobParameters parameters,
-            int id, String url) {
-        this.machine = machine;
-        this.parameters = parameters;
-        this.id = id;
-        this.url = url;
-    }
+	public int getId() {
+		return id;
+	}
 
-    public SpinnakerMachine getMachine() {
-        return machine;
-    }
+	public void setId(int id) {
+		this.id = id;
+	}
 
-    public void setMachine(SpinnakerMachine machine) {
-        this.machine = machine;
-    }
+	public String getUrl() {
+		return url;
+	}
 
-    public JobParameters getParameters() {
-        return parameters;
-    }
-
-    public void setParameters(JobParameters parameters) {
-        this.parameters = parameters;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
+	public void setUrl(String url) {
+		this.url = url;
+	}
 }

@@ -14,6 +14,10 @@ import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
 public class JobManagerLogWriter implements LogWriter {
 	private static final int UPDATE_INTERVAL = 500;
 
+	private static void log(String message) {
+		System.err.println(message);
+	}
+
 	private final JobManagerInterface jobManager;
 	private final int id;
 	private final StringBuilder cached = new StringBuilder();
@@ -37,17 +41,17 @@ public class JobManagerLogWriter implements LogWriter {
 
 	private synchronized void sendLog() {
 		if (cached.length() > 0) {
-			System.err.println("Sending cached data to job manager");
+			log("Sending cached data to job manager");
 			jobManager.appendLog(id, cached.toString());
 			cached.setLength(0);
 		}
 	}
 
 	@Override
-	public void append(String log) {
-		System.err.print("Process Output: " + log);
+	public void append(String logMsg) {
+		log("Process Output: " + logMsg);
 		synchronized (this) {
-			cached.append(log);
+			cached.append(logMsg);
 			if (sendTimer != null)
 				sendTimer.restart();
 		}

@@ -8,6 +8,7 @@ import static org.apache.commons.io.FileUtils.forceDelete;
 import static org.apache.commons.io.FileUtils.forceMkdir;
 import static org.apache.commons.io.FileUtils.forceMkdirParent;
 import static org.apache.commons.io.FileUtils.listFiles;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,9 +24,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.job.JobMachineAllocated;
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
@@ -56,7 +55,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private final JobExecuterFactory jobExecuterFactory;
 	private final boolean restartJobExecuterOnFailure;
 
-	private Log logger = LogFactory.getLog(getClass());
+	private Logger logger = getLogger(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
 	private BlockingQueue<Job> jobsToRun = new LinkedBlockingQueue<>();
 	private Map<String, JobExecuter> jobExecuters = new HashMap<>();

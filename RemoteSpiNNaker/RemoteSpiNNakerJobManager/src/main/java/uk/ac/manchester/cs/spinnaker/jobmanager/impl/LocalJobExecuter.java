@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.jobmanager.impl;
 
 import static java.io.File.createTempFile;
 import static java.io.File.pathSeparatorChar;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -11,8 +12,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuter;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
@@ -33,7 +33,7 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
     private File outputLog = createTempFile("exec", ".log");
     private JobOutputPipe pipe;
     private Process process;
-    private Log logger = LogFactory.getLog(getClass());
+    private Logger logger = getLogger(getClass());
     private IOException startException;
 
     /**

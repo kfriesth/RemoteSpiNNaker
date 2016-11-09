@@ -4,12 +4,10 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -44,6 +42,7 @@ public class PropertyBasedDeserialiser<T> extends StdDeserializer<T> {
 			throw new IllegalArgumentException("propertyName must be non-null");
 		if (type == null)
 			throw new IllegalArgumentException("type must be non-null");
+
 		registry.put(propertyName, type);
 	}
 
@@ -51,10 +50,9 @@ public class PropertyBasedDeserialiser<T> extends StdDeserializer<T> {
 	public T deserialize(JsonParser parser, DeserializationContext context)
 			throws IOException, JsonProcessingException {
 		ObjectNode root = parser.readValueAsTree();
-		Iterator<Entry<String, JsonNode>> elementsIterator = root.fields();
+		Iterator<String> elementsIterator = root.fieldNames();
 		while (elementsIterator.hasNext()) {
-			Entry<String, JsonNode> element = elementsIterator.next();
-			String name = element.getKey();
+			String name = elementsIterator.next();
 			if (registry.containsKey(name))
 				return parser.getCodec().treeToValue(root, registry.get(name));
 		}

@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.jobprocess;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Map;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 
@@ -14,7 +15,7 @@ public class JobProcessFactory {
 	 * guaranteed by the {@link #addMapping(Class,Class)} method, which is the
 	 * only place that this map should be modified.
 	 */
-	private HashMap<Class<? extends JobParameters>, Class<? extends JobProcess<? extends JobParameters>>> typeMap = new HashMap<>();
+	private final Map<Class<? extends JobParameters>, Class<? extends JobProcess<? extends JobParameters>>> typeMap = new HashMap<>();
 
 	/**
 	 * Adds a new type mapping.
@@ -23,7 +24,7 @@ public class JobProcessFactory {
 	 */
 	public <P extends JobParameters> void addMapping(Class<P> parameterType,
 			Class<? extends JobProcess<P>> processType) {
-		this.typeMap.put(parameterType, processType);
+		typeMap.put(parameterType, processType);
 	}
 
 	public Collection<Class<? extends JobParameters>> getParameterTypes() {
@@ -40,9 +41,10 @@ public class JobProcessFactory {
 	 */
 	public <P extends JobParameters> JobProcess<P> createProcess(P parameters)
 			throws InstantiationException, IllegalAccessException {
-
-		// We know that this is of the correct type, because the addMapping
-		// method will only allow the correct type mapping in
+		/*
+		 * We know that this is of the correct type, because the addMapping
+		 * method will only allow the correct type mapping in
+		 */
 		@SuppressWarnings("unchecked")
 		Class<JobProcess<P>> processType =
 				(Class<JobProcess<P>>) typeMap.get(parameters.getClass());

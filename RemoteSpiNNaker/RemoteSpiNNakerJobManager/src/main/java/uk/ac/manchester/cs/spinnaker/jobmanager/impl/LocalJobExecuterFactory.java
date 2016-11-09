@@ -1,10 +1,12 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager.impl;
 
 import static java.io.File.createTempFile;
+import static org.apache.commons.io.FileUtils.copyToFile;
+import static org.apache.commons.io.FileUtils.forceDeleteOnExit;
+import static org.apache.commons.io.FileUtils.forceMkdirParent;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -58,26 +60,17 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
 		// Extract the JobManager resources
 		try (ZipInputStream input = new ZipInputStream(jobManagerStream)) {
-			ZipEntry entry = input.getNextEntry();
-			while (entry != null) {
+			for (ZipEntry entry = input.getNextEntry(); entry != null; entry = input
+					.getNextEntry()) {
+				if (entry.isDirectory())
+					continue;
 				File entryFile = new File(jobExecuterDirectory, entry.getName());
-				if (!entry.isDirectory()) {
-					entryFile.getParentFile().mkdirs();
-					try (FileOutputStream output = new FileOutputStream(
-							entryFile)) {
-						byte[] buffer = new byte[8196];
-						int bytesRead = input.read(buffer);
-						while (bytesRead != -1) {
-							output.write(buffer, 0, bytesRead);
-							bytesRead = input.read(buffer);
-						}
-					}
-					entryFile.deleteOnExit();
+				forceMkdirParent(entryFile);
+				copyToFile(input, entryFile);
+				forceDeleteOnExit(entryFile);
 
-					if (entryFile.getName().endsWith(".jar"))
-						jobProcessManagerClasspath.add(entryFile);
-				}
-				entry = input.getNextEntry();
+				if (entryFile.getName().endsWith(".jar"))
+					jobProcessManagerClasspath.add(entryFile);
 			}
 		}
 	}

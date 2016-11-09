@@ -1,20 +1,15 @@
 package uk.ac.manchester.cs.spinnaker.job;
 
 /**
- * Represents a stack trace provided remotely
+ * Represents a stack trace provided remotely.
  */
 public class RemoteStackTraceElement {
-
-	private String className = null;
-
-	private String methodName = null;
-
-	private String fileName = null;
-
-	private int lineNumber = 0;
+	private String className;
+	private String methodName;
+	private String fileName;
+	private int lineNumber;
 
 	public RemoteStackTraceElement() {
-
 		// Does Nothing
 	}
 
@@ -56,5 +51,4 @@ public class RemoteStackTraceElement {
 	public void setLineNumber(int lineNumber) {
 		this.lineNumber = lineNumber;
 	}
-
 }

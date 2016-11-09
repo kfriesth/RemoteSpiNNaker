@@ -1,8 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.nmpi.model;
 
 public class APIKeyResponse {
-
-	private String key = null;
+	private String key;
 
 	public String getKey() {
 		return key;

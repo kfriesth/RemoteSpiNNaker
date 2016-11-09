@@ -1,15 +1,16 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager.impl;
 
+import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
+import static uk.ac.manchester.cs.spinnaker.jobmanager.JobManager.JOB_PROCESS_MANAGER_JAR;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.UUID;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.xmlrpc.XmlRpcException;
+import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuter;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
@@ -28,7 +29,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 	private final Integer maxNVirtualMachines;
 
 	private int nVirtualMachines = 0;
-	private Log logger = LogFactory.getLog(getClass());
+	private Logger logger = getLogger(getClass());
 
 	public XenVMExecuterFactory(URL xenServerUrl, String username,
 			String password, String templateLabel, long defaultDiskSizeInGbs,
@@ -67,7 +68,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 				+ JOB_PROCESS_MANAGER_ZIP);
 
 		StringBuilder args = new StringBuilder("-jar ");
-		args.append(JobManager.JOB_PROCESS_MANAGER_JAR);
+		args.append(JOB_PROCESS_MANAGER_JAR);
 		args.append(" --serverUrl ");
 		args.append(baseUrl.toString());
 		args.append(" --executerId ");
@@ -81,9 +82,8 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 
 		return new XenVMExecuter(manager, this, uuid, xenServerUrl, username,
 				password, templateLabel, defaultDiskSizeInGbs,
-				jobProcessManagerUrl.toString(),
-				JobManager.JOB_PROCESS_MANAGER_ZIP, args.toString(),
-				deleteOnExit, shutdownOnExit);
+				jobProcessManagerUrl.toString(), JOB_PROCESS_MANAGER_ZIP,
+				args.toString(), deleteOnExit, shutdownOnExit);
 	}
 
 	private void waitToClaimVM() {

@@ -7,7 +7,7 @@ import uk.ac.manchester.cs.spinnaker.rest.PropertyBasedDeserialiser;
 
 public class QueueResponseDeserialiser
         extends PropertyBasedDeserialiser<QueueNextResponse>{
-
+	// Never serializing this
 	private static final long serialVersionUID = 1L;
 
 	public QueueResponseDeserialiser() {

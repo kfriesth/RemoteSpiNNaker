@@ -1,5 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 import java.io.IOException;
 
 import javax.servlet.FilterChain;
@@ -15,9 +17,7 @@ import org.pac4j.core.exception.CredentialsException;
 import org.pac4j.core.exception.RequiresHttpAction;
 import org.pac4j.springframework.security.authentication.ClientAuthenticationToken;
 import org.pac4j.springframework.security.exception.AuthenticationCredentialsException;
-import org.pac4j.springframework.security.web.ClientAuthenticationFilter;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationDetailsSource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
@@ -28,8 +28,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
-	private static final Logger logger = LoggerFactory
-			.getLogger(ClientAuthenticationFilter.class);
+	private final Logger logger = getLogger(getClass());
 	private Client<?, ?> client;
 	private AuthenticationDetailsSource<HttpServletRequest, ?> authenticationDetailsSource = new WebAuthenticationDetailsSource();
 	private AuthenticationEntryPoint authenticationEntryPoint = new BearerAuthenticationEntryPoint();
@@ -45,7 +44,7 @@ public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
 			HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
 		// context
-		final WebContext context = new J2EContext(request, response);
+		WebContext context = new J2EContext(request, response);
 
 		// get credentials
 		Credentials credentials = null;
@@ -70,12 +69,12 @@ public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
 	private void authenticateCredentials(HttpServletRequest request,
 			HttpServletResponse response, Credentials credentials)
 			throws IOException, ServletException {
-		try {
-			// create token from credential
-			ClientAuthenticationToken token = new ClientAuthenticationToken(
-					credentials, client.getName());
-			token.setDetails(authenticationDetailsSource.buildDetails(request));
+		// create token from credential
+		ClientAuthenticationToken token = new ClientAuthenticationToken(
+				credentials, client.getName());
+		token.setDetails(authenticationDetailsSource.buildDetails(request));
 
+		try {
 			// authenticate
 			Authentication authentication = authenticationManager
 					.authenticate(token);

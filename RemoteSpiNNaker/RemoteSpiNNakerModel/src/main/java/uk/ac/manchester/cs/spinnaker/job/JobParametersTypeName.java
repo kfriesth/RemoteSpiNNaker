@@ -6,15 +6,15 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Identifies the unique type name of a JobParameters implementation.
+ * Identifies the unique type name of a {@link JobParameters} implementation.
  * Required if the parameters are to be serialized or deserialized.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface JobParametersTypeName {
-
 	/**
 	 * The type name
+	 * 
 	 * @return The type name
 	 */
 	String value();

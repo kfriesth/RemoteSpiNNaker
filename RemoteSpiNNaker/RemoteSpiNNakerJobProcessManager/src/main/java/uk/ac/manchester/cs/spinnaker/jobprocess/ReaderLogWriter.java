@@ -26,6 +26,7 @@ public class ReaderLogWriter extends Thread implements AutoCloseable {
 	 *            The writer to write to
 	 */
     public ReaderLogWriter(Reader reader, LogWriter writer) {
+    	super("Reader Log Writer");
         if (reader instanceof BufferedReader) {
             this.reader = (BufferedReader) reader;
         } else {

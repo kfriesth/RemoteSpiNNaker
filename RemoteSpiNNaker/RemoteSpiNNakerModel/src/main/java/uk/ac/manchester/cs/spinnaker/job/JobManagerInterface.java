@@ -28,18 +28,18 @@ public interface JobManagerInterface {
 	@GET
 	@Path("next")
 	@Produces(APPLICATION_JSON)
-	public Job getNextJob(@QueryParam("executerId") String executerId);
+	Job getNextJob(@QueryParam("executerId") String executerId);
 
 	@GET
 	@Path("{id}/machine/max")
 	@Produces(APPLICATION_JSON)
-	public SpinnakerMachine getLargestJobMachine(@PathParam("id") int id,
+	SpinnakerMachine getLargestJobMachine(@PathParam("id") int id,
 			@QueryParam("runTime") @DefaultValue("-1") double runTime);
 
 	@GET
 	@Path("{id}/machine")
 	@Produces(APPLICATION_JSON)
-	public SpinnakerMachine getJobMachine(@PathParam("id") int id,
+	SpinnakerMachine getJobMachine(@PathParam("id") int id,
 			@QueryParam("nCores") @DefaultValue("-1") int nCores,
 			@QueryParam("nChips") @DefaultValue("-1") int nChips,
 			@QueryParam("nBoards") @DefaultValue("-1") int nBoards,
@@ -48,35 +48,35 @@ public interface JobManagerInterface {
 	@GET
 	@Path("{id}/machine/checkLease")
 	@Produces(APPLICATION_JSON)
-	public JobMachineAllocated checkMachineLease(@PathParam("id") int id,
+	JobMachineAllocated checkMachineLease(@PathParam("id") int id,
 			@QueryParam("waitTime") @DefaultValue("10000") int waitTime);
 
 	@GET
 	@Path("{id}/machine/extendLease")
-	public void extendJobMachineLease(@PathParam("id") int id,
+	void extendJobMachineLease(@PathParam("id") int id,
 			@QueryParam("runTime") @DefaultValue("-1") double runTime);
 
 	@POST
 	@Path("{id}/log")
 	@Consumes("text/plain")
-	public void appendLog(@PathParam("id") int id, String logToAppend);
+	void appendLog(@PathParam("id") int id, String logToAppend);
 
 	@POST
 	@Path("{id}/provenance")
-	public void addProvenance(@PathParam("id") int id,
+	void addProvenance(@PathParam("id") int id,
 			@QueryParam("name") String name, @QueryParam("value") String value);
 
 	@POST
 	@Path("{projectId}/{id}/addoutput")
 	@Consumes(APPLICATION_OCTET_STREAM)
-	public void addOutput(@PathParam("projectId") String projectId,
+	void addOutput(@PathParam("projectId") String projectId,
 			@PathParam("id") int id,
 			@QueryParam("outputFilename") String output, InputStream input);
 
 	@POST
 	@Path("{projectId}/{id}/finished")
 	@Consumes(TEXT_PLAIN)
-	public void setJobFinished(@PathParam("projectId") String projectId,
+	void setJobFinished(@PathParam("projectId") String projectId,
 			@PathParam("id") int id, String logToAppend,
 			@QueryParam("baseFilename") String baseFilename,
 			@QueryParam("outputFilename") List<String> outputs);
@@ -84,7 +84,7 @@ public interface JobManagerInterface {
 	@POST
 	@Path("{projectId}/{id}/error")
 	@Consumes(APPLICATION_JSON)
-	public void setJobError(@PathParam("projectId") String projectId,
+	void setJobError(@PathParam("projectId") String projectId,
 			@PathParam("id") int id, @QueryParam("error") String error,
 			@QueryParam("logToAppend") String logToAppend,
 			@QueryParam("baseFilename") String baseFilename,
@@ -94,5 +94,5 @@ public interface JobManagerInterface {
 	@GET
 	@Path(JOB_PROCESS_MANAGER_ZIP)
 	@Produces(APPLICATION_ZIP)
-	public Response getJobProcessManager();
+	Response getJobProcessManager();
 }

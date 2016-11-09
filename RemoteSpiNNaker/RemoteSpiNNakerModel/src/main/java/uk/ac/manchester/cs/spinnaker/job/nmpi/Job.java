@@ -15,40 +15,25 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
  * A NMPI job
  */
 public class Job implements QueueNextResponse {
-
-    private String code = null;
-
-    private Map<String, Object> hardwareConfig = null;
-
-    private String hardwarePlatform = null;
-
-    private Integer id = null;
-
-    private List<DataItem> inputData = null;
-
-    private List<DataItem> outputData = null;
-
-    private String collabId = null;
-
-    private String resourceUri = null;
-
-    private String status = null;
-
-    private String command = null;
-
-    private String userId = null;
-
-    private long resourceUsage = 0;
-
-    @JsonSerialize(using=DateTimeSerialiser.class)
-    @JsonDeserialize(using=DateTimeDeserialiser.class)
-    private DateTime timestampCompletion = null;
-
-    @JsonSerialize(using=DateTimeSerialiser.class)
-    @JsonDeserialize(using=DateTimeDeserialiser.class)
-    private DateTime timestampSubmission = null;
-
-    private String provenance = null;
+    private String code;
+    private Map<String, Object> hardwareConfig;
+    private String hardwarePlatform;
+    private Integer id;
+    private List<DataItem> inputData;
+    private List<DataItem> outputData;
+    private String collabId;
+    private String resourceUri;
+    private String status;
+    private String command;
+    private String userId;
+    private long resourceUsage;
+	@JsonSerialize(using = DateTimeSerialiser.class)
+	@JsonDeserialize(using = DateTimeDeserialiser.class)
+	private DateTime timestampCompletion;
+	@JsonSerialize(using = DateTimeSerialiser.class)
+	@JsonDeserialize(using = DateTimeDeserialiser.class)
+	private DateTime timestampSubmission;
+	private String provenance;
 
     public String getCode() {
         return code;

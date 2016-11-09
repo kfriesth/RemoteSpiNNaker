@@ -4,6 +4,7 @@ import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKN
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobState.DESTROYED;
 
 import java.io.BufferedReader;
@@ -23,8 +24,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.Command;
@@ -65,7 +65,7 @@ public class SpallocMachineManagerImpl extends Thread
 	private Map<SpinnakerMachine, Integer> jobByMachine = new HashMap<>();
 	private Map<Integer, JobState> machineState = new HashMap<>();
 	private Map<Integer, MachineNotificationReceiver> callbacks = new HashMap<>();
-    private Log logger = LogFactory.getLog(getClass());
+    private Logger logger = getLogger(getClass());
     private Integer connectSync = new Integer(0);
     private boolean connected = false;
     private boolean done = false;

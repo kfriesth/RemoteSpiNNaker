@@ -1,11 +1,9 @@
 package uk.ac.manchester.cs.spinnaker.job.nmpi;
 
 public class DataItem {
-
-    private String url = null;
+    private String url;
 
     public DataItem() {
-
         // Does Nothing
     }
 
@@ -20,5 +18,4 @@ public class DataItem {
     public void setUrl(String url) {
         this.url = url;
     }
-
 }

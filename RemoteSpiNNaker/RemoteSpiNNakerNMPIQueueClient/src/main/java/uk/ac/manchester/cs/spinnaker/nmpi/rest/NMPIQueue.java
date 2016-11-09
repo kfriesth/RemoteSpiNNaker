@@ -15,7 +15,6 @@ import uk.ac.manchester.cs.spinnaker.nmpi.model.NMPILog;
 
 @Path("/api/v2")
 public interface NMPIQueue {
-
     @GET
     @Path("token/auth")
     @Produces("application/json")

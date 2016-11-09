@@ -1,7 +1,6 @@
 package uk.ac.manchester.cs.spinnaker.job;
 
 public class JobMachineAllocated {
-
     private boolean allocated = false;
 
     public JobMachineAllocated() {

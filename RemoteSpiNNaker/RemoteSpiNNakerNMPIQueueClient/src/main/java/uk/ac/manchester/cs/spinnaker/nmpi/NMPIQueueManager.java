@@ -1,8 +1,9 @@
 package uk.ac.manchester.cs.spinnaker.nmpi;
 
 import static org.joda.time.DateTimeZone.UTC;
+import static org.slf4j.LoggerFactory.getLogger;
+import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createApiKeyClient;
 import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createBasicClient;
-import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createRestClient;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -17,12 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
@@ -31,7 +29,6 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.NMPILog;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
-import uk.ac.manchester.cs.spinnaker.rest.APIKeyScheme;
 import uk.ac.manchester.cs.spinnaker.rest.CustomJacksonJsonProvider;
 
 /**
@@ -39,7 +36,7 @@ import uk.ac.manchester.cs.spinnaker.rest.CustomJacksonJsonProvider;
  */
 public class NMPIQueueManager extends Thread {
 	/**
-	 * The amount of time to sleep when an empty queue is detected
+	 * The amount of time to sleep when an empty queue is detected.
 	 */
 	private static final int EMPTY_QUEUE_SLEEP_MS = 10000;
 
@@ -76,10 +73,10 @@ public class NMPIQueueManager extends Thread {
 	/**
 	 * The logger
 	 */
-	private Log logger = LogFactory.getLog(getClass());
+	private Logger logger = getLogger(getClass());
 
 	/**
-	 * Creates a new Manager, pointing at a queue at a specific URL
+	 * Creates a new Manager, pointing at a queue at a specific URL.
 	 * 
 	 * @param url
 	 *            The URL from which to load the data
@@ -97,21 +94,17 @@ public class NMPIQueueManager extends Thread {
 	 */
 	public NMPIQueueManager(URL url, String hardware, String username,
 			String password, boolean passwordIsKey) {
+		CustomJacksonJsonProvider provider = new CustomJacksonJsonProvider();
+		provider.addDeserialiser(QueueNextResponse.class,
+				new QueueResponseDeserialiser());
+
 		String apiKey = password;
 		if (!passwordIsKey) {
 			queue = createBasicClient(url, username, password, NMPIQueue.class);
 			apiKey = queue.getToken(username).getKey();
 		}
-
-		CustomJacksonJsonProvider provider = new CustomJacksonJsonProvider();
-		provider.addDeserialiser(QueueNextResponse.class,
-				new QueueResponseDeserialiser());
-
-		ResteasyClient client = createRestClient(url,
-				new UsernamePasswordCredentials(username, apiKey),
-				new APIKeyScheme());
-		client.register(provider);
-		queue = client.target(url.toString()).proxy(NMPIQueue.class);
+		queue = createApiKeyClient(url, username, apiKey, NMPIQueue.class,
+				provider);
 
 		this.hardware = hardware;
 	}

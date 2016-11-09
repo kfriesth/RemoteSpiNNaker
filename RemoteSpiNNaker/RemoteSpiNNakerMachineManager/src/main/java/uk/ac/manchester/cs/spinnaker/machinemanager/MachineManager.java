@@ -4,19 +4,15 @@ import java.util.List;
 
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
-public interface MachineManager {
+public interface MachineManager extends AutoCloseable {
+	public List<SpinnakerMachine> getMachines();
 
-    public List<SpinnakerMachine> getMachines();
+	public SpinnakerMachine getNextAvailableMachine(int nBoards);
 
-    public SpinnakerMachine getNextAvailableMachine(int nBoards);
+	public boolean isMachineAvailable(SpinnakerMachine machine);
 
-    public boolean isMachineAvailable(SpinnakerMachine machine);
+	public boolean waitForMachineStateChange(SpinnakerMachine machine,
+			int waitTime);
 
-    public boolean waitForMachineStateChange(
-        SpinnakerMachine machine, int waitTime);
-
-    public void releaseMachine(SpinnakerMachine machine);
-
-    public void close();
-
+	public void releaseMachine(SpinnakerMachine machine);
 }

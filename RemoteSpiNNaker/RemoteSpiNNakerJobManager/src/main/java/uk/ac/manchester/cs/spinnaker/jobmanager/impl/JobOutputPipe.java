@@ -19,8 +19,9 @@ public class JobOutputPipe extends Thread {
 	private volatile boolean done;
 	private Logger logger = getLogger(getClass());
 
-	public JobOutputPipe(InputStream input, File output)
+	public JobOutputPipe(ThreadGroup threadGroup, InputStream input, File output)
 			throws FileNotFoundException {
+		super(threadGroup, "JobOutputPipe");
 		reader = new BufferedReader(new InputStreamReader(input));
 		writer = new PrintWriter(output);
 		done = false;

@@ -2,10 +2,13 @@ package uk.ac.manchester.cs.spinnaker.machine;
 
 import static java.lang.Integer.parseInt;
 
+import java.io.Serializable;
+
 /**
- * Represents a SpiNNaker machine on which jobs can be executed
+ * Represents a SpiNNaker machine on which jobs can be executed.
  */
-public class SpinnakerMachine {
+public class SpinnakerMachine implements Serializable, Comparable<SpinnakerMachine> {
+	private static final long serialVersionUID = -2247744763327978524L;
 
 	/**
 	 * The name of the machine
@@ -41,7 +44,6 @@ public class SpinnakerMachine {
 	 * Creates an empty machine
 	 */
 	public SpinnakerMachine() {
-
 		// Does Nothing
 	}
 
@@ -209,5 +211,68 @@ public class SpinnakerMachine {
 	 */
 	public void setBmpDetails(String bmpDetails) {
 		this.bmpDetails = bmpDetails;
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (o instanceof SpinnakerMachine) {
+			// TODO Is this the right way to determine equality?
+			SpinnakerMachine m = (SpinnakerMachine) o;
+			if (machineName == null) {
+				if (m.machineName != null)
+					return false;
+			} else if (m.machineName == null) {
+				return false;
+			} else {
+				if (!machineName.equals(m.machineName))
+					return false;
+			}
+			if (version == null) {
+				if (m.version != null)
+					return false;
+			} else if (m.version == null) {
+				return false;
+			} else {
+				if (!version.equals(m.version))
+					return false;
+			}
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	@Override
+	public int compareTo(SpinnakerMachine m) {
+		int cmp = 0;
+		if (machineName == null) {
+			cmp = (m.machineName == null) ? 0 : -1;
+		} else if (m.machineName == null) {
+			cmp = 1;
+		} else {
+			cmp = machineName.compareTo(m.machineName);
+		}
+		if (cmp == 0) {
+			// TODO Is this the right way to compare versions? It works...
+			if (version == null) {
+				cmp = (m.version == null) ? 0 : -1;
+			} else if (m.version == null) {
+				cmp = 1;
+			} else {
+				cmp = version.compareTo(m.version);
+			}
+		}
+		return cmp;
+	}
+
+	@Override
+	public int hashCode() {
+		// TODO Should be consistent with equality tests
+		int hc = 0;
+		if (machineName != null)
+			hc ^= machineName.hashCode();
+		if (version != null)
+			hc ^= version.hashCode();
+		return hc;
 	}
 }

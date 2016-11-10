@@ -64,6 +64,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private Map<Integer, Long> jobNCores = new HashMap<>();
 	private Map<Integer, Long> jobResourceUsage = new HashMap<>();
 	private Map<Integer, Map<String, String>> jobProvenance = new HashMap<>();
+	private final ThreadGroup threadGroup;
 
 	public JobManager(MachineManager machineManager,
 			NMPIQueueManager queueManager, OutputManager outputManager,
@@ -75,10 +76,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		this.baseUrl = baseUrl;
 		this.jobExecuterFactory = jobExecuterFactory;
 		this.restartJobExecuterOnFailure = restartJobExecutorOnFailure;
+		threadGroup = new ThreadGroup("NMPI");
 
 		// Start the queue manager
 		queueManager.addListener(this);
-		queueManager.start();
+		new Thread(threadGroup, queueManager, "QueueManager").start();
 	}
 
 	@Override
@@ -231,13 +233,13 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			List<SpinnakerMachine> machines) {
 		final BlockingQueue<Object> stateChangeSync = new LinkedBlockingQueue<>();
 		for (final SpinnakerMachine machine : machines) {
-			Thread stateThread = new Thread(new Runnable() {
+			Thread stateThread = new Thread(threadGroup, new Runnable() {
 				@Override
 				public void run() {
 					machineManager.waitForMachineStateChange(machine, waitTime);
 					stateChangeSync.offer(this);
 				}
-			});
+			}, "waiting for " + machine);
 			stateThread.setDaemon(true);
 			stateThread.start();
 		}

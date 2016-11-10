@@ -46,6 +46,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 	private Status status = null;
 	private Throwable error = null;
 	private List<File> outputs = new ArrayList<>();
+	ThreadGroup threadGroup;
 
 	private static Set<File> gatherFiles(File directory) {
 		return new LinkedHashSet<>(listFiles(directory,
@@ -139,7 +140,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 		Process process = builder.start();
 
 		// Run a thread to gather the log
-		try (ReaderLogWriter logger = new ReaderLogWriter(
+		try (ReaderLogWriter logger = new ReaderLogWriter(threadGroup,
 				process.getInputStream(), logWriter)) {
 			logger.start();
 

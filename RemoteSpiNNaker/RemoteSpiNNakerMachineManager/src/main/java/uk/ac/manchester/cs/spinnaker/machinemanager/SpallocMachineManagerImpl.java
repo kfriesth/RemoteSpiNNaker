@@ -445,6 +445,8 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 				}
 	}
 
+	// --------------------------- DEMO/TEST CODE ---------------------------
+
 	private static void msg(String msg, Object...args) {
     	System.err.println(String.format(msg, args));
     }

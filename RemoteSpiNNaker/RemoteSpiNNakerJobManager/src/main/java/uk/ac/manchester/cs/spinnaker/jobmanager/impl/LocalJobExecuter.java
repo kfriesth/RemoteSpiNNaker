@@ -18,10 +18,10 @@ import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuter;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 
 /**
- * Executes jobs in an external process
+ * Executes jobs in an external process.
  *
  */
-public class LocalJobExecuter extends Thread implements JobExecuter {
+public class LocalJobExecuter implements JobExecuter,Runnable {
     private final JobManager jobManager;
     private final File javaExec;
     private final List<File> classPath;
@@ -35,6 +35,7 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
     private Process process;
     private Logger logger = getLogger(getClass());
     private IOException startException;
+    private final ThreadGroup threadGroup;
 
     /**
     * Create a JobExecuter
@@ -55,6 +56,7 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
         this.mainClass = mainClass;
         this.arguments = arguments;
         this.id = id;
+        threadGroup = new ThreadGroup("LocalJob");
     }
 
     @Override
@@ -64,7 +66,7 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
 
     @Override
     public void startExecuter() {
-        start();
+        new Thread(threadGroup, this, "Executer").start();
     }
 
 	/**
@@ -123,7 +125,7 @@ public class LocalJobExecuter extends Thread implements JobExecuter {
                 logger.debug("Starting execution process");
                 process = builder.start();
                 logger.debug("Starting pipe from process");
-                pipe = new JobOutputPipe(process.getInputStream(), outputLog);
+                pipe = new JobOutputPipe(threadGroup, process.getInputStream(), outputLog);
                 pipe.start();
             } catch (IOException e) {
                 logger.error("Error running external job", e);

@@ -34,7 +34,7 @@ import uk.ac.manchester.cs.spinnaker.rest.CustomJacksonJsonProvider;
 /**
  * Manages the NMPI queue, receiving jobs and submitting them to be run
  */
-public class NMPIQueueManager extends Thread {
+public class NMPIQueueManager implements Runnable {
 	/**
 	 * The amount of time to sleep when an empty queue is detected.
 	 */
@@ -159,7 +159,7 @@ public class NMPIQueueManager extends Thread {
 
 	private void snooze() {
 		try {
-			sleep(EMPTY_QUEUE_SLEEP_MS);
+			Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
 		} catch (InterruptedException e1) {
 			// Do Nothing
 		}

@@ -310,7 +310,7 @@ public class RemoteSpinnakerBeans {
 		if (useSpalloc) {
 			SpallocMachineManagerImpl spalloc = new SpallocMachineManagerImpl(
 					spallocServer, spallocPort, spallocUser);
-			new Thread(spalloc, "Spalloc").start();
+			new Thread(new ThreadGroup("Spalloc"), spalloc, "Spalloc").start();
 			return spalloc;
 		}
 		return new FixedMachineManagerImpl(machines);

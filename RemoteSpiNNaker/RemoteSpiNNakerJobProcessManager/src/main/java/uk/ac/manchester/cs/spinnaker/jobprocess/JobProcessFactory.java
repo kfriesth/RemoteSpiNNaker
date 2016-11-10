@@ -1,5 +1,6 @@
 package uk.ac.manchester.cs.spinnaker.jobprocess;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,6 +11,16 @@ import uk.ac.manchester.cs.spinnaker.job.JobParameters;
  * A factory for creating JobProcess instances given a JobParameters instance
  */
 public class JobProcessFactory {
+	private final ThreadGroup threadGroup;
+
+	public JobProcessFactory(ThreadGroup threadGroup) {
+		this.threadGroup = threadGroup;
+	}
+
+	public JobProcessFactory(String threadGroupName) {
+		this(new ThreadGroup(threadGroupName));
+	}
+
 	/**
 	 * A map between parameter types and process types. Note that the type is
 	 * guaranteed by the {@link #addMapping(Class,Class)} method, which is the
@@ -49,6 +60,15 @@ public class JobProcessFactory {
 		Class<JobProcess<P>> processType =
 				(Class<JobProcess<P>>) typeMap.get(parameters.getClass());
 
-		return processType.newInstance();
+		JobProcess<P> process = processType.newInstance();
+		try {
+			// Magically set the thread group if there is one
+			Field threadGroupField = processType.getDeclaredField("threadGroup");
+			threadGroupField.setAccessible(true);
+			threadGroupField.set(process, threadGroup);
+		} catch (NoSuchFieldException | SecurityException e) {
+		}
+
+		return process;
 	}
 }

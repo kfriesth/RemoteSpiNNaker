@@ -26,7 +26,7 @@ import com.xensource.xenapi.VBD;
 import com.xensource.xenapi.VDI;
 import com.xensource.xenapi.VM;
 
-public class XenVMExecuter extends Thread implements JobExecuter {
+public class XenVMExecuter implements JobExecuter, Runnable {
 	private static final int MS_BETWEEN_CHECKS = 10000;
 
 	// Parameters from constructor
@@ -52,6 +52,7 @@ public class XenVMExecuter extends Thread implements JobExecuter {
 	private VDI vdi;
 	private VDI extraVdi;
 	private VBD extraDisk;
+	private final ThreadGroup threadGroup;
 
 	public XenVMExecuter(JobManager jobManager, XenVMExecuterFactory factory,
 			String uuid, URL xenServerUrl, String username, String password,
@@ -72,6 +73,7 @@ public class XenVMExecuter extends Thread implements JobExecuter {
 		this.args = args;
 		this.deleteOnExit = deleteOnExit;
 		this.shutdownOnExit = shutdownOnExit;
+		this.threadGroup = new ThreadGroup("XenVM");
 	}
 
 	@Override
@@ -81,7 +83,7 @@ public class XenVMExecuter extends Thread implements JobExecuter {
 
 	@Override
 	public void startExecuter() {
-		start();
+		new Thread(threadGroup, this, "Executer").start();
 	}
 
 	private void createVm() throws XmlRpcException, IOException {

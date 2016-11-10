@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.jobprocessmanager;
 
 import static java.io.File.createTempFile;
+import static org.apache.commons.io.FileUtils.deleteQuietly;
 import static uk.ac.manchester.cs.spinnaker.jobprocessmanager.FileDownloader.downloadFile;
 
 import java.io.File;
@@ -16,8 +17,6 @@ import java.util.Map;
 import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
-
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
@@ -38,6 +37,8 @@ import uk.ac.manchester.cs.spinnaker.jobprocess.impl.JobManagerLogWriter;
 import uk.ac.manchester.cs.spinnaker.jobprocess.impl.PyNNJobProcess;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+
 /**
  * Manages a running job process.  This is run as a separate process from the
  * command line, and it assumes input is passed via {@link System#in}.
@@ -53,7 +54,7 @@ public class JobProcessManager {
 			new DirectPyNNJobParametersFactory() };
 
 	/** The factory for converting parameters into processes. */
-	private static final JobProcessFactory JOB_PROCESS_FACTORY = new JobProcessFactory() {
+	private static final JobProcessFactory JOB_PROCESS_FACTORY = new JobProcessFactory("JobProcess") {
 		{
 			addMapping(PyNNJobParameters.class, PyNNJobProcess.class);
 		}
@@ -66,16 +67,6 @@ public class JobProcessManager {
         // TODO Add auth filter
         ResteasyWebTarget target = client.target(url);
         return target.proxy(JobManagerInterface.class);
-    }
-
-    private static void deleteDirectory(File directory) {
-        for (File file : directory.listFiles()) {
-            if (file.isDirectory())
-                deleteDirectory(file);
-            else
-                file.delete();
-        }
-        directory.delete();
     }
 
     private static String serverUrl = null;
@@ -165,7 +156,7 @@ public class JobProcessManager {
 				// Clean up
 				process.cleanup();
 				if (deleteOnExit)
-					deleteDirectory(workingDirectory);
+					deleteQuietly(workingDirectory);
 				break;
 			default:
 				throw new RuntimeException("Unknown status returned!");

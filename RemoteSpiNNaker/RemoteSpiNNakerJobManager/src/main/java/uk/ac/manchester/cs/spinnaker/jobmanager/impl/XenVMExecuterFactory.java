@@ -26,7 +26,8 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 	private final boolean liveUploadOutput;
 	private final boolean requestSpiNNakerMachine;
 	private final long defaultDiskSizeInGbs;
-	private final Integer maxNVirtualMachines;
+	private final int maxNVirtualMachines;
+	private final Object lock = new Object();
 
 	private int nVirtualMachines = 0;
 	private Logger logger = getLogger(getClass());
@@ -45,7 +46,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 		this.liveUploadOutput = liveUploadOutput;
 		this.requestSpiNNakerMachine = requestSpiNNakerMachine;
 		this.defaultDiskSizeInGbs = defaultDiskSizeInGbs;
-		this.maxNVirtualMachines = new Integer(maxNVirtualMachines);
+		this.maxNVirtualMachines = maxNVirtualMachines;
 	}
 
 	@Override
@@ -87,7 +88,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 	}
 
 	private void waitToClaimVM() {
-		synchronized (maxNVirtualMachines) {
+		synchronized (lock) {
 			logger.debug(nVirtualMachines + " of " + maxNVirtualMachines
 					+ " in use");
 			while (nVirtualMachines >= maxNVirtualMachines) {
@@ -95,7 +96,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 						+ nVirtualMachines + " of " + maxNVirtualMachines
 						+ " in use)");
 				try {
-					maxNVirtualMachines.wait();
+					lock.wait();
 				} catch (InterruptedException e) {
 					// Does Nothing
 				}
@@ -105,11 +106,11 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 	}
 
 	protected void executorFinished() {
-		synchronized (maxNVirtualMachines) {
+		synchronized (lock) {
 			nVirtualMachines--;
 			logger.debug(nVirtualMachines + " of " + maxNVirtualMachines
 					+ " now in use");
-			maxNVirtualMachines.notifyAll();
+			lock.notifyAll();
 		}
 	}
 }

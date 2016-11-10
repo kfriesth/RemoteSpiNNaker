@@ -4,13 +4,13 @@ import static uk.ac.manchester.cs.spinnaker.rest.spring.SpringRestClientUtils.cr
 
 import java.net.URL;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import uk.ac.manchester.cs.spinnaker.collab.rest.CollabRestService;
 
 public class CollabSecurityService {
-	private Log logger = LogFactory.getLog(getClass());
+	private Logger logger = LoggerFactory.getLogger(getClass());
 	private final URL collabServiceUrl;
 
 	public CollabSecurityService(URL collabServiceUrl) {
@@ -25,8 +25,8 @@ public class CollabSecurityService {
 			service.getCollabPermissions(id);
 			return true;
 		} catch (Exception e) {
-			logger.debug("Error getting collab permissions"
-					+ " - assumed access denied", e);
+			logger.debug("Error getting collab permissions, "
+					+ "assumed access denied", e);
 			return false;
 		}
 	}

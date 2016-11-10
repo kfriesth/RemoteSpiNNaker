@@ -16,6 +16,7 @@ import org.pac4j.core.client.BaseClient;
 import org.pac4j.core.client.ClientType;
 import org.pac4j.core.client.DirectClient;
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.exception.RequiresHttpAction;
 import org.pac4j.core.exception.TechnicalException;
 import org.pac4j.oidc.profile.OidcProfile;
@@ -33,28 +34,35 @@ import com.nimbusds.openid.connect.sdk.claims.UserInfo;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
 
 public class BearerOidcClient extends
-		DirectClient<BearerCredentials, OidcProfile> {
+		DirectClient<BearerOidcClient.BearerCredentials, OidcProfile> {
 	private static final String BEARER_PREFIX = "Bearer ";
 
 	private final String discoveryURI;
 	private OIDCProviderMetadata oidcProvider;
 	private final String realmName;
 
+	private OIDCProviderMetadata getOIDCProvider() {
+		try {
+			if (oidcProvider == null)
+				oidcProvider = parse(new DefaultResourceRetriever(
+						DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
+						.retrieveResource(new URL(discoveryURI)).getContent());
+		} catch (Exception e) {
+			logger.error("Could not contact OIDC provider; "
+					+ "Bearer authentication will not work", e);
+		}
+		return oidcProvider;
+	}
+
 	public BearerOidcClient(String discoveryURI, String realmName)
 			throws ParseException, MalformedURLException, IOException {
 		this.discoveryURI = discoveryURI;
-
-		try {
-			oidcProvider = parse(new DefaultResourceRetriever(
-					DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
-					.retrieveResource(new URL(discoveryURI)).getContent());
-		} catch (Exception e) {
-			logger.error(
-					"Could not contact OIDC provider - Bearer authentication"
-							+ " will not work", e);
-		}
-
 		this.realmName = realmName;
+		/*
+		 * Try to make the read immediately; otherwise we'll postpone until it's
+		 * needed.
+		 */
+		getOIDCProvider();
 	}
 
 	@Override
@@ -75,7 +83,7 @@ public class BearerOidcClient extends
 			return null;
 		try {
 			BearerAccessToken token = new BearerAccessToken(accessToken);
-			if (oidcProvider.getUserInfoEndpointURI() == null) {
+			if (getOIDCProvider().getUserInfoEndpointURI() == null) {
 				logger.error("No User Info Endpoint!");
 				return null;
 			}
@@ -90,7 +98,7 @@ public class BearerOidcClient extends
 			String accessToken, BearerAccessToken token) throws IOException,
 			ParseException, RequiresHttpAction {
 		UserInfoRequest userInfoRequest = new UserInfoRequest(
-				oidcProvider.getUserInfoEndpointURI(), token);
+				getOIDCProvider().getUserInfoEndpointURI(), token);
 		HTTPRequest userInfoHttpRequest = userInfoRequest.toHTTPRequest();
 		userInfoHttpRequest.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
 		userInfoHttpRequest.setReadTimeout(DEFAULT_READ_TIMEOUT);
@@ -133,5 +141,31 @@ public class BearerOidcClient extends
 	@Override
 	public ClientType getClientType() {
 		return HEADER_BASED;
+	}
+
+	static class BearerCredentials extends Credentials {
+		private static final long serialVersionUID = 5585200812175851776L;
+
+		private String accessToken;
+	    private OidcProfile profile;
+
+	    public BearerCredentials(String accessToken, OidcProfile profile) {
+	        this.accessToken = accessToken;
+	        this.profile = profile;
+	    }
+
+	    public String getAccessToken() {
+	        return accessToken;
+	    }
+
+	    public OidcProfile getProfile() {
+	        return profile;
+	    }
+
+	    @Override
+	    public void clear() {
+	        accessToken = null;
+	        profile = null;
+	    }
 	}
 }

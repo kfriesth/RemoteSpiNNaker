@@ -1,5 +1,6 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
@@ -28,10 +29,22 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
+	public static final String DEFAULT_REALM = "SpiNNaker";
 	private final Logger logger = getLogger(getClass());
 	private Client<?, ?> client;
 	private AuthenticationDetailsSource<HttpServletRequest, ?> authenticationDetailsSource = new WebAuthenticationDetailsSource();
-	private AuthenticationEntryPoint authenticationEntryPoint = new BearerAuthenticationEntryPoint();
+	private String realmName = DEFAULT_REALM;
+	private AuthenticationEntryPoint authenticationEntryPoint = new AuthenticationEntryPoint() {
+		@Override
+		public void commence(HttpServletRequest request,
+				HttpServletResponse response,
+				AuthenticationException authException) throws IOException {
+			response.addHeader("WWW-Authenticate", "Bearer realm=\"" + realmName
+					+ "\"");
+			response.sendError(SC_UNAUTHORIZED, authException.getMessage());
+		}
+	};
+
 	private AuthenticationManager authenticationManager;
 
 	public DirectClientAuthenticationFilter(

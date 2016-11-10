@@ -19,6 +19,13 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import org.springframework.web.filter.DelegatingFilterProxy;
 
 public class WebApplicationConfig implements WebApplicationInitializer {
+	/**
+	 * The name of the <i>system property</i> that describes where to load
+	 * configuration properties from.
+	 */
+	public static final String LOCATION_PROPERTY = "remotespinnaker.properties.location";
+	private static final String FILTER_NAME = "springSecurityFilterChain";
+
 	@Override
 	public void onStartup(ServletContext container) throws ServletException {
 		try {
@@ -32,7 +39,7 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 			container.addServlet("cxf", CXFServlet.class).addMapping(
 					properties.getProperty("cxf.path") + "/*");
 
-			//addFilterChain(container);
+			// addFilterChain(container);
 		} catch (IOException e) {
 			throw new ServletException(e);
 		}
@@ -40,14 +47,14 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 
 	@SuppressWarnings("unused")
 	private void addFilterChain(ServletContext container) {
-		container.addFilter("springSecurityFilterChain",
-				new DelegatingFilterProxy("springSecurityFilterChain"))
+		container
+				.addFilter(FILTER_NAME, new DelegatingFilterProxy(FILTER_NAME))
 				.addMappingForUrlPatterns(EnumSet.of(REQUEST, ERROR, ASYNC),
 						false, "/*");
 	}
 
 	private ResourcePropertySource getPropertySource() throws IOException {
 		return new ResourcePropertySource("file:"
-				+ getProperty("remotespinnaker.properties.location"));
+				+ getProperty(LOCATION_PROPERTY));
 	}
 }

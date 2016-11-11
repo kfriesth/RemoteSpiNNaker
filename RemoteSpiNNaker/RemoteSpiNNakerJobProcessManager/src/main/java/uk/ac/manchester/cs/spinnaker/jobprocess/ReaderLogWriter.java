@@ -1,5 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.jobprocess;
 
+import static uk.ac.manchester.cs.spinnaker.utils.Log.log;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,11 +29,10 @@ public class ReaderLogWriter extends Thread implements AutoCloseable {
 	 */
     public ReaderLogWriter(ThreadGroup threadGroup, Reader reader, LogWriter writer) {
     	super(threadGroup, "Reader Log Writer");
-        if (reader instanceof BufferedReader) {
+        if (reader instanceof BufferedReader)
             this.reader = (BufferedReader) reader;
-        } else {
+        else
             this.reader = new BufferedReader(reader);
-        }
         this.writer = writer;
         this.setDaemon(true);
     }
@@ -88,14 +89,14 @@ public class ReaderLogWriter extends Thread implements AutoCloseable {
     @Override
 	public void close() {
         synchronized (this) {
-            System.err.println("Waiting for log writer to exit...");
+        	log("Waiting for log writer to exit...");
             while (isRunning || isWriting)
                 try {
                     wait();
                 } catch (InterruptedException e) {
                     // Does Nothing
                 }
-            System.err.println("Log writer has exited");
+            log("Log writer has exited");
         }
 
         try {

@@ -10,5 +10,5 @@ public interface LogWriter {
 	 * @param log
 	 *            The line to append. Should include the terminating newline.
 	 */
-	public void append(String log);
+	void append(String log);
 }

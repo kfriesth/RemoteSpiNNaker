@@ -15,7 +15,7 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
  */
 public interface JobProcess<P extends JobParameters> {
 	/**
-	 * Executes the job
+	 * Executes the job.
 	 *
 	 * @param machineUrl
 	 *            The URL to request a machine using (or <tt>null</tt> if
@@ -28,15 +28,15 @@ public interface JobProcess<P extends JobParameters> {
 	 * @param logWriter
 	 *            Somewhere to write logs to
 	 */
-	public void execute(String machineUrl, SpinnakerMachine machine,
-			P parameters, LogWriter logWriter);
+	void execute(String machineUrl, SpinnakerMachine machine, P parameters,
+			LogWriter logWriter);
 
 	/**
 	 * Gets the status of the job.
 	 *
 	 * @return The status
 	 */
-	public Status getStatus();
+	Status getStatus();
 
 	/**
 	 * Gets any errors returned by the job. If the status is not Error, this
@@ -44,7 +44,7 @@ public interface JobProcess<P extends JobParameters> {
 	 *
 	 * @return An error, or <tt>null</tt> if no error
 	 */
-	public Throwable getError();
+	Throwable getError();
 
 	/**
 	 * Gets any outputs from the job. Should always return a list, but this list
@@ -52,10 +52,10 @@ public interface JobProcess<P extends JobParameters> {
 	 *
 	 * @return A list of output files.
 	 */
-	public List<File> getOutputs();
+	List<File> getOutputs();
 
 	/**
 	 * Cleans up the job, removing any associated files
 	 */
-	public void cleanup();
+	void cleanup();
 }

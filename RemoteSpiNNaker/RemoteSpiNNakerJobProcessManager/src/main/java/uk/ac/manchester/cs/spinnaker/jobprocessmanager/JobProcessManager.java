@@ -1,18 +1,23 @@
 package uk.ac.manchester.cs.spinnaker.jobprocessmanager;
 
 import static java.io.File.createTempFile;
+import static java.lang.String.format;
 import static org.apache.commons.io.FileUtils.deleteQuietly;
-import static uk.ac.manchester.cs.spinnaker.jobprocessmanager.FileDownloader.downloadFile;
+import static uk.ac.manchester.cs.spinnaker.utils.FileDownloader.downloadFile;
+import static uk.ac.manchester.cs.spinnaker.utils.Log.log;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.swing.Timer;
 
 import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
@@ -33,7 +38,7 @@ import uk.ac.manchester.cs.spinnaker.job_parameters.impl.GitPyNNJobParametersFac
 import uk.ac.manchester.cs.spinnaker.job_parameters.impl.ZipPyNNJobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcess;
 import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcessFactory;
-import uk.ac.manchester.cs.spinnaker.jobprocess.impl.JobManagerLogWriter;
+import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
 import uk.ac.manchester.cs.spinnaker.jobprocess.impl.PyNNJobProcess;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
@@ -76,6 +81,83 @@ public class JobProcessManager {
     private static boolean liveUploadOutput = false;
     private static boolean requestMachine = false;
 
+    abstract static class JobManagerLogWriter implements LogWriter {
+    	abstract String getLog();
+    	abstract void stop();
+    }
+
+    static class SimpleJobManagerLogWriter extends JobManagerLogWriter {
+    	private final StringBuilder cached = new StringBuilder();
+
+    	@Override
+    	public void append(String logMsg) {
+    		log("Process Output: " + logMsg);
+    		synchronized (this) {
+    			cached.append(logMsg);
+    		}
+    	}
+
+    	@Override
+		public String getLog() {
+    		synchronized (this) {
+    			return cached.toString();
+    		}
+    	}
+
+    	@Override
+		public void stop() {
+    	}
+    }
+
+    static class UploadingJobManagerLogWriter extends JobManagerLogWriter {
+    	private static final int UPDATE_INTERVAL = 500;
+
+    	private final JobManagerInterface jobManager;
+    	private final int id;
+    	private final StringBuilder cached = new StringBuilder();
+    	private final Timer sendTimer;
+
+    	public UploadingJobManagerLogWriter(JobManagerInterface jobManager, int id) {
+    		this.jobManager = jobManager;
+    		this.id = id;
+			sendTimer = new Timer(UPDATE_INTERVAL, new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					sendLog();
+				}
+			});
+    	}
+
+    	private synchronized void sendLog() {
+    		if (cached.length() > 0) {
+    			log("Sending cached data to job manager");
+    			jobManager.appendLog(id, cached.toString());
+    			cached.setLength(0);
+    		}
+    	}
+
+    	@Override
+    	public void append(String logMsg) {
+    		log("Process Output: " + logMsg);
+    		synchronized (this) {
+    			cached.append(logMsg);
+    			sendTimer.restart();
+    		}
+    	}
+
+    	@Override
+		public String getLog() {
+    		synchronized (this) {
+    			return cached.toString();
+    		}
+    	}
+
+    	@Override
+		public void stop() {
+    		sendTimer.stop();
+    	}
+    }
+
     public static void main(String[] args) throws Exception {
         parseArguments(args);
 
@@ -99,48 +181,45 @@ public class JobProcessManager {
             JobParameters parameters = getJobParameters(job, workingDirectory);
 
             // Create a process to process the request
-            System.err.println("Creating process from parameters");
+            log("Creating process from parameters");
             JobProcess<JobParameters> process =
                     JOB_PROCESS_FACTORY.createProcess(parameters);
 
-            logWriter = new JobManagerLogWriter(
-                createJobManager(serverUrl), job.getId(), liveUploadOutput);
+			if (liveUploadOutput)
+				logWriter = new UploadingJobManagerLogWriter(jobManager,
+						job.getId());
+			else
+				logWriter = new SimpleJobManagerLogWriter();
 
             // Read the machine
             // (get a 3 board machine just now)
             SpinnakerMachine machine = null;
             String machineUrl = null;
-            if (requestMachine) {
+            if (requestMachine)
                 machine = jobManager.getJobMachine(job.getId(), -1, -1, -1, -1);
-            } else {
-                machineUrl = serverUrl + "job/" + job.getId() + "/machine";
-            }
+            else
+                machineUrl = format("%sjob/%d/machine", serverUrl, job.getId());
 
             // Execute the process
-            System.err.println("Running job " + job.getId() + " on "
-                    + machine + " using "
-                    + parameters.getClass()
-                    + " reporting to " + serverUrl);
+			log("Running job " + job.getId() + " on " + machine + " using "
+					+ parameters.getClass() + " reporting to " + serverUrl);
             process.execute(machineUrl, machine, parameters, logWriter);
             logWriter.stop();
             String log = logWriter.getLog();
 
             // Get the exit status
             Status status = process.getStatus();
-            System.err.println("Process has finished with status " + status);
+            log("Process has finished with status " + status);
             List<File> outputs = process.getOutputs();
             List<String> outputsAsStrings = new ArrayList<>();
-            if (isLocal) {
-                for (File output : outputs)
-                    outputsAsStrings.add(output.getAbsolutePath());
-            } else {
-                for (File output : outputs) {
-                    InputStream input = new FileInputStream(output);
-                    jobManager.addOutput(
-                        projectId, job.getId(), output.getName(), input);
-                    input.close();
-                }
-            }
+			for (File output : outputs)
+				if (isLocal)
+					outputsAsStrings.add(output.getAbsolutePath());
+				else
+					try (InputStream input = new FileInputStream(output)) {
+						jobManager.addOutput(projectId, job.getId(),
+								output.getName(), input);
+					}
 			switch (status) {
 			case Error:
 				Throwable error = process.getError();
@@ -162,49 +241,53 @@ public class JobProcessManager {
 				throw new RuntimeException("Unknown status returned!");
 			}
         } catch (Throwable error) {
-            if (jobManager != null && job != null) {
-                try {
-                    String log = "";
-                    if (logWriter != null) {
-                        logWriter.stop();
-                        log = logWriter.getLog();
-                    }
+			try {
+				if (jobManager != null && job != null) {
+					String log = "";
+					if (logWriter != null) {
+						logWriter.stop();
+						log = logWriter.getLog();
+					}
 					jobManager.setJobError(projectId, job.getId(),
 							error.getMessage(), log, "",
 							new ArrayList<String>(),
 							new RemoteStackTrace(error));
-                } catch (Throwable t) {
-                    t.printStackTrace();
-                    error.printStackTrace();
-                }
-            } else {
-                error.printStackTrace();
-            }
+				} else
+					log(error);
+			} catch (Throwable t) {
+				log(t);
+				log(error);
+			}
         }
     }
 
 	private static void parseArguments(String[] args) throws IOException {
-		for (int i = 0; i < args.length; i++) {
-        	if (args[i].equals("--serverUrl")) {
+		for (int i = 0; i < args.length; i++)
+			switch (args[i]) {
+			case "--serverUrl":
         		serverUrl = args[++i];
-        	} else if (args[i].equals("--deleteOnExit")) {
+        		break;
+			case "--deleteOnExit":
         		deleteOnExit = true;
-        	} else if (args[i].equals("--local")) {
+        		break;
+			case "--local":
         		isLocal = true;
-        	} else if (args[i].equals("--executerId")) {
+        		break;
+			case "--executerId":
         		executerId = args[++i];
-        	} else if (args[i].equals("--liveUploadOutput")) {
+        		break;
+			case "--liveUploadOutput":
         		liveUploadOutput = true;
-        	} else if (args[i].equals("--requestMachine")) {
+        		break;
+			case "--requestMachine":
         		requestMachine = true;
-        	}
-        }
+        		break;
+			}
         
-        if (serverUrl == null) {
+        if (serverUrl == null)
         	throw new IOException("--serverUrl must be specified");
-        } else if (executerId == null) {
+        else if (executerId == null)
         	throw new IOException("--executerId must be specified");
-        }
 	}
 
 	/**
@@ -225,7 +308,7 @@ public class JobProcessManager {
 		JobParameters parameters = null;
 		Map<String, JobParametersFactoryException> errors = new HashMap<>();
 
-		for (JobParametersFactory factory : JOB_PARAMETER_FACTORIES) {
+		for (JobParametersFactory factory : JOB_PARAMETER_FACTORIES)
 			try {
 				parameters = factory.getJobParameters(job, workingDirectory);
 				break;
@@ -234,14 +317,12 @@ public class JobProcessManager {
 			} catch (JobParametersFactoryException e) {
 				errors.put(factory.getClass().getSimpleName(), e);
 			}
-		}
 
 		if (parameters != null) {
             // Get any requested input files
 			if (job.getInputData() != null)
 				for (DataItem input : job.getInputData())
-					downloadFile(new URL(input.getUrl()), workingDirectory,
-							null);
+					downloadFile(input.getUrl(), workingDirectory, null);
 
 			return parameters;
 		}

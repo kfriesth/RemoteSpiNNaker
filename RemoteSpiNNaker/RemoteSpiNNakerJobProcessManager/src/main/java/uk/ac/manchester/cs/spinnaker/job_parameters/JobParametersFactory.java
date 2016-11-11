@@ -13,7 +13,8 @@ public interface JobParametersFactory {
 	 * The argument to append to the script name to request that the system is
 	 * added to the command line.
 	 */
-	final String SYSTEM_ARG = " {system}";
+	// NB has a space at the start
+	String SYSTEM_ARG = " {system}";
 
 	/**
 	 * Gets job parameters given job description data.

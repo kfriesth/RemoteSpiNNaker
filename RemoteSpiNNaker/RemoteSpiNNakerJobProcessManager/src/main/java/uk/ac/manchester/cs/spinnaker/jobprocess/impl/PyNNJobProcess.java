@@ -5,6 +5,7 @@ import static org.apache.commons.io.FilenameUtils.getExtension;
 import static uk.ac.manchester.cs.spinnaker.job.Status.Error;
 import static uk.ac.manchester.cs.spinnaker.job.Status.Finished;
 import static uk.ac.manchester.cs.spinnaker.job.Status.Running;
+import static uk.ac.manchester.cs.spinnaker.utils.Log.log;
 
 import java.io.File;
 import java.io.IOException;
@@ -60,10 +61,6 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 
 	private boolean isIgnored(File file) {
 		return IGNORED_EXTENSIONS.contains(getExtension(file.getName()));
-	}
-
-	private void log(String message) {
-		System.err.println(message);
 	}
 
 	@Override

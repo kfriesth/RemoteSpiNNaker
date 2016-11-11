@@ -3,7 +3,8 @@ package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
 import static org.rauschig.jarchivelib.ArchiverFactory.createArchiver;
 import static org.rauschig.jarchivelib.CompressionType.BZIP2;
 import static org.rauschig.jarchivelib.CompressionType.GZIP;
-import static uk.ac.manchester.cs.spinnaker.jobprocessmanager.FileDownloader.downloadFile;
+import static uk.ac.manchester.cs.spinnaker.utils.FileDownloader.downloadFile;
+import static uk.ac.manchester.cs.spinnaker.utils.Log.log;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,6 +21,7 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
 import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
+import uk.ac.manchester.cs.spinnaker.utils.Log;
 
 /**
  * A JobParametersFactory that downloads a PyNN job as a zip or tar.gz file
@@ -45,16 +47,16 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
         }
 
         // Try to get the file and extract it
-        try {
-            return constructParameters(job, workingDirectory, url);
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new JobParametersFactoryException(
-                "Error in communication or extraction", e);
-        } catch (Throwable e) {
-            e.printStackTrace();
-            throw new JobParametersFactoryException(
-                "General error with zip extraction", e);
+		try {
+			return constructParameters(job, workingDirectory, url);
+		} catch (IOException e) {
+			log(e);
+			throw new JobParametersFactoryException(
+					"Error in communication or extraction", e);
+		} catch (Throwable e) {
+			log(e);
+			throw new JobParametersFactoryException(
+					"General error with zip extraction", e);
         }
     }
 
@@ -73,7 +75,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 	
 	private boolean extractArchiveUsingKnownFormats(File workingDirectory,
 			File output) {
-		for (ArchiveFormat format : ArchiveFormat.values()) {
+		for (ArchiveFormat format : ArchiveFormat.values())
 			try {
 				Archiver archiver = createArchiver(format);
 				archiver.extract(output, workingDirectory);
@@ -81,7 +83,6 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 			} catch (IOException e) {
 				// Ignore - try the next
 			}
-		}
 		return false;
 	}
 	
@@ -122,7 +123,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 
 		// Delete the archive
 		if (!output.delete())
-		    System.err.println("Warning, could not delete file " + output);
+		    log("Warning, could not delete file " + output);
 
 		// If the archive wasn't extracted, throw an error
 		if (!archiveExtracted)
@@ -134,8 +135,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 		if (command != null && !command.isEmpty())
 		    script = command;
 
-		return new PyNNJobParameters(
-		        workingDirectory.getAbsolutePath(), script,
-		        job.getHardwareConfig());
+		return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
+				script, job.getHardwareConfig());
 	}
 }

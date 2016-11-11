@@ -17,26 +17,22 @@ import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryExceptio
 import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
- * A JobParametersFactory that downloads a PyNN job from git. The git repository
+ * A {@link JobParametersFactory} that downloads a PyNN job from git. The git repository
  * must be world-readable, or sufficient credentials must be present in the URL.
  */
 public class GitPyNNJobParametersFactory implements JobParametersFactory {
-	private static final String DEFAULT_SCRIPT_NAME = "run.py";
-
 	@Override
 	public JobParameters getJobParameters(Job job, File workingDirectory)
 			throws UnsupportedJobException, JobParametersFactoryException {
-
 		// Test that there is a URL
-		String experimentDescription = job.getCode().trim();
-		if (!experimentDescription.startsWith("http://")
-				&& !experimentDescription.startsWith("https://"))
+		String jobCodeLocation = job.getCode().trim();
+		if (!jobCodeLocation.startsWith("http://")
+				&& !jobCodeLocation.startsWith("https://"))
 			throw new UnsupportedJobException();
 
 		// Try to get the repository
 		try {
-			return constructParameters(job, workingDirectory,
-					experimentDescription);
+			return constructParameters(job, workingDirectory, jobCodeLocation);
 		} catch (InvalidRemoteException e) {
 			throw new JobParametersFactoryException("Remote is not valid", e);
 		} catch (TransportException e) {

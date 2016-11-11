@@ -5,6 +5,7 @@ import static java.io.File.pathSeparatorChar;
 import static org.apache.commons.io.FileUtils.copyToFile;
 import static org.apache.commons.io.FileUtils.forceDeleteOnExit;
 import static org.apache.commons.io.FileUtils.forceMkdirParent;
+import static org.apache.commons.io.IOUtils.closeQuietly;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
 
@@ -13,7 +14,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,11 +44,11 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 	private final boolean deleteOnExit;
 	private final boolean liveUploadOutput;
 	private final boolean requestSpiNNakerMachine;
+	private final ThreadGroup threadGroup;
 
 	private List<File> jobProcessManagerClasspath = new ArrayList<>();
 	private File jobExecuterDirectory = null;
-	private static Logger logger = getLogger(Executer.class);
-	private final ThreadGroup threadGroup;
+	private static Logger log = getLogger(Executer.class);
 
 	public LocalJobExecuterFactory(boolean deleteOnExit,
 			boolean liveUploadOutput, boolean requestSpiNNakerMachine)
@@ -112,7 +115,6 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 	    private final File javaExec;
 
 	    private File outputLog = createTempFile("exec", ".log");
-	    private JobOutputPipe pipe;
 	    private Process process;
 	    private IOException startException;
 
@@ -148,16 +150,15 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 		 */
 	    @Override
 		public void run() {
-	        startSubprocess(constructArguments());
-
-	        logger.debug("Waiting for process to finish");
-			try {
-				process.waitFor();
-			} catch (InterruptedException e) {
-				// Do Nothing
+			try (JobOutputPipe pipe = startSubprocess(constructArguments())) {
+				log.debug("Waiting for process to finish");
+				try {
+					process.waitFor();
+				} catch (InterruptedException e) {
+					// Do Nothing
+				}
+				log.debug("Process finished, closing pipe");
 			}
-			logger.debug("Process finished, closing pipe");
-			pipe.close();
 
 			reportResult();
 		}
@@ -174,36 +175,37 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 	        }
 	        command.add("-cp");
 	        command.add(classPathBuilder.toString());
-	        logger.debug("Classpath: " + classPathBuilder);
+	        log.debug("Classpath: " + classPathBuilder);
 
 	        command.add(JOB_PROCESS_MANAGER_MAIN_CLASS);
-	        logger.debug("Main command: " + JOB_PROCESS_MANAGER_MAIN_CLASS);
+	        log.debug("Main command: " + JOB_PROCESS_MANAGER_MAIN_CLASS);
 	        for (String argument : arguments) {
 	            command.add(argument);
-	            logger.debug("Argument: " + argument);
+	            log.debug("Argument: " + argument);
 	        }
 			return command;
 		}
 
-
-		private void startSubprocess(List<String> command) {
+		private JobOutputPipe startSubprocess(List<String> command) {
 			ProcessBuilder builder = new ProcessBuilder(command);
 	        builder.directory(jobExecuterDirectory);
-	        logger.debug("Working directory: " + jobExecuterDirectory);
+	        log.debug("Working directory: " + jobExecuterDirectory);
 	        builder.redirectErrorStream(true);
-	        synchronized (this) {
+	        JobOutputPipe pipe = null;
+			synchronized (this) {
 	            try {
-	                logger.debug("Starting execution process");
+	                log.debug("Starting execution process");
 	                process = builder.start();
-	                logger.debug("Starting pipe from process");
-	                pipe = new JobOutputPipe(threadGroup, process.getInputStream(), outputLog);
+	                log.debug("Starting pipe from process");
+	                pipe = new JobOutputPipe(threadGroup, process.getInputStream(), new PrintWriter(outputLog));
 	                pipe.start();
 	            } catch (IOException e) {
-	                logger.error("Error running external job", e);
+	                log.error("Error running external job", e);
 	                startException = e;
 	            }
 	            notifyAll();
 			}
+	        return pipe;
 		}
 
 		private void reportResult() {
@@ -217,7 +219,7 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 					logToAppend.append(line).append("\n");
 				}
 			} catch (IOException e) {
-				logger.warn("problem in reporting log", e);
+				log.warn("problem in reporting log", e);
 			}
 			jobManager.setExecutorExited(id, logToAppend.toString());
 		}
@@ -249,6 +251,46 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 		 */
 		public File getLogFile() {
 			return outputLog;
+		}
+
+		class JobOutputPipe extends Thread implements AutoCloseable {
+			private final BufferedReader reader;
+			private final PrintWriter writer;
+			private volatile boolean done;
+
+			public JobOutputPipe(ThreadGroup threadGroup, InputStream input,
+					PrintWriter output) {
+				super(threadGroup, "JobOutputPipe");
+				reader = new BufferedReader(new InputStreamReader(input));
+				writer = output;
+				done = false;
+				setDaemon(true);
+			}
+
+			@Override
+			public void run() {
+				while (!done) {
+					String line;
+					try {
+						line = reader.readLine();
+					} catch (IOException e) {
+						break;
+					}
+					if (line == null)
+						break;
+					if (!line.isEmpty()) {
+						log.debug(line);
+						writer.println(line);
+					}
+				}
+				writer.close();
+			}
+
+			@Override
+			public void close() {
+				done = true;
+				closeQuietly(reader);
+			}
 		}
 	}
 }

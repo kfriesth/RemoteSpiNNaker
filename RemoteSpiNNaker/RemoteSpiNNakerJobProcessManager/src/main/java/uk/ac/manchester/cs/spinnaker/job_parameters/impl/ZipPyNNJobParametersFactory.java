@@ -21,32 +21,31 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
 import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
-import uk.ac.manchester.cs.spinnaker.utils.Log;
 
 /**
- * A JobParametersFactory that downloads a PyNN job as a zip or tar.gz file
+ * A {@link JobParametersFactory} that downloads a PyNN job as a zip or tar.gz
+ * file. The URL must refer to a world-readable URL or the credentials must be
+ * present in the URL.
  */
 public class ZipPyNNJobParametersFactory implements JobParametersFactory {
-    private static final String DEFAULT_SCRIPT_NAME = "run.py";
+	@Override
+	public JobParameters getJobParameters(Job job, File workingDirectory)
+			throws UnsupportedJobException, JobParametersFactoryException {
+		// Test that there is a URL
+		String jobCodeLocation = job.getCode().trim();
+		if (!jobCodeLocation.startsWith("http://")
+				&& !jobCodeLocation.startsWith("https://"))
+			throw new UnsupportedJobException();
 
-    @Override
-    public JobParameters getJobParameters(Job job, File workingDirectory)
-            throws UnsupportedJobException, JobParametersFactoryException {
-        // Test that there is a URL
-        String experimentDescription = job.getCode().trim();
-        if (!experimentDescription.startsWith("http://")
-                && !experimentDescription.startsWith("https://"))
-            throw new UnsupportedJobException();
+		// Test that the URL is well formed
+		URL url;
+		try {
+			url = new URL(jobCodeLocation);
+		} catch (MalformedURLException e) {
+			throw new JobParametersFactoryException("The URL is malformed", e);
+		}
 
-        // Test that the URL is well formed
-        URL url;
-        try {
-            url = new URL(experimentDescription);
-        } catch (MalformedURLException e) {
-            throw new JobParametersFactoryException("The URL is malformed", e);
-        }
-
-        // Try to get the file and extract it
+		// Try to get the file and extract it
 		try {
 			return constructParameters(job, workingDirectory, url);
 		} catch (IOException e) {
@@ -57,22 +56,23 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 			log(e);
 			throw new JobParametersFactoryException(
 					"General error with zip extraction", e);
-        }
-    }
+		}
+	}
 
 	private static final CompressionType[] SUPPORTED_TYPES = new CompressionType[] {
 			BZIP2, GZIP };
 
-	private boolean extractAutodetectedArchive(File output, File workingDirectory) throws IOException {
+	private boolean extractAutodetectedArchive(File output,
+			File workingDirectory) throws IOException {
 		try {
 			Archiver archiver = createArchiver(output);
-		    archiver.extract(output, workingDirectory);
-		    return true;
+			archiver.extract(output, workingDirectory);
+			return true;
 		} catch (IllegalArgumentException e) {
-		    return false;
+			return false;
 		}
 	}
-	
+
 	private boolean extractArchiveUsingKnownFormats(File workingDirectory,
 			File output) {
 		for (ArchiveFormat format : ArchiveFormat.values())
@@ -85,7 +85,7 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 			}
 		return false;
 	}
-	
+
 	private boolean extractTypedArchive(File workingDirectory, File output) {
 		for (ArchiveFormat format : ArchiveFormat.values())
 			for (CompressionType type : SUPPORTED_TYPES)
@@ -98,13 +98,14 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 				}
 		return false;
 	}
-	
-    private JobParameters constructParameters(Job job, File workingDirectory,
+
+	private JobParameters constructParameters(Job job, File workingDirectory,
 			URL url) throws IOException, JobParametersFactoryException {
 		File output = downloadFile(url, workingDirectory, null);
 
 		/* Test if there is a recognised archive */
-		boolean archiveExtracted = extractAutodetectedArchive(output, workingDirectory);
+		boolean archiveExtracted = extractAutodetectedArchive(output,
+				workingDirectory);
 
 		/*
 		 * If the archive wasn't extracted by the last line, try the known
@@ -123,17 +124,17 @@ public class ZipPyNNJobParametersFactory implements JobParametersFactory {
 
 		// Delete the archive
 		if (!output.delete())
-		    log("Warning, could not delete file " + output);
+			log("Warning, could not delete file " + output);
 
 		// If the archive wasn't extracted, throw an error
 		if (!archiveExtracted)
-		    throw new JobParametersFactoryException(
-		        "The URL could not be decompressed with any known method");
+			throw new JobParametersFactoryException(
+					"The URL could not be decompressed with any known method");
 
 		String script = DEFAULT_SCRIPT_NAME + SYSTEM_ARG;
 		String command = job.getCommand();
 		if (command != null && !command.isEmpty())
-		    script = command;
+			script = command;
 
 		return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
 				script, job.getHardwareConfig());

@@ -14,12 +14,11 @@ import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryExceptio
 import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
- * A JobParametersFactory that uses the experimentDescription itself as a PyNN
- * script.
+ * A {@link JobParametersFactory} that uses the <tt>experimentDescription</tt>
+ * itself as a PyNN script.
  */
 public class DirectPyNNJobParametersFactory implements JobParametersFactory {
 	private static final String ENCODING = "UTF-8";
-	private static final String SCRIPT_NAME = "run.py";
 
 	@Override
 	public JobParameters getJobParameters(Job job, File workingDirectory)
@@ -40,13 +39,13 @@ public class DirectPyNNJobParametersFactory implements JobParametersFactory {
 	/** Constructs the parameters by writing the script into a local file. */
 	private JobParameters constructParameters(Job job, File workingDirectory)
 			throws FileNotFoundException, UnsupportedEncodingException {
-		File scriptFile = new File(workingDirectory, SCRIPT_NAME);
+		File scriptFile = new File(workingDirectory, DEFAULT_SCRIPT_NAME);
 		PrintWriter writer = new PrintWriter(scriptFile, ENCODING);
 		writer.print(job.getCode());
 		writer.close();
 
 		return new PyNNJobParameters(workingDirectory.getAbsolutePath(),
-				SCRIPT_NAME + SYSTEM_ARG, job.getHardwareConfig());
+				DEFAULT_SCRIPT_NAME + SYSTEM_ARG, job.getHardwareConfig());
 	}
 
 }

@@ -16,6 +16,9 @@ public interface JobParametersFactory {
 	// NB has a space at the start
 	String SYSTEM_ARG = " {system}";
 
+	/** The default name of the python script that will be constructed. */
+	String DEFAULT_SCRIPT_NAME = "run.py";
+
 	/**
 	 * Gets job parameters given job description data.
 	 * 

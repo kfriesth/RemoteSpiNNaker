@@ -52,14 +52,14 @@ import com.nimbusds.oauth2.sdk.ParseException;
 
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
-import uk.ac.manchester.cs.spinnaker.jobmanager.impl.LocalJobExecuterFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.impl.XenVMExecuterFactory;
+import uk.ac.manchester.cs.spinnaker.jobmanager.LocalJobExecuterFactory;
+import uk.ac.manchester.cs.spinnaker.jobmanager.XenVMExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.FixedMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.machinemanager.SpallocMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
-import uk.ac.manchester.cs.spinnaker.output.impl.OutputManagerImpl;
+import uk.ac.manchester.cs.spinnaker.output.OutputManagerImpl;
 import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
 
 @SuppressWarnings("unused")

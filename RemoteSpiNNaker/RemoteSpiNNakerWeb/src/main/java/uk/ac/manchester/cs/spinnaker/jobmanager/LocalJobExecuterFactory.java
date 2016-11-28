@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.jobmanager.impl;
+package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static java.io.File.createTempFile;
 import static java.io.File.pathSeparator;
@@ -26,10 +26,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import org.slf4j.Logger;
-
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuter;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 
 public class LocalJobExecuterFactory implements JobExecuterFactory {
 	private static final String JOB_PROCESS_MANAGER_MAIN_CLASS = "uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager";

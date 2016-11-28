@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.jobmanager.impl;
+package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static com.xensource.xenapi.Session.loginWithPassword;
 import static com.xensource.xenapi.Session.logout;
@@ -18,10 +18,6 @@ import java.util.UUID;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.slf4j.Logger;
-
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuter;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
-import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
 
 import com.xensource.xenapi.Connection;
 import com.xensource.xenapi.SR;

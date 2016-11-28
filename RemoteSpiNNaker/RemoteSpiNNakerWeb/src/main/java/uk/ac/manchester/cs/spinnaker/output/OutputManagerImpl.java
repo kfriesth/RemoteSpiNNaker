@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.output.impl;
+package uk.ac.manchester.cs.spinnaker.output;
 
 import static java.lang.System.currentTimeMillis;
 import static java.nio.file.Files.move;

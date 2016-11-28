@@ -94,7 +94,7 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerNMPIQueueClient</artifactId>
+            <artifactId>RemoteSpiNNakerRESTUtils</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -121,6 +121,10 @@
         <dependency>
             <groupId>org.pac4j</groupId>
             <artifactId>pac4j-oidc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
 
         <dependency>

@@ -8,7 +8,8 @@ import java.util.Map;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 
 /**
- * A factory for creating JobProcess instances given a JobParameters instance
+ * A factory for creating {@link JobProcess} instances given a
+ * {@link JobParameters} instance
  */
 public class JobProcessFactory {
 	private final ThreadGroup threadGroup;
@@ -61,14 +62,34 @@ public class JobProcessFactory {
 				(Class<JobProcess<P>>) typeMap.get(parameters.getClass());
 
 		JobProcess<P> process = processType.newInstance();
-		try {
-			// Magically set the thread group if there is one
-			Field threadGroupField = processType.getDeclaredField("threadGroup");
-			threadGroupField.setAccessible(true);
-			threadGroupField.set(process, threadGroup);
-		} catch (NoSuchFieldException | SecurityException e) {
-		}
+
+		// Magically set the thread group if there is one
+		setField(process, "threadGroup", threadGroup);
 
 		return process;
+	}
+
+	@SuppressWarnings("unused")
+	private static void setField(Class<?> clazz, String fieldName, Object value) {
+		try {
+			Field threadGroupField = clazz.getDeclaredField(fieldName);
+			threadGroupField.setAccessible(true);
+			threadGroupField.set(null, value);
+		} catch (NoSuchFieldException | SecurityException
+				| IllegalArgumentException | IllegalAccessException e) {
+			// Treat any exception as just a simple refusal to set the field.
+		}
+	}
+
+	private static void setField(Object instance, String fieldName, Object value) {
+		try {
+			Field threadGroupField = instance.getClass().getDeclaredField(
+					fieldName);
+			threadGroupField.setAccessible(true);
+			threadGroupField.set(instance, value);
+		} catch (NoSuchFieldException | SecurityException
+				| IllegalArgumentException | IllegalAccessException e) {
+			// Treat any exception as just a simple refusal to set the field.
+		}
 	}
 }

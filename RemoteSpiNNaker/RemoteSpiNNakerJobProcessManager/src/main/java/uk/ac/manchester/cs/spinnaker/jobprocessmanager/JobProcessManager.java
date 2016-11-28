@@ -10,6 +10,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -45,12 +46,13 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 
 /**
- * Manages a running job process.  This is run as a separate process from the
+ * Manages a running job process. This is run as a separate process from the
  * command line, and it assumes input is passed via {@link System#in}.
  */
 public class JobProcessManager {
 	// No instances for you!
-	private JobProcessManager(){}
+	private JobProcessManager() {
+	}
 
 	/** The factories for converting jobs into parameters. */
 	private static final JobParametersFactory[] JOB_PARAMETER_FACTORIES = new JobParametersFactory[] {
@@ -59,239 +61,205 @@ public class JobProcessManager {
 			new DirectPyNNJobParametersFactory() };
 
 	/** The factory for converting parameters into processes. */
-	private static final JobProcessFactory JOB_PROCESS_FACTORY = new JobProcessFactory("JobProcess") {
-		{
-			addMapping(PyNNJobParameters.class, PyNNJobProcess.class);
-		}
-	};
+	private static final JobProcessFactory jobProcessFactory = new JobProcessFactory(
+			"JobProcess");
+	static {
+		jobProcessFactory.addMapping(PyNNJobParameters.class,
+				PyNNJobProcess.class);
+	}
 
 	/** How to talk to the main website. */
-    private static JobManagerInterface createJobManager(String url) {
-        ResteasyClient client = new ResteasyClientBuilder().build();
-        client.register(new JacksonJsonProvider());
-        // TODO Add auth filter
-        ResteasyWebTarget target = client.target(url);
-        return target.proxy(JobManagerInterface.class);
-    }
+	private static JobManagerInterface createJobManager(String url) {
+		ResteasyClient client = new ResteasyClientBuilder().build();
+		client.register(new JacksonJsonProvider());
+		// TODO Add auth filter
+		ResteasyWebTarget target = client.target(url);
+		return target.proxy(JobManagerInterface.class);
+	}
 
-    private static String serverUrl = null;
-    private static boolean deleteOnExit = false;
-    private static boolean isLocal = false;
-    private static String executerId = null;
-    private static boolean liveUploadOutput = false;
-    private static boolean requestMachine = false;
+	private static String serverUrl = null;
+	private static boolean deleteOnExit = false;
+	private static boolean isLocal = false;
+	private static String executerId = null;
+	private static boolean liveUploadOutput = false;
+	private static boolean requestMachine = false;
 
-    abstract static class JobManagerLogWriter implements LogWriter {
-    	abstract String getLog();
-    	abstract void stop();
-    }
+	abstract static class JobManagerLogWriter implements LogWriter {
+		protected final StringBuilder cached = new StringBuilder();
 
-    static class SimpleJobManagerLogWriter extends JobManagerLogWriter {
-    	private final StringBuilder cached = new StringBuilder();
+		protected boolean isPopulated() {
+			return cached.length() > 0;
+		}
 
-    	@Override
-    	public void append(String logMsg) {
-    		log("Process Output: " + logMsg);
-    		synchronized (this) {
-    			cached.append(logMsg);
-    		}
-    	}
+		public synchronized String getLog() {
+			return cached.toString();
+		}
 
-    	@Override
-		public String getLog() {
-    		synchronized (this) {
-    			return cached.toString();
-    		}
-    	}
+		void stop() {
+		}
+	}
 
-    	@Override
-		public void stop() {
-    	}
-    }
+	static class SimpleJobManagerLogWriter extends JobManagerLogWriter {
+		@Override
+		public void append(String logMsg) {
+			log("Process Output: " + logMsg);
+			synchronized (this) {
+				cached.append(logMsg);
+			}
+		}
+	}
 
-    static class UploadingJobManagerLogWriter extends JobManagerLogWriter {
-    	private static final int UPDATE_INTERVAL = 500;
+	private static final int UPDATE_INTERVAL = 500;
 
-    	private final JobManagerInterface jobManager;
-    	private final int id;
-    	private final StringBuilder cached = new StringBuilder();
-    	private final Timer sendTimer;
+	static class UploadingJobManagerLogWriter extends JobManagerLogWriter {
+		private final JobManagerInterface jobManager;
+		private final int id;
+		private final Timer sendTimer;
 
-    	public UploadingJobManagerLogWriter(JobManagerInterface jobManager, int id) {
-    		this.jobManager = jobManager;
-    		this.id = id;
+		public UploadingJobManagerLogWriter(JobManagerInterface jobManager,
+				int id) {
+			this.jobManager = jobManager;
+			this.id = id;
 			sendTimer = new Timer(UPDATE_INTERVAL, new ActionListener() {
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					sendLog();
 				}
 			});
-    	}
+		}
 
-    	private synchronized void sendLog() {
-    		if (cached.length() > 0) {
-    			log("Sending cached data to job manager");
-    			jobManager.appendLog(id, cached.toString());
-    			cached.setLength(0);
-    		}
-    	}
+		private void sendLog() {
+			String toWrite = null;
+			synchronized (this) {
+				if (isPopulated()) {
+					toWrite = cached.toString();
+					cached.setLength(0);
+				}
+			}
+			if (toWrite != null) {
+				log("Sending cached data to job manager");
+				jobManager.appendLog(id, toWrite);
+			}
+		}
 
-    	@Override
-    	public void append(String logMsg) {
-    		log("Process Output: " + logMsg);
-    		synchronized (this) {
-    			cached.append(logMsg);
-    			sendTimer.restart();
-    		}
-    	}
+		@Override
+		public void append(String logMsg) {
+			log("Process Output: " + logMsg);
+			synchronized (this) {
+				cached.append(logMsg);
+				sendTimer.restart();
+			}
+		}
 
-    	@Override
-		public String getLog() {
-    		synchronized (this) {
-    			return cached.toString();
-    		}
-    	}
-
-    	@Override
+		@Override
 		public void stop() {
-    		sendTimer.stop();
-    	}
-    }
+			sendTimer.stop();
+		}
+	}
 
-    public static void main(String[] args) throws Exception {
-        parseArguments(args);
+	public static void main(String[] args) throws Exception {
+		parseArguments(args);
 
-        JobManagerInterface jobManager = null;
-        JobManagerLogWriter logWriter = null;
-        Job job = null;
-        String projectId = null;
-        
-        try {
-            jobManager = createJobManager(serverUrl);
+		JobManagerInterface jobManager = null;
+		JobManagerLogWriter logWriter = null;
+		Job job = null;
+		String projectId = null;
 
-            // Read the job
-            job = jobManager.getNextJob(executerId);
-            projectId = new File(job.getCollabId()).getName();
+		try {
+			jobManager = createJobManager(serverUrl);
 
-            // Create a temporary location for the job
-            File workingDirectory = createTempFile("job", ".tmp");
-            workingDirectory.delete();
-            workingDirectory.mkdirs();
+			// Read the job
+			job = jobManager.getNextJob(executerId);
+			projectId = new File(job.getCollabId()).getName();
 
-            JobParameters parameters = getJobParameters(job, workingDirectory);
+			// Create a temporary location for the job
+			File workingDirectory = createTempFile("job", ".tmp");
+			workingDirectory.delete();
+			workingDirectory.mkdirs();
 
-            // Create a process to process the request
-            log("Creating process from parameters");
-            JobProcess<JobParameters> process =
-                    JOB_PROCESS_FACTORY.createProcess(parameters);
+			JobParameters parameters = getJobParameters(job, workingDirectory);
 
-			if (liveUploadOutput)
-				logWriter = new UploadingJobManagerLogWriter(jobManager,
-						job.getId());
-			else
-				logWriter = new SimpleJobManagerLogWriter();
+			// Create a process to process the request
+			log("Creating process from parameters");
+			JobProcess<JobParameters> process = jobProcessFactory
+					.createProcess(parameters);
+			logWriter = getLogWriter(jobManager, job);
 
-            // Read the machine
-            // (get a 3 board machine just now)
-            SpinnakerMachine machine = null;
-            String machineUrl = null;
-            if (requestMachine)
-                machine = jobManager.getJobMachine(job.getId(), -1, -1, -1, -1);
-            else
-                machineUrl = format("%sjob/%d/machine", serverUrl, job.getId());
+			// Read the machine
+			Machine machine = getMachine(jobManager, job);
 
-            // Execute the process
+			// Execute the process
 			log("Running job " + job.getId() + " on " + machine + " using "
 					+ parameters.getClass() + " reporting to " + serverUrl);
-            process.execute(machineUrl, machine, parameters, logWriter);
-            logWriter.stop();
-            String log = logWriter.getLog();
+			process.execute(machine.url, machine.machine, parameters, logWriter);
+			logWriter.stop();
+			String log = logWriter.getLog();
 
-            // Get the exit status
-            Status status = process.getStatus();
-            log("Process has finished with status " + status);
-            List<File> outputs = process.getOutputs();
-            List<String> outputsAsStrings = new ArrayList<>();
-			for (File output : outputs)
-				if (isLocal)
-					outputsAsStrings.add(output.getAbsolutePath());
-				else
-					try (InputStream input = new FileInputStream(output)) {
-						jobManager.addOutput(projectId, job.getId(),
-								output.getName(), input);
-					}
-			switch (status) {
-			case Error:
-				Throwable error = process.getError();
-				jobManager.setJobError(projectId, job.getId(),
-						error.getMessage(), log,
-						workingDirectory.getAbsolutePath(), outputsAsStrings,
-						new RemoteStackTrace(error));
-				break;
-			case Finished:
-				jobManager.setJobFinished(projectId, job.getId(), log,
-						workingDirectory.getAbsolutePath(), outputsAsStrings);
-
-				// Clean up
-				process.cleanup();
-				if (deleteOnExit)
-					deleteQuietly(workingDirectory);
-				break;
-			default:
-				throw new RuntimeException("Unknown status returned!");
-			}
-        } catch (Throwable error) {
+			// Get the exit status
+			processOutcome(jobManager, job, projectId, workingDirectory,
+					process, log);
+		} catch (Throwable error) {
 			try {
-				if (jobManager != null && job != null) {
-					String log = "";
-					if (logWriter != null) {
-						logWriter.stop();
-						log = logWriter.getLog();
-					}
-					jobManager.setJobError(projectId, job.getId(),
-							error.getMessage(), log, "",
-							new ArrayList<String>(),
-							new RemoteStackTrace(error));
-				} else
+				if (jobManager == null || job == null) {
 					log(error);
+					return;
+				}
+
+				String log = "";
+				if (logWriter != null) {
+					logWriter.stop();
+					log = logWriter.getLog();
+				}
+				jobManager.setJobError(projectId, job.getId(),
+						error.getMessage(), log, "", new ArrayList<String>(),
+						new RemoteStackTrace(error));
 			} catch (Throwable t) {
 				log(t);
 				log(error);
 			}
-        }
-    }
+		}
+	}
+
+	private static Machine getMachine(JobManagerInterface jobManager, Job job) {
+		// (get a 3 board machine just now)
+		if (requestMachine)
+			return new Machine(jobManager.getJobMachine(job.getId(), -1, -1,
+					-1, -1.0));
+		return new Machine(serverUrl, job.getId());
+	}
 
 	private static void parseArguments(String[] args) throws IOException {
 		for (int i = 0; i < args.length; i++)
 			switch (args[i]) {
 			case "--serverUrl":
-        		serverUrl = args[++i];
-        		break;
+				serverUrl = args[++i];
+				break;
 			case "--deleteOnExit":
-        		deleteOnExit = true;
-        		break;
+				deleteOnExit = true;
+				break;
 			case "--local":
-        		isLocal = true;
-        		break;
+				isLocal = true;
+				break;
 			case "--executerId":
-        		executerId = args[++i];
-        		break;
+				executerId = args[++i];
+				break;
 			case "--liveUploadOutput":
-        		liveUploadOutput = true;
-        		break;
+				liveUploadOutput = true;
+				break;
 			case "--requestMachine":
-        		requestMachine = true;
-        		break;
+				requestMachine = true;
+				break;
 			}
-        
-        if (serverUrl == null)
-        	throw new IOException("--serverUrl must be specified");
-        else if (executerId == null)
-        	throw new IOException("--executerId must be specified");
+
+		if (serverUrl == null)
+			throw new IOException("--serverUrl must be specified");
+		else if (executerId == null)
+			throw new IOException("--executerId must be specified");
 	}
 
 	/**
-	 * Sort out the parameters to a job. Includes downloading any necessary files.
+	 * Sort out the parameters to a job. Includes downloading any necessary
+	 * files.
 	 * 
 	 * @param job
 	 *            The job that we're assembling the parameters for.
@@ -319,7 +287,7 @@ public class JobProcessManager {
 			}
 
 		if (parameters != null) {
-            // Get any requested input files
+			// Get any requested input files
 			if (job.getInputData() != null)
 				for (DataItem input : job.getInputData())
 					downloadFile(input.getUrl(), workingDirectory, null);
@@ -341,5 +309,69 @@ public class JobProcessManager {
 		// Miscellaneous other error
 		throw new IOException(
 				"The job did not appear to be supported on this system");
+	}
+
+	private static JobManagerLogWriter getLogWriter(
+			JobManagerInterface jobManager, Job job) {
+		if (!liveUploadOutput)
+			return new SimpleJobManagerLogWriter();
+		return new UploadingJobManagerLogWriter(jobManager, job.getId());
+	}
+
+	private static void processOutcome(JobManagerInterface jobManager, Job job,
+			String projectId, File workingDirectory,
+			JobProcess<JobParameters> process, String log) throws IOException,
+			FileNotFoundException {
+		Status status = process.getStatus();
+		log("Process has finished with status " + status);
+		List<File> outputs = process.getOutputs();
+		List<String> outputsAsStrings = new ArrayList<>();
+		for (File output : outputs)
+			if (isLocal)
+				outputsAsStrings.add(output.getAbsolutePath());
+			else
+				try (InputStream input = new FileInputStream(output)) {
+					jobManager.addOutput(projectId, job.getId(),
+							output.getName(), input);
+				}
+		switch (status) {
+		case Error:
+			Throwable error = process.getError();
+			jobManager.setJobError(projectId, job.getId(), error.getMessage(),
+					log, workingDirectory.getAbsolutePath(), outputsAsStrings,
+					new RemoteStackTrace(error));
+			break;
+		case Finished:
+			jobManager.setJobFinished(projectId, job.getId(), log,
+					workingDirectory.getAbsolutePath(), outputsAsStrings);
+
+			// Clean up
+			process.cleanup();
+			if (deleteOnExit)
+				deleteQuietly(workingDirectory);
+			break;
+		default:
+			throw new RuntimeException("Unknown status returned!");
+		}
+	}
+}
+
+class Machine {
+	SpinnakerMachine machine;
+	String url;
+
+	Machine(SpinnakerMachine machine) {
+		this.machine = machine;
+	}
+
+	Machine(String baseUrl, int id) {
+		this.url = format("%sjob/%d/machine", baseUrl, id);
+	}
+
+	@Override
+	public String toString() {
+		if (machine != null)
+			return machine.toString();
+		return url;
 	}
 }

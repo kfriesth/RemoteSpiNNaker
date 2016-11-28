@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static java.io.File.createTempFile;
 import static java.lang.Math.ceil;
+import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.commons.io.FileUtils.copyInputStreamToFile;
 import static org.apache.commons.io.FileUtils.forceDelete;
@@ -70,11 +71,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			NMPIQueueManager queueManager, OutputManager outputManager,
 			URL baseUrl, JobExecuterFactory jobExecuterFactory,
 			boolean restartJobExecutorOnFailure) {
-		this.machineManager = machineManager;
-		this.queueManager = queueManager;
-		this.outputManager = outputManager;
-		this.baseUrl = baseUrl;
-		this.jobExecuterFactory = jobExecuterFactory;
+		this.machineManager = requireNonNull(machineManager);
+		this.queueManager = requireNonNull(queueManager);
+		this.outputManager = requireNonNull(outputManager);
+		this.baseUrl = requireNonNull(baseUrl);
+		this.jobExecuterFactory = requireNonNull(jobExecuterFactory);
 		this.restartJobExecuterOnFailure = restartJobExecutorOnFailure;
 		threadGroup = new ThreadGroup("NMPI");
 
@@ -85,6 +86,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	@Override
 	public void addJob(Job job) throws IOException {
+		requireNonNull(job);
 		logger.info("New job " + job.getId());
 
 		// Add the job to the set of jobs to be run
@@ -110,6 +112,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Override
 	public Job getNextJob(String executerId) {
 		try {
+			requireNonNull(executerId);
 			Job job = jobsToRun.take();
 			executorJobId.put(executerId, job);
 			logger.info("Executer " + executerId + " is running " + job.getId());
@@ -254,12 +257,14 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	public void appendLog(int id, String logToAppend) {
 		logger.debug("Updating log for " + id);
 		logger.trace(id + ": " + logToAppend);
-		queueManager.appendJobLog(id, logToAppend);
+		queueManager.appendJobLog(id, requireNonNull(logToAppend));
 	}
 
 	@Override
 	public void addOutput(String projectId, int id, String output,
 			InputStream input) {
+		requireNonNull(output);
+		requireNonNull(input);
 		try {
 			if (!jobOutputTempFiles.containsKey(id)) {
 				File tempOutputDir = createTempFile("jobOutput", ".tmp");
@@ -306,7 +311,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	public void addProvenance(int id, String item, String value) {
 		if (!jobProvenance.containsKey(id))
 			jobProvenance.put(id, new HashMap<String, String>());
-		jobProvenance.get(id).put(item, value);
+		jobProvenance.get(id).put(requireNonNull(item), requireNonNull(value));
 	}
 
 	private Map<String, String> getProvenance(int id) {
@@ -316,6 +321,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Override
 	public void setJobFinished(String projectId, int id, String logToAppend,
 			String baseDirectory, List<String> outputs) {
+		requireNonNull(projectId);
+		requireNonNull(logToAppend);
+		requireNonNull(baseDirectory);
+		requireNonNull(outputs);
 		logger.debug("Marking job " + id + " as finished");
 		releaseAllocatedMachines(id);
 
@@ -351,6 +360,13 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	public void setJobError(String projectId, int id, String error,
 			String logToAppend, String baseDirectory, List<String> outputs,
 			RemoteStackTrace stackTrace) {
+		requireNonNull(projectId);
+		requireNonNull(error);
+		requireNonNull(logToAppend);
+		requireNonNull(baseDirectory);
+		requireNonNull(outputs);
+		requireNonNull(stackTrace);
+
 		logger.debug("Marking job " + id + " as error");
 		releaseAllocatedMachines(id);
 
@@ -390,7 +406,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	public void setExecutorExited(String executorId, String logToAppend) {
-		Job job = executorJobId.remove(executorId);
+		requireNonNull(logToAppend);
+		Job job = executorJobId.remove(requireNonNull(executorId));
 		synchronized (jobExecuters) {
 			jobExecuters.remove(executorId);
 		}

@@ -222,7 +222,7 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 					Thread.sleep(1000);
 				}
 			} catch (InterruptedException e) {
-				// Does Nothing
+				Thread.currentThread().interrupt();
 			}
         }
 	}

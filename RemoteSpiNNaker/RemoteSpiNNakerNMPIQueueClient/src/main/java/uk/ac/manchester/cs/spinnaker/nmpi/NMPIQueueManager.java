@@ -161,7 +161,7 @@ public class NMPIQueueManager implements Runnable {
 		try {
 			Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
 		} catch (InterruptedException e1) {
-			// Do Nothing
+			Thread.currentThread().interrupt();
 		}
 	}
 

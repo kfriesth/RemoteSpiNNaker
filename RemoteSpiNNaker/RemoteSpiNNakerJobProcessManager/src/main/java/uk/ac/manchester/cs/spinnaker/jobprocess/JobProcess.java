@@ -17,7 +17,7 @@ public interface JobProcess<P extends JobParameters> {
 	/**
 	 * Executes the job.
 	 *
-	 * @param machineUrl
+	 * @param url
 	 *            The URL to request a machine using (or <tt>null</tt> if
 	 *            machine is given)
 	 * @param machine

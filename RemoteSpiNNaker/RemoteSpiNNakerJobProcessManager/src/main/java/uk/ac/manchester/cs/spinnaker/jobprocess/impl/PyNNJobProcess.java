@@ -1,14 +1,20 @@
 package uk.ac.manchester.cs.spinnaker.jobprocess.impl;
 
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.io.FileUtils.listFiles;
 import static org.apache.commons.io.FilenameUtils.getExtension;
+import static org.apache.commons.io.IOUtils.closeQuietly;
 import static uk.ac.manchester.cs.spinnaker.job.Status.Error;
 import static uk.ac.manchester.cs.spinnaker.job.Status.Finished;
 import static uk.ac.manchester.cs.spinnaker.job.Status.Running;
 import static uk.ac.manchester.cs.spinnaker.utils.Log.log;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -18,25 +24,27 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.filefilter.AbstractFileFilter;
-import org.apache.commons.io.filefilter.TrueFileFilter;
+import org.apache.commons.io.filefilter.IOFileFilter;
 import org.ini4j.ConfigParser;
 
 import uk.ac.manchester.cs.spinnaker.job.Status;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcess;
 import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
-import uk.ac.manchester.cs.spinnaker.jobprocess.ReaderLogWriter;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
+import uk.ac.manchester.cs.spinnaker.utils.ThreadUtils;
 
 /**
  * A process for running PyNN jobs
  */
 public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
+	private static final String SECTION = "Machine";
 	private static final String SUBPROCESS_RUNNER = "python";
 	private static final int FINALIZATION_DELAY = 1000;
 	private static final Set<String> IGNORED_EXTENSIONS = new HashSet<>();
 	private static final Set<String> IGNORED_DIRECTORIES = new HashSet<>();
-	private static final Pattern ARGUMENT_FINDER = Pattern.compile("([^\"]\\S*|\".+?\")\\s*");
+	private static final Pattern ARGUMENT_FINDER = Pattern
+			.compile("([^\"]\\S*|\".+?\")\\s*");
 	static {
 		IGNORED_EXTENSIONS.add("pyc");
 		IGNORED_DIRECTORIES.add("application_generated_data_files");
@@ -50,17 +58,27 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 	ThreadGroup threadGroup;
 
 	private static Set<File> gatherFiles(File directory) {
-		return new LinkedHashSet<>(listFiles(directory,
-				TrueFileFilter.INSTANCE, new AbstractFileFilter() {
-					@Override
-					public boolean accept(File file) {
-						return !IGNORED_DIRECTORIES.contains(file.getName());
-					}
-				}));
+		return new LinkedHashSet<>(listFiles(directory, fileFilter(),
+				directoryFilter()));
 	}
 
-	private boolean isIgnored(File file) {
-		return IGNORED_EXTENSIONS.contains(getExtension(file.getName()));
+	private static IOFileFilter fileFilter() {
+		return new AbstractFileFilter() {
+			@Override
+			public boolean accept(File file) {
+				return !IGNORED_EXTENSIONS
+						.contains(getExtension(file.getName()));
+			}
+		};
+	}
+
+	private static IOFileFilter directoryFilter() {
+		return new AbstractFileFilter() {
+			@Override
+			public boolean accept(File file) {
+				return !IGNORED_DIRECTORIES.contains(file.getName());
+			}
+		};
 	}
 
 	@Override
@@ -78,19 +96,18 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 			if (cfgFile.exists())
 				parser.read(cfgFile);
 
-			if (!parser.hasSection("Machine"))
-				parser.addSection("Machine");
+			if (!parser.hasSection(SECTION))
+				parser.addSection(SECTION);
 			if (machine != null) {
-				parser.set("Machine", "machineName", machine.getMachineName());
-				parser.set("Machine", "version", machine.getVersion());
-				parser.set("Machine", "width", machine.getWidth());
-				parser.set("Machine", "height", machine.getHeight());
+				parser.set(SECTION, "machineName", machine.getMachineName());
+				parser.set(SECTION, "version", machine.getVersion());
+				parser.set(SECTION, "width", machine.getWidth());
+				parser.set(SECTION, "height", machine.getHeight());
 				String bmpDetails = machine.getBmpDetails();
 				if (bmpDetails != null)
-					parser.set("Machine", "bmp_names", bmpDetails);
-			} else {
-				parser.set("Machine", "remote_spinnaker_url", machineUrl);
-			}
+					parser.set(SECTION, "bmp_names", bmpDetails);
+			} else
+				parser.set(SECTION, "remote_spinnaker_url", machineUrl);
 			parser.write(cfgFile);
 
 			// Keep existing files to compare to later
@@ -102,7 +119,7 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 			// Get any output files
 			Set<File> allFiles = gatherFiles(workingDirectory);
 			for (File file : allFiles)
-				if (!existingFiles.contains(file) && !isIgnored(file))
+				if (!existingFiles.contains(file))
 					outputs.add(file);
 
 			// If the exit is an error, mark an error
@@ -137,14 +154,12 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 		Process process = builder.start();
 
 		// Run a thread to gather the log
-		try (ReaderLogWriter logger = new ReaderLogWriter(threadGroup,
+		try (ReaderLogWriter logger = new ReaderLogWriter(
 				process.getInputStream(), logWriter)) {
 			logger.start();
 
 			// Wait for the process to finish
-			int exitValue = process.waitFor();
-			Thread.sleep(FINALIZATION_DELAY);
-			return exitValue;
+			return process.waitFor();
 		}
 	}
 
@@ -166,5 +181,94 @@ public class PyNNJobProcess implements JobProcess<PyNNJobParameters> {
 	@Override
 	public void cleanup() {
 		// Does Nothing
+	}
+
+	class ReaderLogWriter extends Thread implements AutoCloseable {
+		private final BufferedReader reader;
+		private final LogWriter writer;
+
+		private boolean running;
+
+		/**
+		 * Creates a new ReaderLogWriter with another reader.
+		 * 
+		 * @param reader
+		 *            The reader to read from
+		 * @param writer
+		 *            The writer to write to
+		 */
+		public ReaderLogWriter(Reader reader, LogWriter writer) {
+			super(threadGroup, "Reader Log Writer");
+			requireNonNull(reader);
+			if (reader instanceof BufferedReader)
+				this.reader = (BufferedReader) reader;
+			else
+				this.reader = new BufferedReader(reader);
+			this.writer = requireNonNull(writer);
+			setDaemon(true);
+		}
+
+		/**
+		 * Creates a new ReaderLogWriter with an input stream. This will be
+		 * treated as a text stream using the system encoding.
+		 * 
+		 * @param input
+		 *            The input stream to read from.
+		 * @param writer
+		 *            The writer to write to.
+		 */
+		public ReaderLogWriter(InputStream input, LogWriter writer) {
+			this(new InputStreamReader(input), writer);
+		}
+
+		@Override
+		public void run() {
+			try {
+				copyStream();
+			} catch (IOException | RuntimeException e) {
+				return;
+			} finally {
+				synchronized (this) {
+					running = false;
+					notifyAll();
+				}
+			}
+		}
+
+		@Override
+		public void start() {
+			running = true;
+			super.start();
+		}
+
+		private void copyStream() throws IOException {
+			while (!interrupted()) {
+				String line = reader.readLine();
+				if (line == null)
+					return;
+				writer.append(line + "\n");
+			}
+		}
+
+		/**
+		 * Closes the reader/writer
+		 */
+		@Override
+		public void close() {
+			log("Waiting for log writer to exit...");
+
+			synchronized (this) {
+				try {
+					while (running)
+						wait();
+				} catch (InterruptedException e) {
+					// Does Nothing
+				}
+			}
+
+			log("Log writer has exited");
+			closeQuietly(reader);
+			ThreadUtils.sleep(FINALIZATION_DELAY);
+		}
 	}
 }

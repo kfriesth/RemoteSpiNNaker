@@ -64,11 +64,6 @@
             <artifactId>RemoteSpiNNakerNMPIQueueClient</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>RemoteSpiNNakerCollabClient</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <dependency>
             <groupId>org.apache.cxf</groupId>

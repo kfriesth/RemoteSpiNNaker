@@ -10,6 +10,7 @@ import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 import static org.slf4j.LoggerFactory.getLogger;
+import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createBearerClient;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,12 +26,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.output.OutputManager;
+import uk.ac.manchester.cs.spinnaker.output.UnicoreFileClient;
 
 //TODO needs security; Role = OutputHandler
 public class OutputManagerImpl implements OutputManager {
@@ -211,7 +214,7 @@ public class OutputManagerImpl implements OutputManager {
     }
 
 	private void recursivelyUploadFiles(File directory,
-			UnicoreFileManager fileManager, String storageId, String filePath)
+			UnicoreFileClient fileManager, String storageId, String filePath)
 			throws IOException {
 		for (File file : directory.listFiles()) {
 			String uploadFileName = filePath + "/" + file.getName();
@@ -220,7 +223,10 @@ public class OutputManagerImpl implements OutputManager {
 						uploadFileName);
 			else
 				try (FileInputStream input = new FileInputStream(file)) {
-					fileManager.uploadFile(storageId, uploadFileName, input);
+					fileManager.upload(storageId, uploadFileName, input);
+				} catch (WebApplicationException e) {
+					throw new IOException("Error uploading file to "
+							+ storageId + "/" + uploadFileName, e);
 				} catch (FileNotFoundException e) {
 					// Ignore files which vanish.
 				}
@@ -228,13 +234,13 @@ public class OutputManagerImpl implements OutputManager {
 	}
 
     @Override
-    public Response uploadResultsToHPCServer(
-            String projectId, int id, String serverUrl, String storageId,
-            String filePath, String userId, String token) {
+	public Response uploadResultsToHPCServer(String projectId, int id,
+			String serverUrl, String storageId, String filePath, String userId,
+			String token) {
         try {
-			UnicoreFileManager fileManager = new UnicoreFileManager(new URL(
-					serverUrl), userId, token);
-            File projectDirectory = new File(resultsDirectory, projectId);
+			UnicoreFileClient fileClient = createBearerClient(
+					new URL(serverUrl), token, UnicoreFileClient.class);
+			File projectDirectory = new File(resultsDirectory, projectId);
             File idDirectory = new File(projectDirectory, String.valueOf(id));
             if (!idDirectory.canRead()) {
                 logger.debug(idDirectory + " was not found");
@@ -245,7 +251,7 @@ public class OutputManagerImpl implements OutputManager {
 				if (uploadFilePath.endsWith("/"))
 					uploadFilePath = uploadFilePath.substring(0,
 							uploadFilePath.length() - 1);
-				recursivelyUploadFiles(idDirectory, fileManager, storageId,
+				recursivelyUploadFiles(idDirectory, fileClient, storageId,
 						uploadFilePath);
 				return Response.ok().build();
             }

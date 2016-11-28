@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.rest;
+package uk.ac.manchester.cs.spinnaker.rest.utils;
 
 import static org.apache.http.auth.AUTH.PROXY_AUTH_RESP;
 import static org.apache.http.auth.AUTH.WWW_AUTH_RESP;

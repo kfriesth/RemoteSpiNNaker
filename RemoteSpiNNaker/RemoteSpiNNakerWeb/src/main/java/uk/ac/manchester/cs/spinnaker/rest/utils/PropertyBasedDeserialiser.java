@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.rest;
+package uk.ac.manchester.cs.spinnaker.rest.utils;
 
 import java.io.IOException;
 import java.util.HashMap;

@@ -1,7 +1,7 @@
-package uk.ac.manchester.cs.spinnaker.rest.spring;
+package uk.ac.manchester.cs.spinnaker.rest.utils;
 
 import static org.springframework.security.core.context.SecurityContextHolder.getContext;
-import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createBearerClient;
+import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createBearerClient;
 
 import java.net.URL;
 

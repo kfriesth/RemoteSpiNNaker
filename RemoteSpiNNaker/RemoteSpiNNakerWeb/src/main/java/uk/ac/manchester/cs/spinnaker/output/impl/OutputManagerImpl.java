@@ -10,7 +10,7 @@ import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 import static org.slf4j.LoggerFactory.getLogger;
-import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createBearerClient;
+import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createBearerClient;
 
 import java.io.File;
 import java.io.FileInputStream;

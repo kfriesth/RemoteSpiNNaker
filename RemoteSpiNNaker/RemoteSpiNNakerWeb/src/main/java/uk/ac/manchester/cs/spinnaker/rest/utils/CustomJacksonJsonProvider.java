@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.rest;
+package uk.ac.manchester.cs.spinnaker.rest.utils;
 
 import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES;

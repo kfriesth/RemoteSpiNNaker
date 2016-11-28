@@ -2,8 +2,8 @@ package uk.ac.manchester.cs.spinnaker.nmpi;
 
 import static org.joda.time.DateTimeZone.UTC;
 import static org.slf4j.LoggerFactory.getLogger;
-import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createApiKeyClient;
-import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createBasicClient;
+import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createApiKeyClient;
+import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createBasicClient;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -29,7 +29,7 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.nmpi.model.NMPILog;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
-import uk.ac.manchester.cs.spinnaker.rest.CustomJacksonJsonProvider;
+import uk.ac.manchester.cs.spinnaker.rest.utils.CustomJacksonJsonProvider;
 
 /**
  * Manages the NMPI queue, receiving jobs and submitting them to be run

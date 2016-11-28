@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.rest;
+package uk.ac.manchester.cs.spinnaker.job.nmpi;
 
 import org.joda.time.DateTime;
 

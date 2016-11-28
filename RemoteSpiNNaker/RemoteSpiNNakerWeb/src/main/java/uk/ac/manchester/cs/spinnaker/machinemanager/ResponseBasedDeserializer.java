@@ -3,7 +3,7 @@ package uk.ac.manchester.cs.spinnaker.machinemanager;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobsChangedResponse;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Response;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.ReturnResponse;
-import uk.ac.manchester.cs.spinnaker.rest.PropertyBasedDeserialiser;
+import uk.ac.manchester.cs.spinnaker.rest.utils.PropertyBasedDeserialiser;
 
 public class ResponseBasedDeserializer extends
 		PropertyBasedDeserialiser<Response> {

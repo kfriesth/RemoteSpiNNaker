@@ -1,6 +1,6 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
-import static uk.ac.manchester.cs.spinnaker.rest.spring.SpringRestClientUtils.createOIDCClient;
+import static uk.ac.manchester.cs.spinnaker.rest.utils.SpringRestClientUtils.createOIDCClient;
 
 import java.net.URL;
 

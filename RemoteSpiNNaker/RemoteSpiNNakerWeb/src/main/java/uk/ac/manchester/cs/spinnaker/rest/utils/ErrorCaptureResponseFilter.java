@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.rest;
+package uk.ac.manchester.cs.spinnaker.rest.utils;
 
 import static javax.ws.rs.core.Response.Status.Family.CLIENT_ERROR;
 import static javax.ws.rs.core.Response.Status.Family.SERVER_ERROR;

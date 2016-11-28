@@ -26,9 +26,8 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.NMPILog;
-import uk.ac.manchester.cs.spinnaker.nmpi.rest.NMPIQueue;
-import uk.ac.manchester.cs.spinnaker.nmpi.rest.QueueResponseDeserialiser;
+import uk.ac.manchester.cs.spinnaker.model.NMPILog;
+import uk.ac.manchester.cs.spinnaker.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.rest.utils.CustomJacksonJsonProvider;
 
 /**

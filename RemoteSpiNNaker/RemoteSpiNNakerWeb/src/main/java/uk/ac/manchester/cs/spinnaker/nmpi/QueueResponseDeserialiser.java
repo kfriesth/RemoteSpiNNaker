@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.nmpi.rest;
+package uk.ac.manchester.cs.spinnaker.nmpi;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;

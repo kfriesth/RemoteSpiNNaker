@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.output;
+package uk.ac.manchester.cs.spinnaker.rest;
 
 import static javax.ws.rs.core.MediaType.MEDIA_TYPE_WILDCARD;
 

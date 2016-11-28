@@ -7,7 +7,7 @@ import java.net.URL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import uk.ac.manchester.cs.spinnaker.collab.rest.CollabRestService;
+import uk.ac.manchester.cs.spinnaker.rest.CollabRestService;
 
 public class CollabSecurityService {
 	private Logger logger = LoggerFactory.getLogger(getClass());

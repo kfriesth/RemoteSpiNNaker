@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.collab.rest;
+package uk.ac.manchester.cs.spinnaker.rest;
 
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 
@@ -7,8 +7,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 
-import uk.ac.manchester.cs.spinnaker.collab.model.CollabContext;
-import uk.ac.manchester.cs.spinnaker.collab.model.CollabPermissions;
+import uk.ac.manchester.cs.spinnaker.model.CollabContext;
+import uk.ac.manchester.cs.spinnaker.model.CollabPermissions;
 
 @Path("/collab/v0")
 public interface CollabRestService {

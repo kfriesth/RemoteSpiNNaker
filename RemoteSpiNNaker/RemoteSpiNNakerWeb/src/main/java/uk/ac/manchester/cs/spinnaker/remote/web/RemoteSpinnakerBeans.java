@@ -59,8 +59,8 @@ import uk.ac.manchester.cs.spinnaker.machinemanager.FixedMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.machinemanager.SpallocMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
-import uk.ac.manchester.cs.spinnaker.output.OutputManager;
 import uk.ac.manchester.cs.spinnaker.output.impl.OutputManagerImpl;
+import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
 
 @SuppressWarnings("unused")
 @Configuration

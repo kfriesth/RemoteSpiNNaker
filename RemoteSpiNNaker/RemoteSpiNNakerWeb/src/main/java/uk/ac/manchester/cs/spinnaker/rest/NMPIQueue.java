@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.nmpi.rest;
+package uk.ac.manchester.cs.spinnaker.rest;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -10,8 +10,8 @@ import javax.ws.rs.QueryParam;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.APIKeyResponse;
-import uk.ac.manchester.cs.spinnaker.nmpi.model.NMPILog;
+import uk.ac.manchester.cs.spinnaker.model.APIKeyResponse;
+import uk.ac.manchester.cs.spinnaker.model.NMPILog;
 
 @Path("/api/v2")
 public interface NMPIQueue {

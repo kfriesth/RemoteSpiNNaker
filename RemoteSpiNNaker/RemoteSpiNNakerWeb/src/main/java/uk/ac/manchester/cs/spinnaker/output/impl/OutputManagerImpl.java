@@ -32,8 +32,8 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
-import uk.ac.manchester.cs.spinnaker.output.OutputManager;
-import uk.ac.manchester.cs.spinnaker.output.UnicoreFileClient;
+import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
+import uk.ac.manchester.cs.spinnaker.rest.UnicoreFileClient;
 
 //TODO needs security; Role = OutputHandler
 public class OutputManagerImpl implements OutputManager {

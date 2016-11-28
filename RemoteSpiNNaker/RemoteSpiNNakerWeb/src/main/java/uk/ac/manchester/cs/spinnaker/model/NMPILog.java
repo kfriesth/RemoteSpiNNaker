@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.nmpi.model;
+package uk.ac.manchester.cs.spinnaker.model;
 
 public class NMPILog {
     private StringBuilder content;

@@ -37,7 +37,7 @@ import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.MachineManager;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueListener;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
-import uk.ac.manchester.cs.spinnaker.output.OutputManager;
+import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
 
 /**
  * The manager of jobs; synchronises and manages all the ongoing and future

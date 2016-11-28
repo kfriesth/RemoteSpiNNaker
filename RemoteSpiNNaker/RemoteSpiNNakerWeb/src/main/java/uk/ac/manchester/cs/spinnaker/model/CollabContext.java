@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.collab.model;
+package uk.ac.manchester.cs.spinnaker.model;
 
 public class CollabContext {
     private String appId;

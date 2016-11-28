@@ -10,6 +10,7 @@ import static java.util.Objects.requireNonNull;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobManager.JOB_PROCESS_MANAGER_JAR;
+import static uk.ac.manchester.cs.spinnaker.utils.ThreadUtils.sleep;
 
 import java.io.IOException;
 import java.net.URL;
@@ -287,11 +288,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 				throws XenAPIException, XmlRpcException {
 			VmPowerState powerState;
 			do {
-				try {
-					Thread.sleep(VM_POLL_INTERVAL);
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
+				sleep(VM_POLL_INTERVAL);
 				powerState = clonedVm.getPowerState(conn);
 				logger.debug("VM for " + uuid + " is in state " + powerState);
 			} while (powerState != HALTED);

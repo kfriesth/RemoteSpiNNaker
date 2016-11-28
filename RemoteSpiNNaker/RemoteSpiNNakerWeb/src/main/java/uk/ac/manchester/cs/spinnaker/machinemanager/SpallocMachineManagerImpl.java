@@ -9,6 +9,7 @@ import static org.apache.commons.io.IOUtils.closeQuietly;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobState.DESTROYED;
 import static uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobState.READY;
+import static uk.ac.manchester.cs.spinnaker.utils.ThreadUtils.sleep;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -44,6 +45,7 @@ import uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobsChangedRespons
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Machine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Response;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.ReturnResponse;
+import uk.ac.manchester.cs.spinnaker.utils.ThreadUtils;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -216,13 +218,9 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 				if (!done)
 					disconnect();
 			}
-			try {
-				if (!done) {
-					logger.warn("Disconnected from machine server...");
-					Thread.sleep(1000);
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
+			if (!done) {
+				logger.warn("Disconnected from machine server...");
+				sleep(1000);
 			}
         }
 	}
@@ -475,7 +473,7 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 		t.start();
 
 		msg("Machine %s allocated", machine.getMachineName());
-		Thread.sleep(20000);
+		ThreadUtils.sleep(20000);
 		msg("Machine %s is available: %s", machine.getMachineName(),
 				manager.isMachineAvailable(machine));
 		manager.releaseMachine(machine);

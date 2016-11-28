@@ -4,6 +4,7 @@ import static org.joda.time.DateTimeZone.UTC;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createApiKeyClient;
 import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createBasicClient;
+import static uk.ac.manchester.cs.spinnaker.utils.ThreadUtils.sleep;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -29,6 +30,7 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
 import uk.ac.manchester.cs.spinnaker.model.NMPILog;
 import uk.ac.manchester.cs.spinnaker.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.rest.utils.CustomJacksonJsonProvider;
+import uk.ac.manchester.cs.spinnaker.rest.utils.PropertyBasedDeserialiser;
 
 /**
  * Manages the NMPI queue, receiving jobs and submitting them to be run
@@ -94,6 +96,16 @@ public class NMPIQueueManager implements Runnable {
 	public NMPIQueueManager(URL url, String hardware, String username,
 			String password, boolean passwordIsKey) {
 		CustomJacksonJsonProvider provider = new CustomJacksonJsonProvider();
+
+		@SuppressWarnings("serial")
+		class QueueResponseDeserialiser extends
+				PropertyBasedDeserialiser<QueueNextResponse> {
+			public QueueResponseDeserialiser() {
+				super(QueueNextResponse.class);
+				register("id", Job.class);
+				register("warning", QueueEmpty.class);
+			}
+		}
 		provider.addDeserialiser(QueueNextResponse.class,
 				new QueueResponseDeserialiser());
 
@@ -151,45 +163,41 @@ public class NMPIQueueManager implements Runnable {
 				processResponse(response);
 			} catch (Exception e) {
 				logger.error("Error in getting next job", e);
-				snooze();
+				sleep(EMPTY_QUEUE_SLEEP_MS);
 			}
-		}
-	}
-
-	private void snooze() {
-		try {
-			Thread.sleep(EMPTY_QUEUE_SLEEP_MS);
-		} catch (InterruptedException e1) {
-			Thread.currentThread().interrupt();
 		}
 	}
 
 	private void processResponse(QueueNextResponse response)
 			throws MalformedURLException {
-		if (response instanceof QueueEmpty) {
-			snooze();
-		} else if (response instanceof Job) {
-			Job job = (Job) response;
-			synchronized (jobCache) {
-				jobCache.put(job.getId(), job);
+		if (response instanceof QueueEmpty)
+			sleep(EMPTY_QUEUE_SLEEP_MS);
+		else if (response instanceof Job)
+			processResponse((Job) response);
+		else
+			throw new IllegalStateException();
+	}
+
+	private void processResponse(Job job) throws MalformedURLException {
+		synchronized (jobCache) {
+			jobCache.put(job.getId(), job);
+		}
+		logger.debug("Job " + job.getId() + " received");
+		try {
+			for (NMPIQueueListener listener : listeners)
+				listener.addJob(job);
+			logger.debug("Setting job status to queued");
+			job.setTimestampSubmission(job.getTimestampSubmission()
+					.withZoneRetainFields(UTC));
+			job.setTimestampCompletion(null);
+			job.setStatus("queued");
+			logger.debug("Updating job status on server");
+			synchronized (queue) {
+				queue.updateJob(job.getId(), job);
 			}
-			logger.debug("Job " + job.getId() + " received");
-			try {
-				for (NMPIQueueListener listener : listeners)
-					listener.addJob(job);
-				logger.debug("Setting job status to queued");
-				job.setTimestampSubmission(job.getTimestampSubmission()
-						.withZoneRetainFields(UTC));
-				job.setTimestampCompletion(null);
-				job.setStatus("queued");
-				logger.debug("Updating job status on server");
-				synchronized (queue) {
-					queue.updateJob(job.getId(), job);
-				}
-			} catch (IOException e) {
-				logger.error("Error in executing job", e);
-				setJobError(job.getId(), null, null, e, 0, null);
-			}
+		} catch (IOException e) {
+			logger.error("Error in executing job", e);
+			setJobError(job.getId(), null, null, e, 0, null);
 		}
 	}
 

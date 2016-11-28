@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
+package uk.ac.manchester.cs.spinnaker.job_parameters;
 
 import static org.eclipse.jgit.api.Git.cloneRepository;
 
@@ -12,9 +12,6 @@ import org.eclipse.jgit.api.errors.TransportException;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
-import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
-import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
  * A {@link JobParametersFactory} that downloads a PyNN job from git. The git repository

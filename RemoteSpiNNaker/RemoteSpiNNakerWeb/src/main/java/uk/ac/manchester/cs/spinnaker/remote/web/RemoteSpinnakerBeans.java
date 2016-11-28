@@ -148,6 +148,9 @@ public class RemoteSpinnakerBeans {
     @Value("${oidc.discovery.uri}")
     private String oidcDiscoveryUri;
 
+	@Value("${oidc.realm:}")
+	private String realm;
+
     @Value("${baseserver.url}${callback.path}")
     private String oidcRedirectUri;
 
@@ -185,58 +188,51 @@ public class RemoteSpinnakerBeans {
     private boolean restartJobExecutorOnFailure;
 
     //TODO unused
-	// @Autowired
-	public void configureGlobal(AuthenticationManagerBuilder auth)
-			throws Exception {
-		auth.authenticationProvider(clientProvider());
-	}
+    class HbpServices {
+		// @Autowired
+		public void configureGlobal(AuthenticationManagerBuilder auth)
+				throws Exception {
+			auth.authenticationProvider(clientProvider());
+		}
 
-    //TODO unused
-	// @Bean
-	public CollabSecurityService collabSecurityService()
-			throws MalformedURLException {
-		return new CollabSecurityService(new URL(collabServiceUri));
-	}
+		// @Bean
+		public CollabSecurityService collabSecurityService()
+				throws MalformedURLException {
+			return new CollabSecurityService(new URL(collabServiceUri));
+		}
 
-    //TODO unused
-	// @Bean
-	public OidcClient hbpAuthenticationClient() {
-		OidcClient oidcClient = new OidcClient();
-		oidcClient.setClientID(oidcClientId);
-		oidcClient.setSecret(oidcSecret);
-		oidcClient.setDiscoveryURI(oidcDiscoveryUri);
-		oidcClient.setScope("openid profile hbp.collab");
-		oidcClient.setPreferredJwsAlgorithm(RS256);
-		return oidcClient;
-	}
+		// @Bean
+		public OidcClient hbpAuthenticationClient() {
+			OidcClient oidcClient = new OidcClient();
+			oidcClient.setClientID(oidcClientId);
+			oidcClient.setSecret(oidcSecret);
+			oidcClient.setDiscoveryURI(oidcDiscoveryUri);
+			oidcClient.setScope("openid profile hbp.collab");
+			oidcClient.setPreferredJwsAlgorithm(RS256);
+			return oidcClient;
+		}
 
-	@Value("${oidc.realm:}")
-	private String realm;
+		// @Bean
+		public BearerOidcClient hbpBearerClient() throws ParseException,
+				MalformedURLException, IOException {
+			return new BearerOidcClient(oidcDiscoveryUri, realm);
+		}
 
-	//TODO unused
-	// @Bean
-	public BearerOidcClient hbpBearerClient() throws ParseException,
-			MalformedURLException, IOException {
-		BearerOidcClient client = new BearerOidcClient(oidcDiscoveryUri, realm);
-		return client;
-	}
+		// @Bean
+		public Clients clients() throws ParseException, MalformedURLException,
+				IOException {
+			return new Clients(oidcRedirectUri, hbpAuthenticationClient(),
+					hbpBearerClient());
+		}
 
-    //TODO unused
-	// @Bean
-	public Clients clients() throws ParseException, MalformedURLException,
-			IOException {
-		return new Clients(oidcRedirectUri, hbpAuthenticationClient(),
-				hbpBearerClient());
-	}
-
-    //TODO unused
-	// @Bean
-	public ClientAuthenticationProvider clientProvider() throws ParseException,
-			MalformedURLException, IOException {
-		ClientAuthenticationProvider provider = new ClientAuthenticationProvider();
-		provider.setClients(clients());
-		return provider;
-	}
+		// @Bean
+		public ClientAuthenticationProvider clientProvider()
+				throws ParseException, MalformedURLException, IOException {
+			ClientAuthenticationProvider provider = new ClientAuthenticationProvider();
+			provider.setClients(clients());
+			return provider;
+		}
+    }
 
     //TODO unused
 //    @Configuration

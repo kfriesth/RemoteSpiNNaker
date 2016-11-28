@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
+package uk.ac.manchester.cs.spinnaker.job_parameters;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -9,9 +9,6 @@ import java.io.UnsupportedEncodingException;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
-import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
-import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
  * A {@link JobParametersFactory} that uses the <tt>experimentDescription</tt>

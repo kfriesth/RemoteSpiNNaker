@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.job_parameters.impl;
+package uk.ac.manchester.cs.spinnaker.job_parameters;
 
 import static org.rauschig.jarchivelib.ArchiverFactory.createArchiver;
 import static org.rauschig.jarchivelib.CompressionType.BZIP2;
@@ -18,9 +18,6 @@ import org.rauschig.jarchivelib.CompressionType;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
-import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
-import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
 
 /**
  * A {@link JobParametersFactory} that downloads a PyNN job as a zip or tar.gz

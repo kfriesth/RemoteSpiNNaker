@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.jobprocess.impl;
+package uk.ac.manchester.cs.spinnaker.jobprocess;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.io.FileUtils.listFiles;
@@ -29,8 +29,6 @@ import org.ini4j.ConfigParser;
 
 import uk.ac.manchester.cs.spinnaker.job.Status;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
-import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcess;
-import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.utils.ThreadUtils;
 

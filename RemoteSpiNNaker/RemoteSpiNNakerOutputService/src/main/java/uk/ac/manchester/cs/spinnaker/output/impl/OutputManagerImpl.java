@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.output.OutputManager;
-import uk.ac.manchester.cs.spinnaker.unicore.UnicoreFileManager;
 
 //TODO needs security; Role = OutputHandler
 public class OutputManagerImpl implements OutputManager {

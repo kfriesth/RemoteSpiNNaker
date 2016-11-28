@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.unicore;
+package uk.ac.manchester.cs.spinnaker.output.impl;
 
 import static uk.ac.manchester.cs.spinnaker.rest.RestClientUtils.createBearerClient;
 
@@ -10,7 +10,7 @@ import java.security.NoSuchAlgorithmException;
 
 import javax.ws.rs.WebApplicationException;
 
-import uk.ac.manchester.cs.spinnaker.unicore.rest.UnicoreFileClient;
+import uk.ac.manchester.cs.spinnaker.output.UnicoreFileClient;
 
 /**
  * A manager for the UNICORE storage REST API

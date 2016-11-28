@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.unicore.rest;
+package uk.ac.manchester.cs.spinnaker.output;
 
 import java.io.InputStream;
 

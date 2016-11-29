@@ -24,7 +24,7 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
  * file. The URL must refer to a world-readable URL or the credentials must be
  * present in the URL.
  */
-public class ZipPyNNJobParametersFactory implements JobParametersFactory {
+public class ZipPyNNJobParametersFactory extends JobParametersFactory {
 	@Override
 	public JobParameters getJobParameters(Job job, File workingDirectory)
 			throws UnsupportedJobException, JobParametersFactoryException {

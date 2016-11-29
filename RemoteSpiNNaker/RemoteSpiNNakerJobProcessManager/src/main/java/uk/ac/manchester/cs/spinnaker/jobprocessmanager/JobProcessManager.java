@@ -2,10 +2,10 @@ package uk.ac.manchester.cs.spinnaker.jobprocessmanager;
 
 import static java.lang.String.format;
 import static java.lang.System.exit;
-import static javax.ws.rs.core.HttpHeaders.AUTHORIZATION;
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.io.FileUtils.deleteQuietly;
 import static org.eclipse.jgit.util.FileUtils.createTempDir;
-import static org.jboss.resteasy.util.Base64.encodeBytes;
+import static uk.ac.manchester.cs.spinnaker.jobprocessmanager.RemoteSpiNNakerAPI.createJobManager;
 import static uk.ac.manchester.cs.spinnaker.utils.FileDownloader.downloadFile;
 import static uk.ac.manchester.cs.spinnaker.utils.Log.log;
 
@@ -18,18 +18,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.swing.Timer;
-import javax.ws.rs.client.ClientRequestContext;
-import javax.ws.rs.client.ClientRequestFilter;
-
-import org.jboss.resteasy.client.jaxrs.ResteasyClient;
-import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
@@ -38,85 +32,28 @@ import uk.ac.manchester.cs.spinnaker.job.Status;
 import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
-import uk.ac.manchester.cs.spinnaker.job_parameters.DirectPyNNJobParametersFactory;
-import uk.ac.manchester.cs.spinnaker.job_parameters.GitPyNNJobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.job_parameters.JobParametersFactoryException;
-import uk.ac.manchester.cs.spinnaker.job_parameters.UnsupportedJobException;
-import uk.ac.manchester.cs.spinnaker.job_parameters.ZipPyNNJobParametersFactory;
 import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcess;
 import uk.ac.manchester.cs.spinnaker.jobprocess.JobProcessFactory;
 import uk.ac.manchester.cs.spinnaker.jobprocess.LogWriter;
 import uk.ac.manchester.cs.spinnaker.jobprocess.PyNNJobProcess;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
-
 /**
  * Manages a running job process. This is run as a separate process from the
  * command line, and it assumes input is passed via {@link System#in}.
  */
 public class JobProcessManager {
-	/** The factories for converting jobs into parameters. */
-	private static final JobParametersFactory[] JOB_PARAMETER_FACTORIES = new JobParametersFactory[] {
-			new GitPyNNJobParametersFactory(),
-			new ZipPyNNJobParametersFactory(),
-			new DirectPyNNJobParametersFactory() };
+	private static final int UPDATE_INTERVAL = 500;
 
 	/** The factory for converting parameters into processes. */
 	private static final JobProcessFactory jobProcessFactory = new JobProcessFactory(
 			"JobProcess");
-	private static final Charset UTF8 = Charset.forName("UTF-8");
 	static {
 		jobProcessFactory.addMapping(PyNNJobParameters.class,
 				PyNNJobProcess.class);
 	}
-
-	/** How to talk to the main website. */
-	private static JobManagerInterface createJobManager(String url,
-			final String authToken) {
-		ResteasyClientBuilder builder = new ResteasyClientBuilder();
-		// TODO Add https trust store, etc.
-		ResteasyClient client = builder.build();
-		client.register(new JacksonJsonProvider());
-		if (authToken != null)
-			client.register(new ClientRequestFilter() {
-				@Override
-				public void filter(ClientRequestContext requestContext)
-						throws IOException {
-					requestContext.getHeaders().add(AUTHORIZATION,
-							encodeBytes(authToken.getBytes(UTF8)));
-				}
-			});
-		return client.target(url).proxy(JobManagerInterface.class);
-	}
-
-	abstract static class JobManagerLogWriter implements LogWriter {
-		protected final StringBuilder cached = new StringBuilder();
-
-		protected boolean isPopulated() {
-			return cached.length() > 0;
-		}
-
-		public synchronized String getLog() {
-			return cached.toString();
-		}
-
-		void stop() {
-		}
-	}
-
-	static class SimpleJobManagerLogWriter extends JobManagerLogWriter {
-		@Override
-		public void append(String logMsg) {
-			log("Process Output: " + logMsg);
-			synchronized (this) {
-				cached.append(logMsg);
-			}
-		}
-	}
-
-	private static final int UPDATE_INTERVAL = 500;
 
 	class UploadingJobManagerLogWriter extends JobManagerLogWriter {
 		private final Timer sendTimer;
@@ -172,21 +109,18 @@ public class JobProcessManager {
 	private Job job;
 	private String projectId;
 
-	JobProcessManager(String serverUrl, boolean deleteOnExit, boolean isLocal,
-			String executerId, boolean liveUploadOutput,
-			boolean requestMachine, String authToken) throws IOException {
-		this.serverUrl = serverUrl;
+	public JobProcessManager(String serverUrl, boolean deleteOnExit,
+			boolean isLocal, String executerId, boolean liveUploadOutput,
+			boolean requestMachine, String authToken) {
+		this.serverUrl = requireNonNull(serverUrl,
+				"--serverUrl must be specified");
+		this.executerId = requireNonNull(executerId,
+				"--executerId must be specified");
 		this.deleteOnExit = deleteOnExit;
 		this.isLocal = isLocal;
-		this.executerId = executerId;
 		this.liveUploadOutput = liveUploadOutput;
 		this.requestMachine = requestMachine;
 		this.authToken = authToken;
-
-		if (serverUrl == null)
-			throw new IOException("--serverUrl must be specified");
-		else if (executerId == null)
-			throw new IOException("--executerId must be specified");
 	}
 
 	public void runJob() {
@@ -230,7 +164,7 @@ public class JobProcessManager {
 			log(error);
 			return;
 		}
-		
+
 		try {
 			String log = "";
 			if (logWriter != null) {
@@ -257,7 +191,7 @@ public class JobProcessManager {
 		boolean liveUploadOutput = false;
 		boolean requestMachine = false;
 		String authToken = null;
-		
+
 		for (int i = 0; i < args.length; i++)
 			switch (args[i]) {
 			case "--serverUrl":
@@ -287,9 +221,9 @@ public class JobProcessManager {
 			default:
 				throw new IllegalArgumentException("unknown option: " + args[i]);
 			}
-		
-		new JobProcessManager(serverUrl, deleteOnExit, isLocal,
-				executerId, liveUploadOutput, requestMachine, authToken).runJob();
+
+		new JobProcessManager(serverUrl, deleteOnExit, isLocal, executerId,
+				liveUploadOutput, requestMachine, authToken).runJob();
 		exit(0);
 	}
 
@@ -317,43 +251,24 @@ public class JobProcessManager {
 	 */
 	private JobParameters getJobParameters(File workingDirectory)
 			throws IOException {
-		JobParameters parameters = null;
 		Map<String, JobParametersFactoryException> errors = new HashMap<>();
+		JobParameters parameters = JobParametersFactory.getJobParameters(job,
+				workingDirectory, errors);
 
-		for (JobParametersFactory factory : JOB_PARAMETER_FACTORIES)
-			try {
-				parameters = factory.getJobParameters(job, workingDirectory);
-				if (parameters != null)
-					break;
-			} catch (UnsupportedJobException e) {
-				// Do Nothing
-			} catch (JobParametersFactoryException e) {
-				errors.put(factory.getClass().getSimpleName(), e);
-			}
-
-		if (parameters != null) {
-			// Get any requested input files
-			if (job.getInputData() != null)
-				for (DataItem input : job.getInputData())
-					downloadFile(input.getUrl(), workingDirectory, null);
-
-			return parameters;
+		if (parameters == null) {
+			if (!errors.isEmpty())
+				throw new JobErrorsException(errors);
+			// Miscellaneous other error
+			throw new IOException(
+					"The job did not appear to be supported on this system");
 		}
 
-		if (!errors.isEmpty()) {
-			StringBuilder problemBuilder = new StringBuilder();
-			problemBuilder.append("The job type was recognised by at least"
-					+ " one factory, but could not be decoded.  The errors "
-					+ " are as follows:\n");
-			for (String key : errors.keySet())
-				problemBuilder.append(key).append(": ")
-						.append(errors.get(key).getMessage()).append('\n');
-			throw new IOException(problemBuilder.toString());
-		}
+		// Get any requested input files
+		if (job.getInputData() != null)
+			for (DataItem input : job.getInputData())
+				downloadFile(input.getUrl(), workingDirectory, null);
 
-		// Miscellaneous other error
-		throw new IOException(
-				"The job did not appear to be supported on this system");
+		return parameters;
 	}
 
 	private JobManagerLogWriter getLogWriter() {
@@ -362,11 +277,11 @@ public class JobProcessManager {
 		return new UploadingJobManagerLogWriter();
 	}
 
-	private void processOutcome(File workingDirectory,
-			JobProcess<JobParameters> process, String log) throws IOException,
-			FileNotFoundException {
+	private void processOutcome(File workingDirectory, JobProcess<?> process,
+			String log) throws IOException, FileNotFoundException {
 		Status status = process.getStatus();
 		log("Process has finished with status " + status);
+
 		List<File> outputs = process.getOutputs();
 		List<String> outputsAsStrings = new ArrayList<>();
 		for (File output : outputs)
@@ -377,6 +292,7 @@ public class JobProcessManager {
 					jobManager.addOutput(projectId, job.getId(),
 							output.getName(), input);
 				}
+
 		switch (status) {
 		case Error:
 			Throwable error = process.getError();
@@ -394,7 +310,7 @@ public class JobProcessManager {
 				deleteQuietly(workingDirectory);
 			break;
 		default:
-			throw new RuntimeException("Unknown status returned!");
+			throw new IllegalStateException("Unknown status returned!");
 		}
 	}
 }
@@ -416,5 +332,49 @@ class Machine {
 		if (machine != null)
 			return machine.toString();
 		return url;
+	}
+}
+
+abstract class JobManagerLogWriter implements LogWriter {
+	protected final StringBuilder cached = new StringBuilder();
+
+	protected boolean isPopulated() {
+		return cached.length() > 0;
+	}
+
+	public synchronized String getLog() {
+		return cached.toString();
+	}
+
+	void stop() {
+	}
+}
+
+class SimpleJobManagerLogWriter extends JobManagerLogWriter {
+	@Override
+	public void append(String logMsg) {
+		log("Process Output: " + logMsg);
+		synchronized (this) {
+			cached.append(logMsg);
+		}
+	}
+}
+
+@SuppressWarnings("serial")
+class JobErrorsException extends IOException {
+	private static final String MAIN_MSG = "The job type was recognised"
+			+ " by at least one factory, but could not be decoded.  The"
+			+ " errors  are as follows:\n";
+
+	private static String buildMessage(Map<String, ? extends Exception> errors) {
+		StringBuilder problemBuilder = new StringBuilder(MAIN_MSG);
+		for (String key : errors.keySet())
+			problemBuilder.append(key).append(": ")
+					.append(errors.get(key).getMessage()).append('\n');
+		return problemBuilder.toString();
+	}
+
+	JobErrorsException(Map<String, JobParametersFactoryException> errors) {
+		super(buildMessage(errors));
 	}
 }

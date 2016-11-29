@@ -41,39 +41,18 @@ public class NMPIQueueManager implements Runnable {
 	 */
 	private static final int EMPTY_QUEUE_SLEEP_MS = 10000;
 
-	/**
-	 * The queue to get jobs from
-	 */
+	/** The queue to get jobs from */
 	private NMPIQueue queue;
-
-	/**
-	 * Marker to indicate if the manager is done or not
-	 */
+	/** Marker to indicate if the manager is done or not */
 	private boolean done = false;
-
-	/**
-	 * The hardware identifier for the queue
-	 */
+	/** The hardware identifier for the queue */
 	private final String hardware;
-
-	/**
-	 * The set of listeners for this queue
-	 */
+	/** The set of listeners for this queue */
 	private final Set<NMPIQueueListener> listeners = new HashSet<>();
-
-	/**
-	 * A cache of jobs that have been received
-	 */
+	/** A cache of jobs that have been received */
 	private final Map<Integer, Job> jobCache = new HashMap<>();
-
-	/**
-	 * The log of the job so far
-	 */
+	/** The log of the job so far */
 	private final Map<Integer, NMPILog> jobLog = new HashMap<>();
-
-	/**
-	 * The logger
-	 */
 	private Logger logger = getLogger(getClass());
 
 	/**
@@ -132,9 +111,7 @@ public class NMPIQueueManager implements Runnable {
 		synchronized (jobCache) {
 			Job job = jobCache.get(id);
 			if (job == null) {
-				synchronized (queue) {
-					job = queue.getJob(id);
-				}
+				job = queue.getJob(id);
 				jobCache.put(id, job);
 			}
 			return job;
@@ -156,11 +133,7 @@ public class NMPIQueueManager implements Runnable {
 		while (!done) {
 			try {
 				// logger.debug("Getting next job");
-				QueueNextResponse response;
-				synchronized (queue) {
-					response = queue.getNextJob(hardware);
-				}
-				processResponse(response);
+				processResponse(queue.getNextJob(hardware));
 			} catch (Exception e) {
 				logger.error("Error in getting next job", e);
 				sleep(EMPTY_QUEUE_SLEEP_MS);
@@ -192,9 +165,7 @@ public class NMPIQueueManager implements Runnable {
 			job.setTimestampCompletion(null);
 			job.setStatus("queued");
 			logger.debug("Updating job status on server");
-			synchronized (queue) {
-				queue.updateJob(job.getId(), job);
-			}
+			queue.updateJob(job.getId(), job);
 		} catch (IOException e) {
 			logger.error("Error in executing job", e);
 			setJobError(job.getId(), null, null, e, 0, null);
@@ -217,9 +188,7 @@ public class NMPIQueueManager implements Runnable {
 		}
 		existingLog.appendContent(logToAppend);
 		logger.debug("Job " + id + " log is being updated");
-		synchronized (queue) {
-			queue.updateLog(id, existingLog);
-		}
+		queue.updateLog(id, existingLog);
 	}
 
 	public void setJobRunning(int id) {
@@ -227,9 +196,7 @@ public class NMPIQueueManager implements Runnable {
 		Job job = getJob(id);
 		job.setStatus("running");
 		logger.debug("Updating job status on server");
-		synchronized (queue) {
-			queue.updateJob(id, job);
-		}
+		queue.updateJob(id, job);
 	}
 
 	/**
@@ -262,9 +229,7 @@ public class NMPIQueueManager implements Runnable {
 		// job.setProvenance(provenance);
 
 		logger.debug("Updating job status on server");
-		synchronized (queue) {
-			queue.updateJob(id, job);
-		}
+		queue.updateJob(id, job);
 	}
 
 	/**
@@ -306,9 +271,7 @@ public class NMPIQueueManager implements Runnable {
 		// job.setProvenance(provenance);
 
 		logger.debug("Updating job on server");
-		synchronized (queue) {
-			queue.updateJob(id, job);
-		}
+		queue.updateJob(id, job);
 	}
 
 	/**

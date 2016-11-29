@@ -14,7 +14,7 @@ import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
  * A {@link JobParametersFactory} that uses the <tt>experimentDescription</tt>
  * itself as a PyNN script.
  */
-public class DirectPyNNJobParametersFactory extends JobParametersFactory {
+class DirectPyNNJobParametersFactory extends JobParametersFactory {
 	private static final String ENCODING = "UTF-8";
 
 	@Override

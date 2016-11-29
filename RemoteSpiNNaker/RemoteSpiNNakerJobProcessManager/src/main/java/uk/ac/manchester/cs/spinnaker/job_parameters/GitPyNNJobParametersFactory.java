@@ -14,10 +14,11 @@ import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 
 /**
- * A {@link JobParametersFactory} that downloads a PyNN job from git. The git repository
- * must be world-readable, or sufficient credentials must be present in the URL.
+ * A {@link JobParametersFactory} that downloads a PyNN job from git. The git
+ * repository must be world-readable, or sufficient credentials must be present
+ * in the URL.
  */
-public class GitPyNNJobParametersFactory extends JobParametersFactory {
+class GitPyNNJobParametersFactory extends JobParametersFactory {
 	@Override
 	public JobParameters getJobParameters(Job job, File workingDirectory)
 			throws UnsupportedJobException, JobParametersFactoryException {

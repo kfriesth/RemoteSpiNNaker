@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.rest;
 
 import static javax.ws.rs.core.MediaType.MEDIA_TYPE_WILDCARD;
+import static javax.ws.rs.core.MediaType.TEXT_PLAIN;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,6 +66,7 @@ public interface OutputManager {
 			@QueryParam("download") @DefaultValue("true") boolean download);
 
     @POST
+    @Produces(TEXT_PLAIN)
     @Path("{projectId}/{id}/uploadToHPC")
     // TODO: Enable authentication based on collab id
     //@PreAuthorize("@collabSecurityService.canWrite(#projectId)")

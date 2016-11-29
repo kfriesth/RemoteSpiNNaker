@@ -42,58 +42,59 @@ public class OutputManagerImpl implements OutputManager {
     private File resultsDirectory;
     private URL baseServerUrl;
     private long timeToKeepResults;
-    private final Map<File, LockToken> synchronizers = new HashMap<>();
+    private final Map<File, JobLock.Token> synchronizers = new HashMap<>();
     private Logger logger = getLogger(getClass());
 
-    private static class LockToken {
-        private boolean locked = true;
-        private boolean waiting = false;
-
-        private synchronized void waitForUnlock() {
-            waiting = true;
-
-            // Wait until unlocked
-            while (locked) {
-                try {
-                    wait();
-                } catch (InterruptedException e) {
-                    // Do Nothing
-                }
-            }
-
-            // Now lock again
-            locked = true;
-            waiting = false;
-        }
-
-        private synchronized boolean unlock() {
-            locked = false;
-            notifyAll();
-            return waiting;
-        }
-    }
-    
     private class JobLock implements AutoCloseable {
+    	private class Token {
+    		private boolean locked = true;
+    		private boolean waiting = false;
+    		
+    		private synchronized void waitForUnlock() {
+    			waiting = true;
+    			
+    			// Wait until unlocked
+    			while (locked) {
+    				try {
+    					wait();
+    				} catch (InterruptedException e) {
+    					// Do Nothing
+    				}
+    			}
+    			
+    			// Now lock again
+    			locked = true;
+    			waiting = false;
+    		}
+    		
+    		private synchronized boolean unlock() {
+    			locked = false;
+    			notifyAll();
+    			return waiting;
+    		}
+    	}
+    	
     	private File dir;
     	JobLock(File dir) {
     		this.dir = dir;
 
-    		LockToken lock = null;
+    		Token lock;
     		synchronized (synchronizers) {
-				if (!synchronizers.containsKey(dir))
-					synchronizers.put(dir, new LockToken());
-				else
-					lock = synchronizers.get(dir);
+				if (!synchronizers.containsKey(dir)){
+					// Constructed pre-locked
+					synchronizers.put(dir, new Token());
+					return;
+				}
+				lock = synchronizers.get(dir);
     		}
 
-			if (lock != null)
-				lock.waitForUnlock();
+    		lock.waitForUnlock();
     	}
     	
     	@Override
     	public void close() {
     		synchronized (synchronizers) {
-    			LockToken lock = synchronizers.get(dir);
+    			Token lock = synchronizers.get(dir);
     			if (!lock.unlock())
     				synchronizers.remove(dir);
     		}
@@ -115,6 +116,15 @@ public class OutputManagerImpl implements OutputManager {
 		}, 0, 1, DAYS);
 	}
 
+	private File getProjectDirectory(String projectId) {
+		if (projectId == null || projectId.isEmpty() || projectId.endsWith("/"))
+			throw new IllegalArgumentException("bad projectId");
+		String name = new File(projectId).getName();
+		if (name.equals(".") || name.equals("..") || name.isEmpty())
+			throw new IllegalArgumentException("bad projectId");
+		return new File(resultsDirectory, name);
+	}
+
     @Override
 	public List<DataItem> addOutputs(String projectId, int id,
 			File baseDirectory, Collection<File> outputs) throws IOException {
@@ -123,7 +133,7 @@ public class OutputManagerImpl implements OutputManager {
 
 		String pId = new File(projectId).getName();
 		int pathStart = baseDirectory.getAbsolutePath().length();
-		File projectDirectory = new File(resultsDirectory, pId);
+		File projectDirectory = getProjectDirectory(projectId);
 		File idDirectory = new File(projectDirectory, String.valueOf(id));
 
 		try (JobLock op = new JobLock(idDirectory)) {
@@ -199,37 +209,48 @@ public class OutputManagerImpl implements OutputManager {
 	@Override
 	public Response getResultFile(String projectId, int id, String filename,
 			boolean download) {
+    	// TODO projectId and id? What's going on? 
 		logger.debug("Retrieving " + filename + " from " + projectId + "/" + id);
-		File projectDirectory = new File(resultsDirectory, projectId);
+		File projectDirectory = getProjectDirectory(projectId);
 		File idDirectory = new File(projectDirectory, String.valueOf(id));
 		return getResultFile(idDirectory, filename, download);
 	}
 
     @Override
     public Response getResultFile(int id, String filename, boolean download) {
+    	// TODO projectId and NO id? What's going on? 
         logger.debug(
             "Retrieving " + filename + " from " + id);
-        File idDirectory = new File(resultsDirectory, String.valueOf(id));
+        File idDirectory = getProjectDirectory(String.valueOf(id));
         return getResultFile(idDirectory, filename, download);
     }
 
 	private void recursivelyUploadFiles(File directory,
 			UnicoreFileClient fileManager, String storageId, String filePath)
 			throws IOException {
-		for (File file : directory.listFiles()) {
+		File[] files = directory.listFiles();
+		if (files == null)
+			return;
+		for (File file : files) {
+			if (file.getName().equals(".") || file.getName().equals("..")
+					|| file.getName().isEmpty())
+				continue;
 			String uploadFileName = filePath + "/" + file.getName();
-			if (file.isDirectory())
+			if (file.isDirectory()) {
 				recursivelyUploadFiles(file, fileManager, storageId,
 						uploadFileName);
-			else
-				try (FileInputStream input = new FileInputStream(file)) {
-					fileManager.upload(storageId, uploadFileName, input);
-				} catch (WebApplicationException e) {
-					throw new IOException("Error uploading file to "
-							+ storageId + "/" + uploadFileName, e);
-				} catch (FileNotFoundException e) {
-					// Ignore files which vanish.
-				}
+				continue;
+			}
+			if (!file.isFile())
+				continue;
+			try (FileInputStream input = new FileInputStream(file)) {
+				fileManager.upload(storageId, uploadFileName, input);
+			} catch (WebApplicationException e) {
+				throw new IOException("Error uploading file to " + storageId
+						+ "/" + uploadFileName, e);
+			} catch (FileNotFoundException e) {
+				// Ignore files which vanish.
+			}
 		}
 	}
 
@@ -237,40 +258,36 @@ public class OutputManagerImpl implements OutputManager {
 	public Response uploadResultsToHPCServer(String projectId, int id,
 			String serverUrl, String storageId, String filePath, String userId,
 			String token) {
+    	// TODO projectId and id? What's going on? 
+		File idDirectory = new File(getProjectDirectory(projectId),
+				String.valueOf(id));
+    	if (!idDirectory.canRead()) {
+    		logger.debug(idDirectory + " was not found");
+    		return Response.status(NOT_FOUND).build();
+    	}
+    	
         try {
 			UnicoreFileClient fileClient = createBearerClient(
 					new URL(serverUrl), token, UnicoreFileClient.class);
-			File projectDirectory = new File(resultsDirectory, projectId);
-            File idDirectory = new File(projectDirectory, String.valueOf(id));
-            if (!idDirectory.canRead()) {
-                logger.debug(idDirectory + " was not found");
-                return Response.status(NOT_FOUND).build();
-            }
 			try (JobLock op = new JobLock(idDirectory)) {
-				String uploadFilePath = filePath;
-				if (uploadFilePath.endsWith("/"))
-					uploadFilePath = uploadFilePath.substring(0,
-							uploadFilePath.length() - 1);
 				recursivelyUploadFiles(idDirectory, fileClient, storageId,
-						uploadFilePath);
-				return Response.ok().build();
-            }
+						filePath.replaceAll("/+$", ""));
+			}
 		} catch (MalformedURLException e) {
 			logger.error("bad user-supplied URL", e);
 			return Response.status(BAD_REQUEST)
 					.entity("The URL specified was malformed").build();
-		} catch (IOException e) {
+		} catch (Throwable e) {
 			logger.error("failure in upload", e);
 			return Response.status(INTERNAL_SERVER_ERROR)
 					.entity("General error reading or uploading a file")
 					.build();
-		} catch (Throwable e) {
-			logger.error("general failure in upload", e);
-			return Response.status(INTERNAL_SERVER_ERROR).build();
 		}
+
+        return Response.ok().entity("ok").build();
 	}
 
-    private void removeDirectory(File directory) {
+	private void removeDirectory(File directory) {
         for (File file : directory.listFiles()) {
             if (file.isDirectory())
                 removeDirectory(file);

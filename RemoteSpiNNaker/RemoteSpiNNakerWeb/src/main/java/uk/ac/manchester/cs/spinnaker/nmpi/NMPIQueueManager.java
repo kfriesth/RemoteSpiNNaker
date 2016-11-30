@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
@@ -222,11 +221,9 @@ public class NMPIQueueManager implements Runnable {
 		Job job = getJob(id);
 		job.setStatus("finished");
 		job.setOutputData(outputs);
-		job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
+		job.setTimestampCompletion(new DateTime(UTC));
 		job.setResourceUsage(resourceUsage);
-
-		// TODO: Make provenance work
-		// job.setProvenance(provenance);
+		job.setProvenance(provenance);
 
 		logger.debug("Updating job status on server");
 		queue.updateJob(id, job);
@@ -263,12 +260,10 @@ public class NMPIQueueManager implements Runnable {
 
 		Job job = getJob(id);
 		job.setStatus("error");
-		job.setTimestampCompletion(new DateTime(DateTimeZone.UTC));
+		job.setTimestampCompletion(new DateTime(UTC));
 		job.setOutputData(outputs);
 		job.setResourceUsage(resourceUsage);
-
-		// TODO: Make provenance work
-		// job.setProvenance(provenance);
+		job.setProvenance(provenance);
 
 		logger.debug("Updating job on server");
 		queue.updateJob(id, job);

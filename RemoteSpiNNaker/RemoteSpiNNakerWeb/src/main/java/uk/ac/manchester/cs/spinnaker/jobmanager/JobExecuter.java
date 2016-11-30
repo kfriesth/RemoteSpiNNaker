@@ -1,10 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
-import java.io.IOException;
-
 /**
  * Executes jobs in an external process
  *
+ * @see LocalJobExecuterFactory.Executer
+ * @see XenVMExecuterFactory.Executer
  */
 public interface JobExecuter {
 	/**
@@ -12,13 +12,11 @@ public interface JobExecuter {
 	 * 
 	 * @return The id
 	 */
-	public String getExecuterId();
+	String getExecuterId();
 
 	/**
-	 * Starts the external job
-	 * 
-	 * @throws IOException
-	 *             If there is an error starting the job
+	 * Starts the external job. Expected to launch a thread and/or process
+	 * immediately.
 	 */
-	public void startExecuter();
+	void startExecuter();
 }

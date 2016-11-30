@@ -178,9 +178,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		logger.info("Running " + id + " on " + machine.getMachineName());
 		long resourceUsage = (long) ((runTime / 1000.0) * quotaNCores);
 		logger.info("Resource usage " + resourceUsage);
-
-		jobResourceUsage.put(id, resourceUsage);
-		jobNCores.put(id, quotaNCores);
+		synchronized (jobResourceUsage) {
+			jobResourceUsage.put(id, resourceUsage);
+			jobNCores.put(id, quotaNCores);
+		}
 
 		return machine;
 	}
@@ -207,8 +208,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	public void extendJobMachineLease(int id, double runTime) {
 		// TODO Check quota that the lease can be extended
 
-		long usage = (long) (jobNCores.get(id) * (runTime / 1000.0));
-		jobResourceUsage.put(id, usage);
+		long usage;
+		synchronized (jobResourceUsage) {
+			usage = (long) (jobNCores.get(id) * (runTime / 1000.0));
+			jobResourceUsage.put(id, usage);
+		}
 		logger.info("Usage for " + id + " now " + usage);
 	}
 
@@ -309,13 +313,34 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	@Override
 	public void addProvenance(int id, String item, String value) {
-		if (!jobProvenance.containsKey(id))
-			jobProvenance.put(id, new HashMap<String, String>());
-		jobProvenance.get(id).put(requireNonNull(item), requireNonNull(value));
+		synchronized (jobProvenance) {
+			if (!jobProvenance.containsKey(id))
+				jobProvenance.put(id, new HashMap<String, String>());
+			jobProvenance.get(id).put(requireNonNull(item),
+					requireNonNull(value));
+		}
 	}
 
 	private Map<String, String> getProvenance(int id) {
-		return jobProvenance.remove(id);
+		Map<String, String> prov;
+		synchronized (jobProvenance) {
+			prov = jobProvenance.remove(id);
+		}
+		if (prov != null && prov.isEmpty())
+			prov = null;
+		return prov;
+	}
+
+	private long getResourceUsage(int id) {
+		long resourceUsage = 0;
+		synchronized (jobResourceUsage) {
+			Long ru = jobResourceUsage.remove(id);
+			if (ru != null) {
+				resourceUsage = ru;
+				jobNCores.remove(id);
+			}
+		}
+		return resourceUsage;
 	}
 
 	@Override
@@ -328,18 +353,14 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		logger.debug("Marking job " + id + " as finished");
 		releaseAllocatedMachines(id);
 
-		long resourceUsage = 0;
-		if (jobResourceUsage.containsKey(id)) {
-			resourceUsage = jobResourceUsage.remove(id);
-			jobNCores.remove(id);
-		}
-
-		Map<String, String> provenance = getProvenance(id);
+		// Do these before anything that can throw
+		long resourceUsage = getResourceUsage(id);
+		Map<String, String> prov = getProvenance(id);
 
 		try {
 			queueManager.setJobFinished(id, logToAppend,
 					getOutputFiles(projectId, id, baseDirectory, outputs),
-					resourceUsage, provenance);
+					resourceUsage, prov);
 		} catch (IOException e) {
 			logger.error("Error creating URLs while updating job", e);
 		}
@@ -371,37 +392,29 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		releaseAllocatedMachines(id);
 
 		Exception exception = reconstructRemoteException(error, stackTrace);
-
-		long resourceUsage = 0;
-		if (jobResourceUsage.containsKey(id)) {
-			resourceUsage = jobResourceUsage.remove(id);
-			jobNCores.remove(id);
-		}
-
-		Map<String, String> provenance = getProvenance(id);
+		// Do these before anything that can throw
+		long resourceUsage = getResourceUsage(id);
+		Map<String, String> prov = getProvenance(id);
 
 		try {
 			queueManager.setJobError(id, logToAppend,
 					getOutputFiles(projectId, id, baseDirectory, outputs),
-					exception, resourceUsage, provenance);
+					exception, resourceUsage, prov);
 		} catch (IOException e) {
 			logger.error("Error creating URLs while updating job", e);
 		}
 	}
 
+	private static final StackTraceElement[] STE_TMPL = new StackTraceElement[0];
+
 	private Exception reconstructRemoteException(String error,
 			RemoteStackTrace stackTrace) {
-		Exception exception = new Exception(error);
-
-		StackTraceElement[] elements = new StackTraceElement[stackTrace
-				.getElements().size()];
-		int i = 0;
+		ArrayList<StackTraceElement> elements = new ArrayList<>();
 		for (RemoteStackTraceElement element : stackTrace.getElements())
-			elements[i++] = new StackTraceElement(element.getClassName(),
-					element.getMethodName(), element.getFileName(),
-					element.getLineNumber());
-		exception.setStackTrace(elements);
+			elements.add(element.toSTE());
 
+		Exception exception = new Exception(error);
+		exception.setStackTrace(elements.toArray(STE_TMPL));
 		return exception;
 	}
 
@@ -412,25 +425,19 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			jobExecuters.remove(executorId);
 		}
 		if (job != null) {
-			logger.debug("Job " + job.getId() + " has exited");
+			int id = job.getId();
+			logger.debug("Job " + id + " has exited");
 
-			if (releaseAllocatedMachines(job.getId())) {
-				logger.debug("Job " + job.getId() + " has not exited cleanly");
+			if (releaseAllocatedMachines(id)) {
+				logger.debug("Job " + id + " has not exited cleanly");
 				try {
-					long resourceUsage = 0;
-					if (jobResourceUsage.containsKey(job.getId())) {
-						resourceUsage = jobResourceUsage.remove(job.getId());
-						jobNCores.remove(job.getId());
-					}
-
-					Map<String, String> provenance = jobProvenance.remove(job
-							.getId());
-
+					long resourceUsage = getResourceUsage(id);
+					Map<String, String> prov = getProvenance(id);
 					String projectId = new File(job.getCollabId()).getName();
-					queueManager.setJobError(job.getId(), logToAppend,
-							getOutputFiles(projectId, job.getId(), null, null),
+					queueManager.setJobError(id, logToAppend,
+							getOutputFiles(projectId, id, null, null),
 							new Exception("Job did not finish cleanly"),
-							resourceUsage, provenance);
+							resourceUsage, prov);
 				} catch (IOException e) {
 					logger.error("Error creating URLs while updating job", e);
 				}

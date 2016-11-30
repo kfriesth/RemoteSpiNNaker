@@ -6,6 +6,8 @@ import java.net.URL;
 /**
  * A factory for creating job executers
  *
+ * @see LocalJobExecuterFactory
+ * @see XenVMExecuterFactory
  */
 public interface JobExecuterFactory {
 	/**

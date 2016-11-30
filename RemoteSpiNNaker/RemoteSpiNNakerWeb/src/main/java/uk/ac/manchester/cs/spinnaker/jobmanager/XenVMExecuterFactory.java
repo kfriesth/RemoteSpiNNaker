@@ -163,7 +163,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 
 		@Override
 		public void startExecuter() {
-			new Thread(threadGroup, this, "Executer:" + uuid).start();
+			new Thread(threadGroup, this, "Executer (" + uuid + ")").start();
 		}
 
 		private synchronized Connection createVm() throws XmlRpcException, IOException {

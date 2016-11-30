@@ -16,8 +16,8 @@ import org.rauschig.jarchivelib.Archiver;
 import org.rauschig.jarchivelib.CompressionType;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
-import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.job.pynn.PyNNJobParameters;
 
 /**
  * A {@link JobParametersFactory} that downloads a PyNN job as a zip or tar.gz

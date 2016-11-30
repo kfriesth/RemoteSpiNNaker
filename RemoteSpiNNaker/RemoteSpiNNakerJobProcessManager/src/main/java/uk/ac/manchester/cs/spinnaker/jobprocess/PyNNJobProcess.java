@@ -28,7 +28,7 @@ import org.apache.commons.io.filefilter.IOFileFilter;
 import org.ini4j.ConfigParser;
 
 import uk.ac.manchester.cs.spinnaker.job.Status;
-import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
+import uk.ac.manchester.cs.spinnaker.job.pynn.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.utils.ThreadUtils;
 

@@ -30,7 +30,7 @@ public class Job implements QueueNextResponse {
 	@JsonSerialize(using = DateTimeSerialiser.class)
 	@JsonDeserialize(using = DateTimeDeserialiser.class)
 	private DateTime timestampSubmission;
-	private String provenance;
+	private Object provenance;
 
     public String getCode() {
         return code;
@@ -144,11 +144,11 @@ public class Job implements QueueNextResponse {
         this.resourceUsage = resourceUsage;
     }
 
-    public String getProvenance() {
+    public Object getProvenance() {
         return provenance;
     }
 
-    public void setProvenance(String provenance) {
+    public void setProvenance(Object provenance) {
         this.provenance = provenance;
     }
 }

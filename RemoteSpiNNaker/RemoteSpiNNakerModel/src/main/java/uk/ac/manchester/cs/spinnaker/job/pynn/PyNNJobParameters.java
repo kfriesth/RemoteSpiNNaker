@@ -1,4 +1,4 @@
-package uk.ac.manchester.cs.spinnaker.job.impl;
+package uk.ac.manchester.cs.spinnaker.job.pynn;
 
 import java.util.Map;
 

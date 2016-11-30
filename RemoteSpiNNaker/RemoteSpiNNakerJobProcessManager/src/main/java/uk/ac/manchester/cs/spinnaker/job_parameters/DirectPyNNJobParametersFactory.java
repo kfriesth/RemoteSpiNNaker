@@ -7,8 +7,8 @@ import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 
 import uk.ac.manchester.cs.spinnaker.job.JobParameters;
-import uk.ac.manchester.cs.spinnaker.job.impl.PyNNJobParameters;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.job.pynn.PyNNJobParameters;
 
 /**
  * A {@link JobParametersFactory} that uses the <tt>experimentDescription</tt>

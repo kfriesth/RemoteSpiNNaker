@@ -140,7 +140,7 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
 		@Override
 		public void startExecuter() {
-			new Thread(threadGroup, this, "Executer").start();
+			new Thread(threadGroup, this, "Executer (" + id + ")").start();
 		}
 
 		/**

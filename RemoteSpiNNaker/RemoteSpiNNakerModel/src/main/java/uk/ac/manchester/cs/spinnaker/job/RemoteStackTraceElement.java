@@ -51,4 +51,9 @@ public class RemoteStackTraceElement {
 	public void setLineNumber(int lineNumber) {
 		this.lineNumber = lineNumber;
 	}
+
+	public StackTraceElement toSTE() {
+		return new StackTraceElement(getClassName(), getMethodName(),
+				getFileName(), getLineNumber());
+	}
 }

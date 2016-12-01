@@ -22,10 +22,13 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import javax.annotation.PostConstruct;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import uk.ac.manchester.cs.spinnaker.job.JobMachineAllocated;
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
@@ -49,12 +52,17 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private static final double CORES_PER_CHIP = 15.0;
 	public static final String JOB_PROCESS_MANAGER_JAR = "RemoteSpiNNakerJobProcessManager.jar";
 
-	private final MachineManager machineManager;
-	private final NMPIQueueManager queueManager;
-	private final OutputManager outputManager;
+	@Autowired
+	private MachineManager machineManager;
+	@Autowired
+	private NMPIQueueManager queueManager;
+	@Autowired
+	private OutputManager outputManager;
 	private final URL baseUrl;
-	private final JobExecuterFactory jobExecuterFactory;
-	private final boolean restartJobExecuterOnFailure;
+	@Autowired
+	private JobExecuterFactory jobExecuterFactory;
+    @Value("${restartJobExecutorOnFailure}")
+	private boolean restartJobExecuterOnFailure;
 
 	private Logger logger = getLogger(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
@@ -65,20 +73,15 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private Map<Integer, Long> jobNCores = new HashMap<>();
 	private Map<Integer, Long> jobResourceUsage = new HashMap<>();
 	private Map<Integer, Map<String, String>> jobProvenance = new HashMap<>();
-	private final ThreadGroup threadGroup;
+	private ThreadGroup threadGroup;
 
-	public JobManager(MachineManager machineManager,
-			NMPIQueueManager queueManager, OutputManager outputManager,
-			URL baseUrl, JobExecuterFactory jobExecuterFactory,
-			boolean restartJobExecutorOnFailure) {
-		this.machineManager = requireNonNull(machineManager);
-		this.queueManager = requireNonNull(queueManager);
-		this.outputManager = requireNonNull(outputManager);
+	public JobManager(URL baseUrl) {
 		this.baseUrl = requireNonNull(baseUrl);
-		this.jobExecuterFactory = requireNonNull(jobExecuterFactory);
-		this.restartJobExecuterOnFailure = restartJobExecutorOnFailure;
-		threadGroup = new ThreadGroup("NMPI");
+	}
 
+	@PostConstruct
+	void startManager() {
+		threadGroup = new ThreadGroup("NMPI");
 		// Start the queue manager
 		queueManager.addListener(this);
 		new Thread(threadGroup, queueManager, "QueueManager").start();

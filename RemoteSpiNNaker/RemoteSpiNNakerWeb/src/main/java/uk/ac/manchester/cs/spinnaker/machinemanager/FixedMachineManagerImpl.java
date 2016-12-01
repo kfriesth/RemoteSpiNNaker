@@ -1,10 +1,11 @@
 package uk.ac.manchester.cs.spinnaker.machinemanager;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Value;
 
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
@@ -15,20 +16,14 @@ public class FixedMachineManagerImpl implements MachineManager {
 	/**
 	 * The queue of available machines
 	 */
-	private Set<SpinnakerMachine> machinesAvailable = new HashSet<>();
-	private Set<SpinnakerMachine> machinesAllocated = new HashSet<>();
+	private final Set<SpinnakerMachine> machinesAvailable = new HashSet<>();
+	private final Set<SpinnakerMachine> machinesAllocated = new HashSet<>();
 	private final Object lock = new Object();
 	private boolean done = false;
 
-	/**
-	 * Creates a new MachineManager for a set of machines
-	 * 
-	 * @param machinesAvailable
-	 *            The machines that are to be managed
-	 */
-	public FixedMachineManagerImpl(
-			Collection<SpinnakerMachine> machinesAvailable) {
-		this.machinesAvailable.addAll(machinesAvailable);
+    @Value("${machines}")
+	void setInitialMachines(List<SpinnakerMachine> machines) {
+		machinesAvailable.addAll(machines);
 	}
 
 	@Override
@@ -46,8 +41,8 @@ public class FixedMachineManagerImpl implements MachineManager {
 	 *
 	 * @param nBoards
 	 *            The number of boards to request
-	 * @return The next machine available, or null if the manager is closed
-	 *         before a machine becomes available
+	 * @return The next machine available, or <tt>null</tt> if the manager is
+	 *         closed before a machine becomes available
 	 */
 	@Override
 	public SpinnakerMachine getNextAvailableMachine(int nBoards) {

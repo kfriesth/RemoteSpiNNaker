@@ -3,7 +3,6 @@ package uk.ac.manchester.cs.spinnaker.machinemanager;
 import static com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES;
 import static com.fasterxml.jackson.databind.PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES;
 import static java.util.Arrays.asList;
-import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.io.IOUtils.closeQuietly;
@@ -27,7 +26,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.commands.Command;
@@ -54,9 +56,12 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 	private static final String MACHINE_VERSION = "5";
 	private static final String DEFAULT_TAG = "default";
 
-	private final String ipAddress;
-	private final int port;
-	private final String owner;
+    @Value("${spalloc.server}")
+	private String ipAddress;
+    @Value("${spalloc.port}")
+	private int port;
+    @Value("${spalloc.user.name}")
+	private String owner;
 
 	private ObjectMapper mapper = new ObjectMapper();
 	private Map<Integer, SpinnakerMachine> machinesAllocated = new HashMap<>();
@@ -69,16 +74,17 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 	private volatile boolean done = false;
 	private MachineNotificationReceiver callback = null;
 
-	public SpallocMachineManagerImpl(String ipAddress, int port, String owner) {
+	public SpallocMachineManagerImpl() {
 		SimpleModule module = new SimpleModule();
 		module.addDeserializer(Response.class, new ResponseBasedDeserializer());
 		mapper.registerModule(module);
 		mapper.setPropertyNamingStrategy(CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
 		mapper.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
+	}
 
-		this.ipAddress = requireNonNull(ipAddress);
-		this.port = port;
-		this.owner = owner;
+	@PostConstruct
+	void startThread() {
+		new Thread(new ThreadGroup("Spalloc"), this, "Spalloc").start();
 	}
 
 	// ------------------------------ COMMS ------------------------------
@@ -474,8 +480,10 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 		}
 
 		public static void main(String[] args) throws Exception {
-			final SpallocMachineManagerImpl manager = new SpallocMachineManagerImpl(
-					"10.0.0.3", 22244, "test");
+			final SpallocMachineManagerImpl manager = new SpallocMachineManagerImpl();
+			manager.ipAddress = "10.0.0.3";
+			manager.port=22244;
+			manager.owner="test";
 			new Thread(manager).start();
 
 			for (SpinnakerMachine machine : manager.getMachines())

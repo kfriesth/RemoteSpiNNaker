@@ -11,16 +11,17 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.PostConstruct;
+
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
@@ -44,8 +45,6 @@ public class NMPIQueueManager implements Runnable {
 	private NMPIQueue queue;
 	/** Marker to indicate if the manager is done or not */
 	private boolean done = false;
-	/** The hardware identifier for the queue */
-	private final String hardware;
 	/** The set of listeners for this queue */
 	private final Set<NMPIQueueListener> listeners = new HashSet<>();
 	/** A cache of jobs that have been received */
@@ -54,25 +53,27 @@ public class NMPIQueueManager implements Runnable {
 	private final Map<Integer, NMPILog> jobLog = new HashMap<>();
 	private Logger logger = getLogger(getClass());
 
+	/** The hardware identifier for the queue */
+	@Value("${nmpi.hardware}")
+	private String hardware;
+	/** The URL from which to load the data */
+    @Value("${nmpi.url}")
+    private URL nmpiUrl;
+    /** The username to log in to the server with */
+    @Value("${nmpi.username}")
+    private String nmpiUsername;
+    /** The password or API key to log in to the server with */
+    @Value("${nmpi.password}")
+    private String nmpiPassword;
 	/**
-	 * Creates a new Manager, pointing at a queue at a specific URL.
-	 * 
-	 * @param url
-	 *            The URL from which to load the data
-	 * @param hardware
-	 *            The name of the hardware that this queue is for
-	 * @param username
-	 *            The username to log in to the server with
-	 * @param password
-	 *            The password or API key to log in to the server with
-	 * @param passwordIsKey
-	 *            True if the password is an API key, False if the password
-	 *            should be used to obtain the key
-	 * @throws NoSuchAlgorithmException
-	 * @throws KeyManagementException
+	 * True if the password is an API key, False if the password should be used
+	 * to obtain the key
 	 */
-	public NMPIQueueManager(URL url, String hardware, String username,
-			String password, boolean passwordIsKey) {
+    @Value("${nmpi.passwordIsApiKey}")
+    private boolean nmpiPasswordIsApiKey;
+
+	@PostConstruct
+	private void initAPIClient() {
 		CustomJacksonJsonProvider provider = new CustomJacksonJsonProvider();
 
 		@SuppressWarnings("serial")
@@ -87,15 +88,14 @@ public class NMPIQueueManager implements Runnable {
 		provider.addDeserialiser(QueueNextResponse.class,
 				new QueueResponseDeserialiser());
 
-		String apiKey = password;
-		if (!passwordIsKey) {
-			queue = createBasicClient(url, username, password, NMPIQueue.class);
-			apiKey = queue.getToken(username).getKey();
+		String apiKey = nmpiPassword;
+		if (!nmpiPasswordIsApiKey) {
+			queue = createBasicClient(nmpiUrl, nmpiUsername, nmpiPassword,
+					NMPIQueue.class);
+			apiKey = queue.getToken(nmpiUsername).getKey();
 		}
-		queue = createApiKeyClient(url, username, apiKey, NMPIQueue.class,
-				provider);
-
-		this.hardware = hardware;
+		queue = createApiKeyClient(nmpiUrl, nmpiUsername, apiKey,
+				NMPIQueue.class, provider);
 	}
 
 	/**

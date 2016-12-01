@@ -22,6 +22,7 @@ import org.apache.cxf.bus.spring.SpringBus;
 import org.apache.cxf.endpoint.Server;
 import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.spring.JaxRsConfig;
+import org.pac4j.core.client.Client;
 import org.pac4j.core.client.Clients;
 import org.pac4j.oidc.client.OidcClient;
 import org.pac4j.springframework.security.authentication.ClientAuthenticationProvider;
@@ -91,35 +92,8 @@ public class RemoteSpinnakerBeans {
     @Value("${spalloc.enabled}")
     private boolean useSpalloc;
 
-    @Value("${machines}")
-    private List<SpinnakerMachine> machines;
-
-    @Value("${spalloc.server}")
-    private String spallocServer;
-
-    @Value("${spalloc.port}")
-    private int spallocPort;
-
-    @Value("${spalloc.user.name}")
-    private String spallocUser;
-
-    @Value("${nmpi.url}")
-    private URL nmpiUrl;
-
-    @Value("${nmpi.username}")
-    private String nmpiUsername;
-
-    @Value("${nmpi.password}")
-    private String nmpiPassword;
-
-    @Value("${nmpi.passwordIsApiKey}")
-    private boolean nmpiPasswordIsApiKey;
-
-    @Value("${nmpi.hardware}")
-    private String nmpiHardware;
-
-    @Value("${results.directory}")
-    private File resultsDirectory;
+    @Value("${xen.server.enabled}")
+    private boolean useXenVms;
 
     @Value("${baseserver.url}${cxf.path}${cxf.rest.path}/")
     private URL baseServerUrl;
@@ -127,65 +101,11 @@ public class RemoteSpinnakerBeans {
     @Value("${cxf.rest.path}")
     private String restPath;
 
-    @Value("${cxf.path}${cxf.rest.path}")
-    private String restServicePath;
-
-    @Value("${deleteJobsOnExit}")
-    private boolean deleteJobsOnExit;
-
-    @Value("${liveUploadOutput}")
-    private boolean liveUploadOutput;
-
-    @Value("${requestSpiNNakerMachine}")
-    private boolean requestSpiNNakerMachine;
-
-    @Value("${oidc.clientId}")
-    private String oidcClientId;
-
-    @Value("${oidc.secret}")
-    private String oidcSecret;
-
-    @Value("${oidc.discovery.uri}")
-    private String oidcDiscoveryUri;
-
-	@Value("${oidc.realm:}")
-	private String realm;
-
     @Value("${baseserver.url}${callback.path}")
     private String oidcRedirectUri;
 
     @Value("${collab.service.uri}")
     private String collabServiceUri;
-
-    @Value("${results.purge.days}")
-    private long nDaysToKeepResults;
-
-    @Value("${xen.server.enabled}")
-    private boolean useXenVms;
-
-    @Value("${xen.server.url}")
-    private URL xenServerUrl;
-
-    @Value("${xen.server.username}")
-    private String xenUsername;
-
-    @Value("${xen.server.password}")
-    private String xenPassword;
-
-    @Value("${xen.server.templateVm}")
-    private String xenTemplateVmName;
-
-    @Value("${xen.server.diskspaceInGbs}")
-    private long xenDiskSizeInGbs;
-
-    @Value("${xen.server.shutdownOnExit}")
-    private boolean xenShutdownOnExit;
-
-    @Value("${xen.server.maxVms}")
-    private int xenMaxVms;
-
-    @Value("${restartJobExecutorOnFailure}")
-    private boolean restartJobExecutorOnFailure;
 
     //TODO unused
     class HbpServices {
@@ -202,20 +122,14 @@ public class RemoteSpinnakerBeans {
 		}
 
 		// @Bean
-		public OidcClient hbpAuthenticationClient() {
-			OidcClient oidcClient = new OidcClient();
-			oidcClient.setClientID(oidcClientId);
-			oidcClient.setSecret(oidcSecret);
-			oidcClient.setDiscoveryURI(oidcDiscoveryUri);
-			oidcClient.setScope("openid profile hbp.collab");
-			oidcClient.setPreferredJwsAlgorithm(RS256);
-			return oidcClient;
+		public Client<?,?> hbpAuthenticationClient() {
+			return new BasicOidcClient();
 		}
 
 		// @Bean
-		public BearerOidcClient hbpBearerClient() throws ParseException,
+		public Client<?,?> hbpBearerClient() throws ParseException,
 				MalformedURLException, IOException {
-			return new BearerOidcClient(oidcDiscoveryUri, realm);
+			return new BearerOidcClient();
 		}
 
 		// @Bean
@@ -238,19 +152,15 @@ public class RemoteSpinnakerBeans {
 //    @Configuration
 //    @Order(100)
 //    public static class HbpAuthentication extends WebSecurityConfigurerAdapter {
-//
 //        @Value("${cxf.path}${cxf.rest.path}")
 //        String restServicePath;
-//
 //        @Value("${callback.path}")
 //        private String callbackPath;
 //
 //        @Autowired
 //        OidcClient hbpAuthenticationClient;
-//
 //        @Autowired
 //        BearerOidcClient hbpBearerClient;
-//
 //        @Autowired
 //        Clients clients;
 //
@@ -308,46 +218,34 @@ public class RemoteSpinnakerBeans {
 
 	@Bean
 	public MachineManager machineManager() {
-		if (useSpalloc) {
-			SpallocMachineManagerImpl spalloc = new SpallocMachineManagerImpl(
-					spallocServer, spallocPort, spallocUser);
-			new Thread(new ThreadGroup("Spalloc"), spalloc, "Spalloc").start();
-			return spalloc;
-		}
-		return new FixedMachineManagerImpl(machines);
+		if (useSpalloc)
+			return new SpallocMachineManagerImpl();
+		return new FixedMachineManagerImpl();
 	}
 
 	@Bean
 	public NMPIQueueManager queueManager() throws NoSuchAlgorithmException,
 			KeyManagementException {
-		return new NMPIQueueManager(nmpiUrl, nmpiHardware, nmpiUsername,
-				nmpiPassword, nmpiPasswordIsApiKey);
+		return new NMPIQueueManager();
 	}
 
 	@Bean
 	public JobExecuterFactory jobExecuterFactory() throws IOException {
 		if (!useXenVms)
-			return new LocalJobExecuterFactory(deleteJobsOnExit,
-					liveUploadOutput, requestSpiNNakerMachine);
-
-		return new XenVMExecuterFactory(xenServerUrl, xenUsername, xenPassword,
-				xenTemplateVmName, xenDiskSizeInGbs, deleteJobsOnExit,
-				xenShutdownOnExit, liveUploadOutput, requestSpiNNakerMachine,
-				xenMaxVms);
+			return new LocalJobExecuterFactory();
+		return new XenVMExecuterFactory();
 	}
 
 	@Bean
 	public OutputManager outputManager() {
-		return new OutputManagerImpl(baseServerUrl, resultsDirectory,
-				nDaysToKeepResults);
+		// Pass this, as it is non-trivial constructed value
+		return new OutputManagerImpl(baseServerUrl);
 	}
 
 	@Bean
-	public JobManager jobManager() throws IOException,
-			NoSuchAlgorithmException, KeyManagementException {
-		return new JobManager(machineManager(), queueManager(),
-				outputManager(), baseServerUrl, jobExecuterFactory(),
-				restartJobExecutorOnFailure);
+	public JobManager jobManager() {
+		// Pass this, as it is non-trivial constructed value
+		return new JobManager(baseServerUrl);
 	}
 
 	@Bean

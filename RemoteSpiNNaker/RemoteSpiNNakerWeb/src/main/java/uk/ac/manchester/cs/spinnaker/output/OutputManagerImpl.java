@@ -26,10 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.annotation.PostConstruct;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
@@ -39,6 +41,7 @@ import uk.ac.manchester.cs.spinnaker.rest.UnicoreFileClient;
 public class OutputManagerImpl implements OutputManager {
     private static final String PURGED_FILE = ".purged_";
 
+    @Value("${results.directory}")
     private File resultsDirectory;
     private URL baseServerUrl;
     private long timeToKeepResults;
@@ -101,12 +104,17 @@ public class OutputManagerImpl implements OutputManager {
     	}
     }
 
-	public OutputManagerImpl(URL baseServerUrl, File resultsDirectory,
-			long nDaysToKeepResults) {
+	public OutputManagerImpl(URL baseServerUrl) {
 		this.baseServerUrl = baseServerUrl;
-		this.resultsDirectory = resultsDirectory;
-		this.timeToKeepResults = MILLISECONDS.convert(nDaysToKeepResults, DAYS);
+	}
 
+    @Value("${results.purge.days}")
+    void setPurgeTimeout(long nDaysToKeepResults) {
+    	timeToKeepResults = MILLISECONDS.convert(nDaysToKeepResults, DAYS);
+    }
+
+    @PostConstruct
+    void initPurgeScheduler() {
 		ScheduledExecutorService scheduler = newScheduledThreadPool(1);
 		scheduler.scheduleAtFixedRate(new Runnable() {
 			@Override
@@ -114,9 +122,9 @@ public class OutputManagerImpl implements OutputManager {
 				removeOldFiles();
 			}
 		}, 0, 1, DAYS);
-	}
+    }
 
-	private File getProjectDirectory(String projectId) {
+    private File getProjectDirectory(String projectId) {
 		if (projectId == null || projectId.isEmpty() || projectId.endsWith("/"))
 			throw new IllegalArgumentException("bad projectId");
 		String name = new File(projectId).getName();

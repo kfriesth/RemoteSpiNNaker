@@ -25,7 +25,10 @@ import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 
 public class LocalJobExecuterFactory implements JobExecuterFactory {
 	private static final String JOB_PROCESS_MANAGER_MAIN_CLASS = "uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager";
@@ -38,35 +41,36 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 		return exec;
 	}
 
-	private final boolean deleteOnExit;
-	private final boolean liveUploadOutput;
-	private final boolean requestSpiNNakerMachine;
+    @Value("${deleteJobsOnExit}")
+	private boolean deleteOnExit;
+    @Value("${liveUploadOutput}")
+	private boolean liveUploadOutput;
+    @Value("${requestSpiNNakerMachine}")
+	private boolean requestSpiNNakerMachine;
 	private final ThreadGroup threadGroup;
 
 	private List<File> jobProcessManagerClasspath = new ArrayList<>();
 	private File jobExecuterDirectory = null;
 	private static Logger log = getLogger(Executer.class);
 
-	public LocalJobExecuterFactory(boolean deleteOnExit,
-			boolean liveUploadOutput, boolean requestSpiNNakerMachine)
-			throws IOException {
-		this.deleteOnExit = deleteOnExit;
-		this.liveUploadOutput = liveUploadOutput;
-		this.requestSpiNNakerMachine = requestSpiNNakerMachine;
+	public LocalJobExecuterFactory() {
 		this.threadGroup = new ThreadGroup("LocalJob");
+	}
 
-		// Create a temporary folder
-		jobExecuterDirectory = createTempFile("jobExecuter", "tmp");
-		jobExecuterDirectory.delete();
-		jobExecuterDirectory.mkdirs();
-		jobExecuterDirectory.deleteOnExit();
-
+	@PostConstruct
+	void installJobExecuter() throws IOException {
 		// Find the JobManager resource
 		InputStream jobManagerStream = getClass().getResourceAsStream(
 				"/" + JOB_PROCESS_MANAGER_ZIP);
 		if (jobManagerStream == null)
 			throw new UnsatisfiedLinkError("/" + JOB_PROCESS_MANAGER_ZIP
 					+ " not found in classpath");
+		
+		// Create a temporary folder
+		jobExecuterDirectory = createTempFile("jobExecuter", "tmp");
+		jobExecuterDirectory.delete();
+		jobExecuterDirectory.mkdirs();
+		jobExecuterDirectory.deleteOnExit();
 
 		// Extract the JobManager resources
 		try (ZipInputStream input = new ZipInputStream(jobManagerStream)) {

@@ -9,8 +9,9 @@ import static org.pac4j.core.context.HttpConstants.DEFAULT_READ_TIMEOUT;
 import static org.pac4j.core.exception.RequiresHttpAction.unauthorized;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
+
+import javax.annotation.PostConstruct;
 
 import org.pac4j.core.client.BaseClient;
 import org.pac4j.core.client.ClientType;
@@ -20,6 +21,7 @@ import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.exception.RequiresHttpAction;
 import org.pac4j.core.exception.TechnicalException;
 import org.pac4j.oidc.profile.OidcProfile;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.nimbusds.oauth2.sdk.ParseException;
 import com.nimbusds.oauth2.sdk.http.DefaultResourceRetriever;
@@ -37,16 +39,19 @@ public class BearerOidcClient extends
 		DirectClient<BearerOidcClient.BearerCredentials, OidcProfile> {
 	private static final String BEARER_PREFIX = "Bearer ";
 
-	private final String discoveryURI;
+    @Value("${oidc.discovery.uri}")
+	private URL discoveryURI;
+    @Value("${oidc.realm:}")
+    private String realmName;
 	private OIDCProviderMetadata oidcProvider;
-	private final String realmName;
 
+	@PostConstruct
 	private OIDCProviderMetadata getOIDCProvider() {
 		try {
 			if (oidcProvider == null)
 				oidcProvider = parse(new DefaultResourceRetriever(
 						DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
-						.retrieveResource(new URL(discoveryURI)).getContent());
+						.retrieveResource(discoveryURI).getContent());
 		} catch (Exception e) {
 			logger.error("Could not contact OIDC provider; "
 					+ "Bearer authentication will not work", e);
@@ -54,8 +59,10 @@ public class BearerOidcClient extends
 		return oidcProvider;
 	}
 
-	public BearerOidcClient(String discoveryURI, String realmName)
-			throws ParseException, MalformedURLException, IOException {
+	public BearerOidcClient() {
+	}
+
+	private BearerOidcClient(URL discoveryURI, String realmName) {
 		this.discoveryURI = discoveryURI;
 		this.realmName = realmName;
 		/*
@@ -133,7 +140,7 @@ public class BearerOidcClient extends
 	protected BaseClient<BearerCredentials, OidcProfile> newClient() {
 		try {
 			return new BearerOidcClient(discoveryURI, realmName);
-		} catch (ParseException | IOException e) {
+		} catch (Exception e) {
 			throw new TechnicalException(e);
 		}
 	}

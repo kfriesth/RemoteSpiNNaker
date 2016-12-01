@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 
 import javax.annotation.PostConstruct;
 
@@ -47,6 +48,7 @@ import uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobsChangedRespons
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Machine;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.Response;
 import uk.ac.manchester.cs.spinnaker.machinemanager.responses.ReturnResponse;
+import uk.ac.manchester.cs.spinnaker.rest.utils.PropertyBasedDeserialiser;
 import uk.ac.manchester.cs.spinnaker.utils.ThreadUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,6 +57,16 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 	private static final String MACHINE_VERSION = "5";
 	private static final String DEFAULT_TAG = "default";
+
+	public interface MachineNotificationReceiver {
+		/**
+		 * Indicates that a machine is no longer allocated
+		 * 
+		 * @param machine
+		 *            The machine that is no longer allocated
+		 */
+		void machineUnallocated(SpinnakerMachine machine);
+	}
 
     @Value("${spalloc.server}")
 	private String ipAddress;
@@ -74,6 +86,16 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 	private volatile boolean done = false;
 	private MachineNotificationReceiver callback = null;
 
+	@SuppressWarnings("serial")
+	static private class ResponseBasedDeserializer extends
+			PropertyBasedDeserialiser<Response> {
+		ResponseBasedDeserializer() {
+			super(Response.class);
+			register("jobs_changed", JobsChangedResponse.class);
+			register("return", ReturnResponse.class);
+		}
+	}
+
 	public SpallocMachineManagerImpl() {
 		SimpleModule module = new SimpleModule();
 		module.addDeserializer(Response.class, new ResponseBasedDeserializer());
@@ -82,9 +104,35 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 		mapper.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
 	}
 
+	ScheduledExecutorService scheduler;
+
 	@PostConstruct
-	void startThread() {
-		new Thread(new ThreadGroup("Spalloc"), this, "Spalloc").start();
+	void startThreads() {
+		final ThreadGroup group = new ThreadGroup("Spalloc");
+		scheduler = newScheduledThreadPool(1, new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable r) {
+				return new Thread(group, r, "Spalloc Keep Alive Handler");
+			}
+		});
+
+		new Thread(group, this, "Spalloc Comms Interface").start();
+
+		Thread t = new Thread(group, new Runnable() {
+			@Override
+			public void run() {
+				updateStateOfJobs();
+			}
+		}, "Spalloc JobState Update Notification Handler");
+		t.setDaemon(true);
+		t.start();
+
+		scheduler.scheduleAtFixedRate(new Runnable() {
+			@Override
+			public void run() {
+				keepAllJobsAlive();
+			}
+		}, 5, 5, SECONDS);
 	}
 
 	// ------------------------------ COMMS ------------------------------
@@ -226,29 +274,7 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 
 	@Override
 	public void run() {
-		Runnable handler = new Runnable() {
-			@Override
-			public void run() {
-				try {
-					updateStateOfJobs();
-				} catch (InterruptedException e) {
-					// Stop thread on interruption
-				}
-			}
-		};
-
-		Thread t = new Thread(handler, "JobState Update Notification Handler");
-		t.setDaemon(true);
-		t.start();
-
-		ScheduledExecutorService scheduler = newScheduledThreadPool(1);
 		try {
-			scheduler.scheduleAtFixedRate(new Runnable() {
-				@Override
-				public void run() {
-					keepAllJobsAlive();
-				}
-			}, 5, 5, SECONDS);
 			comms.mainLoop();
 		} finally {
 			scheduler.shutdownNow();
@@ -462,14 +488,18 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 			}
 	}
 
-	private void updateStateOfJobs() throws InterruptedException {
-		while (!done)
-			for (int jobId : comms.getJobsChanged())
-				try {
-					updateJobState(new Job(jobId));
-				} catch (IOException e) {
-					logger.error("Error getting job state", e);
-				}
+	private void updateStateOfJobs() {
+		try {
+			while (!done)
+				for (int jobId : comms.getJobsChanged())
+					try {
+						updateJobState(new Job(jobId));
+					} catch (IOException e) {
+						logger.error("Error getting job state", e);
+					}
+		} catch (InterruptedException e) {
+			logger.warn("interrupt of job state updating");
+		}
 	}
 
 	// --------------------------- DEMO/TEST CODE ---------------------------
@@ -482,9 +512,9 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 		public static void main(String[] args) throws Exception {
 			final SpallocMachineManagerImpl manager = new SpallocMachineManagerImpl();
 			manager.ipAddress = "10.0.0.3";
-			manager.port=22244;
-			manager.owner="test";
-			new Thread(manager).start();
+			manager.port = 22244;
+			manager.owner = "test";
+			manager.startThreads();
 
 			for (SpinnakerMachine machine : manager.getMachines())
 				msg("%d x %d", machine.getWidth(), machine.getHeight());

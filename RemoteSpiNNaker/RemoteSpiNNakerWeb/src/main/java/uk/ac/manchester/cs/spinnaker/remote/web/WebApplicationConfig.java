@@ -5,6 +5,7 @@ import static javax.servlet.DispatcherType.ASYNC;
 import static javax.servlet.DispatcherType.ERROR;
 import static javax.servlet.DispatcherType.REQUEST;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.EnumSet;
 
@@ -25,6 +26,7 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 	 */
 	public static final String LOCATION_PROPERTY = "remotespinnaker.properties.location";
 	private static final String FILTER_NAME = "springSecurityFilterChain";
+	private static final boolean ADD_FILTER = false;
 
 	@Override
 	public void onStartup(ServletContext container) throws ServletException {
@@ -39,13 +41,13 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 			container.addServlet("cxf", CXFServlet.class).addMapping(
 					properties.getProperty("cxf.path") + "/*");
 
-			// addFilterChain(container);
+			if (ADD_FILTER)
+				addFilterChain(container);
 		} catch (IOException e) {
 			throw new ServletException(e);
 		}
 	}
 
-	@SuppressWarnings("unused")
 	private void addFilterChain(ServletContext container) {
 		container
 				.addFilter(FILTER_NAME, new DelegatingFilterProxy(FILTER_NAME))
@@ -54,7 +56,7 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 	}
 
 	private ResourcePropertySource getPropertySource() throws IOException {
-		return new ResourcePropertySource("file:"
-				+ getProperty(LOCATION_PROPERTY));
+		File source = new File(getProperty(LOCATION_PROPERTY));
+		return new ResourcePropertySource(source.toURI().toString());
 	}
 }

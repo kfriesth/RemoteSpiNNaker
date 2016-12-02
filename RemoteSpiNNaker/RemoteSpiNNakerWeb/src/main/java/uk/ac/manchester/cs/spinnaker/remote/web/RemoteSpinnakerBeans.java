@@ -104,9 +104,6 @@ public class RemoteSpinnakerBeans {
     @Value("${baseserver.url}${callback.path}")
     private String oidcRedirectUri;
 
-    @Value("${collab.service.uri}")
-    private String collabServiceUri;
-
     //TODO unused
     class HbpServices {
 		// @Autowired
@@ -118,7 +115,7 @@ public class RemoteSpinnakerBeans {
 		// @Bean
 		public CollabSecurityService collabSecurityService()
 				throws MalformedURLException {
-			return new CollabSecurityService(new URL(collabServiceUri));
+			return new CollabSecurityService();
 		}
 
 		// @Bean
@@ -198,8 +195,7 @@ public class RemoteSpinnakerBeans {
 //        }
 //
 //        @Bean
-//        public DirectClientAuthenticationFilter directAuthFilter()
-//                throws Exception {
+//        public OncePerRequestFilter directAuthFilter() throws Exception {
 //            DirectClientAuthenticationFilter filter =
 //                new DirectClientAuthenticationFilter(
 //                    authenticationManagerBean());

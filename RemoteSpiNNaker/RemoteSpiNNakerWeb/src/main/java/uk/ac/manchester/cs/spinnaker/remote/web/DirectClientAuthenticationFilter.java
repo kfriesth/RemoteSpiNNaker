@@ -1,10 +1,13 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
+import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -19,7 +22,6 @@ import org.pac4j.core.exception.RequiresHttpAction;
 import org.pac4j.springframework.security.authentication.ClientAuthenticationToken;
 import org.pac4j.springframework.security.exception.AuthenticationCredentialsException;
 import org.slf4j.Logger;
-import org.springframework.security.authentication.AuthenticationDetailsSource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -29,27 +31,43 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
+	private static final String MUST_AUTH_HEADER = "WWW-Authenticate";
+	private static final String MUST_AUTH_PAYLOAD = "Bearer realm=\"%s\"";
 	public static final String DEFAULT_REALM = "SpiNNaker";
 	private final Logger logger = getLogger(getClass());
-	private Client<?, ?> client;
-	private AuthenticationDetailsSource<HttpServletRequest, ?> authenticationDetailsSource = new WebAuthenticationDetailsSource();
-	private String realmName = DEFAULT_REALM;
-	private AuthenticationEntryPoint authenticationEntryPoint = new AuthenticationEntryPoint() {
-		@Override
-		public void commence(HttpServletRequest request,
-				HttpServletResponse response,
-				AuthenticationException authException) throws IOException {
-			response.addHeader("WWW-Authenticate", "Bearer realm=\"" + realmName
-					+ "\"");
-			response.sendError(SC_UNAUTHORIZED, authException.getMessage());
-		}
-	};
 
+	private Client<?, ?> client;
+	private String realmName = DEFAULT_REALM;
+	private AuthenticationEntryPoint authenticationEntryPoint;
+	private WebAuthenticationDetailsSource detailsSource;
 	private AuthenticationManager authenticationManager;
 
 	public DirectClientAuthenticationFilter(
 			AuthenticationManager authenticationManager) {
-		this.authenticationManager = authenticationManager;
+		this.authenticationManager = requireNonNull(authenticationManager);
+		detailsSource = new WebAuthenticationDetailsSource();
+	}
+
+	@PostConstruct
+	void checkForSanity() {
+		requireNonNull(client);
+		if (authenticationEntryPoint == null)
+			authenticationEntryPoint = new AuthenticationEntryPoint() {
+				@Override
+				public void commence(HttpServletRequest request,
+						HttpServletResponse response,
+						AuthenticationException authException)
+						throws IOException {
+					commenceBearerAuth(response, authException);
+				}
+			};
+	}
+
+	private void commenceBearerAuth(HttpServletResponse response,
+			AuthenticationException authException) throws IOException {
+		response.addHeader(MUST_AUTH_HEADER,
+				format(MUST_AUTH_PAYLOAD, realmName));
+		response.sendError(SC_UNAUTHORIZED, authException.getMessage());
 	}
 
 	@Override
@@ -85,15 +103,13 @@ public class DirectClientAuthenticationFilter extends OncePerRequestFilter {
 		// create token from credential
 		ClientAuthenticationToken token = new ClientAuthenticationToken(
 				credentials, client.getName());
-		token.setDetails(authenticationDetailsSource.buildDetails(request));
+		token.setDetails(detailsSource.buildDetails(request));
 
 		try {
 			// authenticate
-			Authentication authentication = authenticationManager
-					.authenticate(token);
-			logger.debug("authentication: {}", authentication);
-			SecurityContextHolder.getContext()
-					.setAuthentication(authentication);
+			Authentication auth = authenticationManager.authenticate(token);
+			logger.debug("authentication: {}", auth);
+			SecurityContextHolder.getContext().setAuthentication(auth);
 		} catch (AuthenticationException e) {
 			authenticationEntryPoint.commence(request, response, e);
 		}

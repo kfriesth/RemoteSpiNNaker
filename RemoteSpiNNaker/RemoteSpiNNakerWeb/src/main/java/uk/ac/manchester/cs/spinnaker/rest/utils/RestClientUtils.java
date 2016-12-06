@@ -100,27 +100,39 @@ public class RestClientUtils {
 		return localContext;
 	}
 
+	private static boolean checkTrusted(X509Certificate[] certs) {
+		return true;
+	}
+	private static X509Certificate getTrustedCert() {
+		return null;
+	}
+	public static final String SECURE_PROTOCOL = "TLS";
+
 	/** Set up HTTPS to ignore certificate errors
 	 * @deprecated This method is doing bad things. */
 	private static SchemeRegistry getSchemeRegistry()
 			throws NoSuchAlgorithmException, KeyManagementException {
-		SSLContext sslContext = SSLContext.getInstance("SSL");
+		SSLContext sslContext = SSLContext.getInstance(SECURE_PROTOCOL);
 		sslContext.init(null, new TrustManager[] { new X509TrustManager() {
 			@Override
 			public void checkClientTrusted(X509Certificate[] certs,
 					String authType) throws CertificateException {
-				// Does Nothing
+				// Does Nothing; we aren't deploying client-side certs
 			}
 
 			@Override
 			public void checkServerTrusted(X509Certificate[] certs,
 					String authType) throws CertificateException {
-				// Does Nothing
+				if (!checkTrusted(certs))
+					throw new CertificateException("untrusted server");
 			}
 
 			@Override
 			public X509Certificate[] getAcceptedIssuers() {
-				return null;
+				X509Certificate cert = getTrustedCert();
+				if (cert == null)
+					return null;
+				return new X509Certificate[] { cert };
 			}
 		} }, new SecureRandom());
 		SchemeRegistry schemeRegistry = new SchemeRegistry();

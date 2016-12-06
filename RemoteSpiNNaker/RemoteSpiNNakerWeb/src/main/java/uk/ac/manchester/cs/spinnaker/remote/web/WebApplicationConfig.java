@@ -13,12 +13,14 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 
 import org.apache.cxf.transport.servlet.CXFServlet;
+import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.support.ResourcePropertySource;
 import org.springframework.web.WebApplicationInitializer;
 import org.springframework.web.context.ContextLoaderListener;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.filter.DelegatingFilterProxy;
 
+/* Instead of web.xml; application entry point */
 public class WebApplicationConfig implements WebApplicationInitializer {
 	/**
 	 * The name of the <i>system property</i> that describes where to load
@@ -27,25 +29,36 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 	public static final String LOCATION_PROPERTY = "remotespinnaker.properties.location";
 	private static final String FILTER_NAME = "springSecurityFilterChain";
 	private static final boolean ADD_FILTER = false;
+	private static final boolean ADD_SERVLET = true;
 
 	@Override
 	public void onStartup(ServletContext container) throws ServletException {
 		try {
-			AnnotationConfigWebApplicationContext annotationConfig = new AnnotationConfigWebApplicationContext();
-			ResourcePropertySource properties = getPropertySource();
-			annotationConfig.getEnvironment().getPropertySources()
-					.addFirst(properties);
-			annotationConfig.register(RemoteSpinnakerBeans.class);
-			container.addListener(new ContextLoaderListener(annotationConfig));
-
-			container.addServlet("cxf", CXFServlet.class).addMapping(
-					properties.getProperty("cxf.path") + "/*");
-
+			PropertySource<?> properties = getPropertySource();
+			if (ADD_SERVLET | ADD_FILTER)
+				container.addListener(getContextLoaderListener(properties));
+			if (ADD_SERVLET)
+				addServlet(container, properties);
 			if (ADD_FILTER)
 				addFilterChain(container);
 		} catch (IOException e) {
 			throw new ServletException(e);
 		}
+	}
+
+	private ContextLoaderListener getContextLoaderListener(
+			PropertySource<?> properties) {
+		AnnotationConfigWebApplicationContext annotationConfig = new AnnotationConfigWebApplicationContext();
+		annotationConfig.getEnvironment().getPropertySources()
+				.addFirst(properties);
+		annotationConfig.register(RemoteSpinnakerBeans.class);
+		return new ContextLoaderListener(annotationConfig);
+	}
+
+	private void addServlet(ServletContext container,
+			PropertySource<?> properties) {
+		container.addServlet("cxf", CXFServlet.class).addMapping(
+				properties.getProperty("cxf.path") + "/*");
 	}
 
 	private void addFilterChain(ServletContext container) {
@@ -55,7 +68,7 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 						false, "/*");
 	}
 
-	private ResourcePropertySource getPropertySource() throws IOException {
+	private PropertySource<?> getPropertySource() throws IOException {
 		File source = new File(getProperty(LOCATION_PROPERTY));
 		return new ResourcePropertySource(source.toURI().toString());
 	}

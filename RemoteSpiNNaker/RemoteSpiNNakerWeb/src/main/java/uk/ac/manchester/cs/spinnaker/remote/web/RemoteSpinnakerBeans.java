@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
 import static com.nimbusds.jose.JWSAlgorithm.RS256;
+import static com.nimbusds.jose.util.IOUtils.readFileToString;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 
@@ -8,16 +9,24 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import javax.sql.DataSource;
 import javax.ws.rs.Path;
 
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.cxf.bus.spring.SpringBus;
 import org.apache.cxf.endpoint.Server;
 import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
@@ -49,6 +58,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.util.IOUtils;
 import com.nimbusds.oauth2.sdk.ParseException;
 
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
@@ -254,4 +264,53 @@ public class RemoteSpinnakerBeans {
 		factory.setProviders(asList(new JacksonJsonProvider()));
 		return factory.create();
 	}
+
+	// ---------------- DATABASE ACCESS LAYER ----------------
+
+	@Value("${jdbc.driver:org.sqlite.JDBC}")
+	private String jdbcDriver;
+	@Value("${jdbc.url:jdbc:sqlite:${sqlite.dbfile:RemoteSpiNNaker.db}}")
+	private String jdbcUrl;
+	@Value("${jdbc.username:}")
+	private String jdbcUser;
+	@Value("${jdbc.password:}")
+	private String jdbcPass;
+	@Value("${jdbc.initScript:init.sql}")
+	private File databaseInitScript;
+
+	private BasicDataSource dataSource = new BasicDataSource();
+
+	@Bean
+	public DataSource getDataSource() {
+		return dataSource;
+	}
+
+	@PostConstruct
+	void initDataSource() throws SQLException, IOException {
+		dataSource.setDriverClassName(jdbcDriver);
+		dataSource.setUrl(jdbcUrl);
+		if (jdbcUser != null && !jdbcUser.isEmpty()) {
+			dataSource.setUsername(jdbcUser);
+			if (jdbcPass != null && !jdbcPass.isEmpty())
+				dataSource.setPassword(jdbcPass);
+		}
+
+		if (databaseInitScript.canRead()) {
+			String sql = readFileToString(databaseInitScript,
+					Charset.forName("UTF-8"));
+			try (Connection conn = dataSource.getConnection();
+					Statement s = conn.createStatement()) {
+				s.execute(sql);
+			}
+		}
+	}
+
+	@PreDestroy
+	void stopDataSource() throws SQLException {
+		if (dataSource != null)
+		dataSource.close();
+		dataSource = null;
+	}
+
+
 }

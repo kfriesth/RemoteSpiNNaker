@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.remote.web;
 
 import static com.nimbusds.openid.connect.sdk.UserInfoResponse.parse;
 import static com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata.parse;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.pac4j.core.client.ClientType.HEADER_BASED;
 import static org.pac4j.core.context.HttpConstants.AUTHORIZATION_HEADER;
 import static org.pac4j.core.context.HttpConstants.DEFAULT_CONNECT_TIMEOUT;
@@ -86,7 +87,7 @@ public class BearerOidcClient extends
 
 		// Verify the access token
 		String accessToken = authorization.substring(BEARER_PREFIX.length());
-		if (accessToken.trim().isEmpty())
+		if (isBlank(accessToken))
 			return null;
 		try {
 			BearerAccessToken token = new BearerAccessToken(accessToken);

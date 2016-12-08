@@ -23,6 +23,7 @@
 		<j2ee.version>6.0</j2ee.version>
 		<commons.lang.version>3.4</commons.lang.version>
 		<commons.io.version>2.5</commons.io.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
 	<dependencyManagement>

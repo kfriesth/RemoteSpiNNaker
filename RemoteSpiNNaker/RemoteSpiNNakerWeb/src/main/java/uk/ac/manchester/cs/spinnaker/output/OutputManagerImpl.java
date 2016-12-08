@@ -9,6 +9,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.rest.utils.RestClientUtils.createBearerClient;
 
@@ -125,10 +126,10 @@ public class OutputManagerImpl implements OutputManager {
     }
 
     private File getProjectDirectory(String projectId) {
-		if (projectId == null || projectId.isEmpty() || projectId.endsWith("/"))
+		if (isBlank(projectId) || projectId.endsWith("/"))
 			throw new IllegalArgumentException("bad projectId");
 		String name = new File(projectId).getName();
-		if (name.equals(".") || name.equals("..") || name.isEmpty())
+		if (isBlank(name) || name.startsWith("."))
 			throw new IllegalArgumentException("bad projectId");
 		return new File(resultsDirectory, name);
 	}
@@ -241,7 +242,7 @@ public class OutputManagerImpl implements OutputManager {
 			return;
 		for (File file : files) {
 			if (file.getName().equals(".") || file.getName().equals("..")
-					|| file.getName().isEmpty())
+					|| file.getName().trim().isEmpty())
 				continue;
 			String uploadFileName = filePath + "/" + file.getName();
 			if (file.isDirectory()) {

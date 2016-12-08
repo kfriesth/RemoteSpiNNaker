@@ -1,9 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
-import static com.nimbusds.jose.JWSAlgorithm.RS256;
-import static com.nimbusds.jose.util.IOUtils.readFileToString;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
+import static org.apache.commons.io.FileUtils.readFileToString;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.springframework.core.annotation.AnnotationUtils.findAnnotation;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,14 +16,7 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import javax.sql.DataSource;
 import javax.ws.rs.Path;
 
@@ -33,7 +27,6 @@ import org.apache.cxf.jaxrs.JAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.spring.JaxRsConfig;
 import org.pac4j.core.client.Client;
 import org.pac4j.core.client.Clients;
-import org.pac4j.oidc.client.OidcClient;
 import org.pac4j.springframework.security.authentication.ClientAuthenticationProvider;
 import org.pac4j.springframework.security.web.ClientAuthenticationEntryPoint;
 import org.pac4j.springframework.security.web.ClientAuthenticationFilter;
@@ -43,11 +36,13 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.support.ConversionServiceFactoryBean;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -55,14 +50,16 @@ import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.util.IOUtils;
 import com.nimbusds.oauth2.sdk.ParseException;
 
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobManager;
+import uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage;
 import uk.ac.manchester.cs.spinnaker.jobmanager.LocalJobExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.jobmanager.XenVMExecuterFactory;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
@@ -73,11 +70,9 @@ import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
 import uk.ac.manchester.cs.spinnaker.output.OutputManagerImpl;
 import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
 
-@SuppressWarnings("unused")
+
 @Configuration
-//@EnableGlobalMethodSecurity(prePostEnabled=true, proxyTargetClass=true)
-//@EnableWebSecurity
-@Import(JaxRsConfig.class)
+@Import({JaxRsConfig.class, RemoteSpinnakerBeans.Database.class, RemoteSpinnakerBeans.TrivialStore.class, RemoteSpinnakerBeans.HbpSecurityServices.class})
 public class RemoteSpinnakerBeans {
 	@Bean
 	public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
@@ -111,116 +106,102 @@ public class RemoteSpinnakerBeans {
     @Value("${cxf.rest.path}")
     private String restPath;
 
-    @Value("${baseserver.url}${callback.path}")
-    private String oidcRedirectUri;
+    @Configuration
+    @Profile("security")
+    @EnableGlobalMethodSecurity(prePostEnabled=true, proxyTargetClass=true)
+    @EnableWebSecurity
+    public static class HbpSecurityServices extends WebSecurityConfigurerAdapter {
+    	@Value("${baseserver.url}${callback.path}")
+    	private String oidcRedirectUri;
+		@Value("${cxf.path}${cxf.rest.path}")
+		String restServicePath;
+		@Value("${callback.path}")
+		private String callbackPath;
 
-    //TODO unused
-    class HbpServices {
-		// @Autowired
+    	
+		@Autowired
 		public void configureGlobal(AuthenticationManagerBuilder auth)
 				throws Exception {
 			auth.authenticationProvider(clientProvider());
 		}
 
-		// @Bean
+		@Bean
 		public CollabSecurityService collabSecurityService()
 				throws MalformedURLException {
 			return new CollabSecurityService();
 		}
 
-		// @Bean
+		@Bean
 		public Client<?,?> hbpAuthenticationClient() {
 			return new BasicOidcClient();
 		}
 
-		// @Bean
+		@Bean
 		public Client<?,?> hbpBearerClient() throws ParseException,
 				MalformedURLException, IOException {
 			return new BearerOidcClient();
 		}
 
-		// @Bean
+		@Bean
 		public Clients clients() throws ParseException, MalformedURLException,
 				IOException {
 			return new Clients(oidcRedirectUri, hbpAuthenticationClient(),
 					hbpBearerClient());
 		}
 
-		// @Bean
+		@Bean
 		public ClientAuthenticationProvider clientProvider()
 				throws ParseException, MalformedURLException, IOException {
 			ClientAuthenticationProvider provider = new ClientAuthenticationProvider();
 			provider.setClients(clients());
 			return provider;
 		}
-    }
 
-    //TODO unused
-//    @Configuration
-//    @Order(100)
-//    public static class HbpAuthentication extends WebSecurityConfigurerAdapter {
-//        @Value("${cxf.path}${cxf.rest.path}")
-//        String restServicePath;
-//        @Value("${callback.path}")
-//        private String callbackPath;
-//
-//        @Autowired
-//        OidcClient hbpAuthenticationClient;
-//        @Autowired
-//        BearerOidcClient hbpBearerClient;
-//        @Autowired
-//        Clients clients;
-//
-//        @Override
-//        public void configure(WebSecurity web) throws Exception {
-//            Path path = AnnotationUtils.findAnnotation(
-//                JobManager.class, Path.class);
-//            web.ignoring().antMatchers(restServicePath + path.value() + "/**");
-//        }
-//
-//        @Override
-//        protected void configure(HttpSecurity http) throws Exception {
-//            Path path = AnnotationUtils.findAnnotation(
-//                OutputManager.class, Path.class);
-//            http.addFilterBefore(
-//                    directAuthFilter(),
-//                    UsernamePasswordAuthenticationFilter.class)
-//                .addFilterBefore(
-//                    callbackFilter(),
-//                    UsernamePasswordAuthenticationFilter.class)
-//                .exceptionHandling().authenticationEntryPoint(
-//                        hbpAuthenticationEntryPoint()).and()
-//                .authorizeRequests().antMatchers(
-//                    restServicePath + path.value() + "/**").authenticated()
-//                                   .anyRequest().permitAll();
-//        }
-//
-//        @Bean
-//        public ClientAuthenticationFilter callbackFilter() throws Exception {
-//            ClientAuthenticationFilter filter =
-//                new ClientAuthenticationFilter(callbackPath);
-//            filter.setClients(clients);
-//            filter.setAuthenticationManager(authenticationManagerBean());
-//            return filter;
-//        }
-//
-//        @Bean
-//        public OncePerRequestFilter directAuthFilter() throws Exception {
-//            DirectClientAuthenticationFilter filter =
-//                new DirectClientAuthenticationFilter(
-//                    authenticationManagerBean());
-//            filter.setClient(hbpBearerClient);
-//            return filter;
-//        }
-//
-//        @Bean
-//        public ClientAuthenticationEntryPoint hbpAuthenticationEntryPoint() {
-//            ClientAuthenticationEntryPoint entryPoint =
-//                new ClientAuthenticationEntryPoint();
-//            entryPoint.setClient(hbpAuthenticationClient);
-//            return entryPoint;
-//        }
-//    }
+		@Bean
+		public ClientAuthenticationFilter callbackFilter() throws Exception {
+			ClientAuthenticationFilter filter = new ClientAuthenticationFilter(
+					callbackPath);
+			filter.setClients(clients());
+			filter.setAuthenticationManager(authenticationManagerBean());
+			return filter;
+		}
+
+		@Override
+		public void configure(WebSecurity web) throws Exception {
+			Path path = findAnnotation(JobManager.class, Path.class);
+			web.ignoring().antMatchers(restServicePath + path.value() + "/**");
+		}
+
+		@Override
+		protected void configure(HttpSecurity http) throws Exception {
+			Path path = AnnotationUtils.findAnnotation(OutputManager.class,
+					Path.class);
+			http.addFilterBefore(directAuthFilter(),
+					UsernamePasswordAuthenticationFilter.class)
+					.addFilterBefore(callbackFilter(),
+							UsernamePasswordAuthenticationFilter.class)
+					.exceptionHandling()
+					.authenticationEntryPoint(hbpAuthenticationEntryPoint())
+					.and().authorizeRequests()
+					.antMatchers(restServicePath + path.value() + "/**")
+					.authenticated().anyRequest().permitAll();
+		}
+
+		@Bean
+		public OncePerRequestFilter directAuthFilter() throws Exception {
+			DirectClientAuthenticationFilter filter = new DirectClientAuthenticationFilter(
+					authenticationManagerBean());
+			filter.setClient(hbpBearerClient());
+			return filter;
+		}
+
+		@Bean
+		public ClientAuthenticationEntryPoint hbpAuthenticationEntryPoint() {
+			ClientAuthenticationEntryPoint entryPoint = new ClientAuthenticationEntryPoint();
+			entryPoint.setClient(hbpAuthenticationClient());
+			return entryPoint;
+		}
+	}
 
 	@Bean
 	public MachineManager machineManager() {
@@ -265,52 +246,76 @@ public class RemoteSpinnakerBeans {
 		return factory.create();
 	}
 
-	// ---------------- DATABASE ACCESS LAYER ----------------
-
-	@Value("${jdbc.driver:org.sqlite.JDBC}")
-	private String jdbcDriver;
-	@Value("${jdbc.url:jdbc:sqlite:${sqlite.dbfile:RemoteSpiNNaker.db}}")
-	private String jdbcUrl;
-	@Value("${jdbc.username:}")
-	private String jdbcUser;
-	@Value("${jdbc.password:}")
-	private String jdbcPass;
-	@Value("${jdbc.initScript:init.sql}")
-	private File databaseInitScript;
-
-	private BasicDataSource dataSource = new BasicDataSource();
-
-	@Bean
-	public DataSource getDataSource() {
-		return dataSource;
+	/**
+	 * Proxy to use instead of database access layer
+	 * 
+	 * @author Donal Fellows
+	 * @see Database
+	 */
+	@Configuration
+	@Profile("!db")
+	public static class TrivialStore {
+		@Bean
+		JobStorage jobStorage() {
+			return new JobStorage.Queue();
+		}
 	}
 
-	@PostConstruct
-	void initDataSource() throws SQLException, IOException {
-		dataSource.setDriverClassName(jdbcDriver);
-		dataSource.setUrl(jdbcUrl);
-		if (jdbcUser != null && !jdbcUser.isEmpty()) {
-			dataSource.setUsername(jdbcUser);
-			if (jdbcPass != null && !jdbcPass.isEmpty())
+	/**
+	 * Database Access Layer
+	 * @author Donal Fellows
+	 */
+	@Configuration
+	@Profile("db")
+	@PropertySource("classpath:/database.properties")
+	@EnableTransactionManagement
+	public static class Database {
+		@Value("${jdbc.driver:org.sqlite.JDBC}")
+		private String jdbcDriver;
+		@Value("${jdbc.url:jdbc:sqlite:${sqlite.dbfile:RemoteSpiNNaker.db}}")
+		private String jdbcUrl;
+		@Value("${jdbc.username:}")
+		private String jdbcUser;
+		@Value("${jdbc.password:}")
+		private String jdbcPass;
+		@Value("${jdbc.initScript:init.sql}")
+		private File databaseInitScript;
+		@Value("${jdbc.connectionInit:PRAGMA foreign_keys = ON}")
+		private String connectionInit;
+
+		@Bean
+		public DataSource dataSource() throws SQLException, IOException {
+			BasicDataSource dataSource = new BasicDataSource();
+
+			dataSource.setDriverClassName(jdbcDriver);
+			dataSource.setUrl(jdbcUrl);
+			if (isNotBlank(jdbcUser) && isNotBlank(jdbcPass)) {
+				dataSource.setUsername(jdbcUser);
 				dataSource.setPassword(jdbcPass);
-		}
-
-		if (databaseInitScript.canRead()) {
-			String sql = readFileToString(databaseInitScript,
-					Charset.forName("UTF-8"));
-			try (Connection conn = dataSource.getConnection();
-					Statement s = conn.createStatement()) {
-				s.execute(sql);
 			}
+
+			if (isNotBlank(connectionInit))
+				dataSource.setConnectionInitSqls(singleton(connectionInit));
+
+			if (databaseInitScript.canRead())
+				try (Connection conn = dataSource.getConnection();
+						Statement s = conn.createStatement()) {
+					s.execute(readFileToString(databaseInitScript,
+							Charset.forName("UTF-8")));
+				}
+
+			return dataSource;
 		}
-	}
 
-	@PreDestroy
-	void stopDataSource() throws SQLException {
-		if (dataSource != null)
-		dataSource.close();
-		dataSource = null;
-	}
+		@Bean
+		public PlatformTransactionManager txManager() throws SQLException,
+				IOException {
+			return new DataSourceTransactionManager(dataSource());
+		}
 
-
+		@Bean
+		JobStorage jobStorage() {
+			return new JobStorage.DAO();
+		}
+}
 }

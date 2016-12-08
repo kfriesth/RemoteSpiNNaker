@@ -29,6 +29,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.transaction.annotation.Transactional;
 
 import uk.ac.manchester.cs.spinnaker.job.JobMachineAllocated;
 import uk.ac.manchester.cs.spinnaker.job.JobManagerInterface;
@@ -63,6 +64,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private JobExecuterFactory jobExecuterFactory;
     @Value("${restartJobExecutorOnFailure}")
 	private boolean restartJobExecuterOnFailure;
+    @Autowired
+    private JobStorage storage;
 
 	private Logger logger = getLogger(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
@@ -88,42 +91,46 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public void addJob(Job job) throws IOException {
 		requireNonNull(job);
 		logger.info("New job " + job.getId());
 
 		// Add the job to the set of jobs to be run
 		synchronized (jobExecuters) {
-			jobsToRun.offer(job);
-
+			jobsToRun.offer(job);//FIXME
 			// Start an executer for the job
-			launchExecuter();
+			JobExecuter executer = jobExecuterFactory.createJobExecuter(this,
+					baseUrl);
+			jobExecuters.put(executer.getExecuterId(), executer);
+			storage.addJob(job, executer.getExecuterId());
+			executer.startExecuter();
 		}
 	}
 
 	/**
 	 * You need to hold the lock on {@link #jobExecuters} when running this
 	 * method.
+	 * @return the ID of the executer
 	 */
-	private void launchExecuter() throws IOException {
+	private String launchExecuter() throws IOException {
 		JobExecuter executer = jobExecuterFactory.createJobExecuter(this,
 				baseUrl);
 		jobExecuters.put(executer.getExecuterId(), executer);
 		executer.startExecuter();
+		return executer.getExecuterId();
 	}
 
 	@Override
+	@Transactional
 	public Job getNextJob(String executerId) {
-		try {
-			requireNonNull(executerId);
-			Job job = jobsToRun.take();
-			executorJobId.put(executerId, job);
-			logger.info("Executer " + executerId + " is running " + job.getId());
-			queueManager.setJobRunning(job.getId());
-			return job;
-		} catch (InterruptedException e) {
-			return null;
-		}
+		requireNonNull(executerId);
+		Job job = storage.getJob(executerId);
+		executorJobId.put(executerId, job);
+		logger.info("Executer " + executerId + " is running " + job.getId());
+		queueManager.setJobRunning(job.getId());
+		storage.markRunning(job);
+		return job;
 	}
 
 	@Override
@@ -138,7 +145,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		return largest;
 	}
 
+	/**{@inheritDoc}*/
 	@Override
+	@Transactional
 	public SpinnakerMachine getJobMachine(int id, int nCores, int nChips,
 			int nBoards, double runTime) {
 		// TODO Check quota
@@ -208,7 +217,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 	
 	@Override
+	@Transactional
 	public void extendJobMachineLease(int id, double runTime) {
+		if (runTime < 0.0)
+			// TODO handle the default a bit better
+			return;
 		// TODO Check quota that the lease can be extended
 
 		long usage;
@@ -220,6 +233,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public JobMachineAllocated checkMachineLease(int id, int waitTime) {
 		List<SpinnakerMachine> machines = getMachineForJob(id);
 
@@ -261,6 +275,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public void appendLog(int id, String logToAppend) {
 		logger.debug("Updating log for " + id);
 		logger.trace(id + ": " + logToAppend);
@@ -268,6 +283,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public void addOutput(String projectId, int id, String output,
 			InputStream input) {
 		requireNonNull(output);
@@ -315,6 +331,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public void addProvenance(int id, String item, String value) {
 		synchronized (jobProvenance) {
 			if (!jobProvenance.containsKey(id))
@@ -347,6 +364,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public void setJobFinished(String projectId, int id, String logToAppend,
 			String baseDirectory, List<String> outputs) {
 		requireNonNull(projectId);
@@ -381,6 +399,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	@Override
+	@Transactional
 	public void setJobError(String projectId, int id, String error,
 			String logToAppend, String baseDirectory, List<String> outputs,
 			RemoteStackTrace stackTrace) {

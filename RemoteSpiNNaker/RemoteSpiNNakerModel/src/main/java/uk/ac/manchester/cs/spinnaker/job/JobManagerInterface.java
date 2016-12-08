@@ -25,6 +25,12 @@ public interface JobManagerInterface {
 	String APPLICATION_ZIP = "application/zip";
 	String JOB_PROCESS_MANAGER_ZIP = "RemoteSpiNNakerJobProcessManager.zip";
 
+	/**
+	 * Get the next job to be run on the given executer.
+	 * 
+	 * @param executerId
+	 *            the ID of the executer that is asking.
+	 */
 	@GET
 	@Path("next")
 	@Produces(APPLICATION_JSON)

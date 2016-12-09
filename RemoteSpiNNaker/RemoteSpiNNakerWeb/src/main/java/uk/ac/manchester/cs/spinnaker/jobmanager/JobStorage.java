@@ -1,5 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
+import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.Values.where;
+
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -8,18 +10,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
@@ -35,6 +34,8 @@ public interface JobStorage {
 
 	Job getJob(String executerId);
 
+	Job getJob(int jobId);
+
 	List<Job> getWaiting();
 
 	boolean isRunning(Job job);
@@ -42,6 +43,15 @@ public interface JobStorage {
 	void markDone(Job job);
 
 	void markRunning(Job job);
+
+	/**
+	 * @param job
+	 *            the job to update the assignment for
+	 * @param executer
+	 *            The executer that is assigned to the job. May be <tt>null</tt>
+	 *            to clear the assignment.
+	 */
+	void assignNewExecutor(Job job, JobExecuter executer);
 
 	static class Queue implements JobStorage {
 		private Map<String, Integer> map = new ConcurrentHashMap<>();
@@ -62,6 +72,11 @@ public interface JobStorage {
 		}
 
 		@Override
+		public Job getJob(int jobId) {
+			return store.get(jobId);
+		}
+
+		@Override
 		public List<Job> getWaiting() {
 			List<Job> result = new ArrayList<>();
 			for (Integer id : waiting)
@@ -71,23 +86,39 @@ public interface JobStorage {
 
 		@Override
 		public boolean isRunning(Job job) {
+			if (job == null)
+				return false;
 			return running.contains(job.getId());
 		}
 
 		@Override
 		public void markDone(Job job) {
-			waiting.remove(job.getId());
-			running.remove(job.getId());
+			if (job != null) {
+				waiting.remove(job.getId());
+				running.remove(job.getId());
+			}
 		}
 
 		@Override
 		public void markRunning(Job job) {
-			waiting.remove(job.getId());
-			running.add(job.getId());
+			if (job != null) {
+				waiting.remove(job.getId());
+				running.add(job.getId());
+			}
+		}
+
+		@Override
+		public void assignNewExecutor(Job job, JobExecuter executer) {
+			for (Entry<String, Integer> e : map.entrySet())
+				if (e.getValue().equals(job.getId())) {
+					map.remove(e.getKey());
+					break;
+				}
+			if (executer != null)
+				map.put(executer.getExecuterId(), job.getId());
 		}
 	}
 
-	@SuppressWarnings("serial")
 	static class DAO implements JobStorage {
 		private NamedParameterJdbcTemplate db;
 
@@ -96,46 +127,53 @@ public interface JobStorage {
 			this.db = new NamedParameterJdbcTemplate(dataSource);
 		}
 
-		static final String ADD_JOB = "INSERT INTO job(id, json, state, executer) "
+		private static final String ADD_JOB = "INSERT INTO job(id, json, state, executer) "
 				+ "VALUES (:id, :json, 0, :executer)";
-		static final String GET_JOB = "SELECT json FROM job WHERE executer = :executer LIMIT 1";
-		static final String GET_IN_STATE = "SELECT json FROM job WHERE state = :state";
-		static final String GET_STATE = "SELECT state FROM job WHERE id = :id LIMIT 1";
-		static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :id";
+		private static final String GET_JOB_BY_ID = "SELECT json FROM job WHERE id = :id LIMIT 1";
+		private static final String GET_JOB_BY_EXECUTER = "SELECT json FROM job WHERE executer = :executer LIMIT 1";
+		private static final String GET_IN_STATE = "SELECT json FROM job WHERE state = :state";
+		private static final String GET_STATE = "SELECT state FROM job WHERE id = :id LIMIT 1";
+		private static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :id";
+		private static final String SET_EXEC = "UPDATE job SET executer = :executer WHERE id = :id";
 
 		@Override
 		public void addJob(final Job job, final String executerId) {
-			db.update(ADD_JOB, new HashMap<String, Object>() {{
-				put("id", job.getId());
-				put("json", JobMapper.map(job));
-				put("executer", executerId);
-			}});
+			Objects.requireNonNull(job, "can only register real jobs");
+			db.update(ADD_JOB,
+					where("id", job.getId()).and("json", JobMapper.map(job))
+							.and("executer", executerId));
 		}
 
 		@Override
 		public Job getJob(final String executerId) {
-			return db.queryForObject(GET_JOB, new HashMap<String, Object>() {{
-				put("executer", executerId);
-			}}, new JobMapper("json"));
+			if (executerId == null)
+				return null;
+			return db.queryForObject(GET_JOB_BY_EXECUTER,
+					where("executer", executerId), new JobMapper("json"));
+		}
+
+		@Override
+		public Job getJob(final int jobId) {
+			return db.queryForObject(GET_JOB_BY_ID, where("id", jobId),
+					new JobMapper("json"));
 		}
 
 		private List<Job> getInState(final int state) {
-			return db.query(GET_IN_STATE, new HashMap<String, Object>() {{
-				put("state", state);
-			}}, new JobMapper("json"));
+			return db.query(GET_IN_STATE, where("state", state), new JobMapper(
+					"json"));
 		}
-		
+
 		private Integer getState(final Job job) {
-			return db.queryForObject(GET_STATE, new HashMap<String, Object>() {{
-				put("id", job.getId());
-			}}, Integer.class);
+			if (job == null)
+				return null;
+			return db.queryForObject(GET_STATE, where("id", job.getId()),
+					Integer.class);
 		}
 
 		private void setState(final Job job, final int state) {
-			db.update(SET_STATE, new HashMap<String, Object>() {{
-				put("state", state);
-				put("id", job.getId());
-			}});
+			if (job != null)
+				db.update(SET_STATE,
+						where("id", job.getId()).and("state", state));
 		}
 
 		@Override
@@ -145,19 +183,47 @@ public interface JobStorage {
 
 		@Override
 		public boolean isRunning(Job job) {
+			if (job == null)
+				return false;
 			return getState(job) == 1;
 		}
 
 		@Override
 		public void markDone(Job job) {
-			setState(job, 2);
+			if (job != null)
+				setState(job, 2);
 		}
 
 		@Override
 		public void markRunning(Job job) {
-			setState(job, 1);
+			if (job != null)
+				setState(job, 1);
 		}
 
+		@Override
+		public void assignNewExecutor(final Job job, final JobExecuter executer) {
+			if (job != null)
+				db.update(
+						SET_EXEC,
+						where("id", job.getId()).and(
+								"executer",
+								executer != null ? executer.getExecuterId()
+										: null));
+		}
+
+		@SuppressWarnings("serial")
+		static class Values extends HashMap<String, Object> {
+			static Values where(String key, Object value) {
+				Values v = new Values();
+				v.put(key, value);
+				return v;
+			}
+
+			Values and(String key, Object value) {
+				put(key, value);
+				return this;
+			}
+		}
 	}
 }
 

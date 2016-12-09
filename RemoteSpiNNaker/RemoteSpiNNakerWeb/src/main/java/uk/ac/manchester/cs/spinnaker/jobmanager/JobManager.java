@@ -69,9 +69,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private Logger logger = getLogger(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
-	private BlockingQueue<Job> jobsToRun = new LinkedBlockingQueue<>();
-	private Map<String, JobExecuter> jobExecuters = new HashMap<>();
-	private Map<String, Job> executorJobId = new HashMap<>();
 	private Map<Integer, File> jobOutputTempFiles = new HashMap<>();
 	private Map<Integer, Long> jobNCores = new HashMap<>();
 	private Map<Integer, Long> jobResourceUsage = new HashMap<>();
@@ -90,49 +87,32 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		new Thread(threadGroup, queueManager, "QueueManager").start();
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void addJob(Job job) throws IOException {
 		requireNonNull(job);
 		logger.info("New job " + job.getId());
 
-		// Add the job to the set of jobs to be run
-		synchronized (jobExecuters) {
-			jobsToRun.offer(job);//FIXME
-			// Start an executer for the job
-			JobExecuter executer = jobExecuterFactory.createJobExecuter(this,
-					baseUrl);
-			jobExecuters.put(executer.getExecuterId(), executer);
-			storage.addJob(job, executer.getExecuterId());
-			executer.startExecuter();
-		}
-	}
-
-	/**
-	 * You need to hold the lock on {@link #jobExecuters} when running this
-	 * method.
-	 * @return the ID of the executer
-	 */
-	private String launchExecuter() throws IOException {
 		JobExecuter executer = jobExecuterFactory.createJobExecuter(this,
 				baseUrl);
-		jobExecuters.put(executer.getExecuterId(), executer);
+		storage.addJob(job, executer.getExecuterId());
 		executer.startExecuter();
-		return executer.getExecuterId();
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public Job getNextJob(String executerId) {
 		requireNonNull(executerId);
 		Job job = storage.getJob(executerId);
-		executorJobId.put(executerId, job);
 		logger.info("Executer " + executerId + " is running " + job.getId());
 		queueManager.setJobRunning(job.getId());
 		storage.markRunning(job);
 		return job;
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	public SpinnakerMachine getLargestJobMachine(int id, double runTime) {
 		// TODO Check quota to get the largest machine within the quota
@@ -216,6 +196,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		}
 	}
 	
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void extendJobMachineLease(int id, double runTime) {
@@ -232,6 +213,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		logger.info("Usage for " + id + " now " + usage);
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public JobMachineAllocated checkMachineLease(int id, int waitTime) {
@@ -274,6 +256,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		}
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void appendLog(int id, String logToAppend) {
@@ -282,6 +265,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		queueManager.appendJobLog(id, requireNonNull(logToAppend));
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void addOutput(String projectId, int id, String output,
@@ -330,6 +314,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		return outputItems;
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void addProvenance(int id, String item, String value) {
@@ -363,6 +348,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		return resourceUsage;
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void setJobFinished(String projectId, int id, String logToAppend,
@@ -377,6 +363,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		// Do these before anything that can throw
 		long resourceUsage = getResourceUsage(id);
 		Map<String, String> prov = getProvenance(id);
+		storage.markDone(storage.getJob(id));
 
 		try {
 			queueManager.setJobFinished(id, logToAppend,
@@ -398,6 +385,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		}
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void setJobError(String projectId, int id, String error,
@@ -412,6 +400,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 		logger.debug("Marking job " + id + " as error");
 		releaseAllocatedMachines(id);
+		storage.markDone(storage.getJob(id));
 
 		Exception exception = reconstructRemoteException(error, stackTrace);
 		// Do these before anything that can throw
@@ -440,13 +429,15 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		return exception;
 	}
 
+	/**
+	 * @param executorId The ID of the executor that has executed.
+	 * @param logToAppend May be <tt>null</tt>
+	 */
+	@Transactional
 	public void setExecutorExited(String executorId, String logToAppend) {
-		requireNonNull(logToAppend);
-		Job job = executorJobId.remove(requireNonNull(executorId));
-		synchronized (jobExecuters) {
-			jobExecuters.remove(executorId);
-		}
+		Job job = storage.getJob(requireNonNull(executorId));
 		if (job != null) {
+			storage.assignNewExecutor(job, null);
 			int id = job.getId();
 			logger.debug("Job " + id + " has exited");
 
@@ -475,19 +466,18 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private void restartExecuters() {
 		try {
-			int jobSize;
-			synchronized (jobsToRun) {
-				jobSize = jobsToRun.size();
-			}
-			synchronized (jobExecuters) {
-				while (jobSize > jobExecuters.size())
-					launchExecuter();
+			for (Job job : storage.getWaiting()) {
+				JobExecuter executer = jobExecuterFactory.createJobExecuter(
+						this, baseUrl);
+				storage.assignNewExecutor(job, executer);
+				executer.startExecuter();
 			}
 		} catch (IOException e) {
 			logger.error("Could not launch a new executer", e);
 		}
 	}
 
+	/**{@inheritDoc}*/
 	@Override
 	public Response getJobProcessManager() {
 		InputStream jobManagerStream = getClass().getResourceAsStream(

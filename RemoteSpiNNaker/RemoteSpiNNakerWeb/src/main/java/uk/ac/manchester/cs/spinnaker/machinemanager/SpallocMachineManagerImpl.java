@@ -395,7 +395,7 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 		Job job = null;
 		SpinnakerMachine machineAllocated = null;
 
-		while (job == null || machineAllocated == null) {
+		do {
 			try {
 				job = createJob(nBoards);
 
@@ -416,7 +416,7 @@ public class SpallocMachineManagerImpl implements MachineManager, Runnable {
 			} catch (IOException e) {
 				logger.error("Error getting machine - retrying", e);
 			}
-		}
+		} while (job == null || machineAllocated == null);
 
 		machinesAllocated.put(job.id, machineAllocated);
 		jobByMachine.put(machineAllocated, job.id);

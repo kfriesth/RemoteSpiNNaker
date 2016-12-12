@@ -2,6 +2,7 @@ package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static java.io.File.createTempFile;
 import static java.lang.Math.ceil;
+import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.commons.io.FileUtils.copyInputStreamToFile;
@@ -51,6 +52,8 @@ import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
 public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private static final double CHIPS_PER_BOARD = 48.0;
 	private static final double CORES_PER_CHIP = 15.0;
+	/** Requests close within this much of a board get an extra one */
+	private static final double SLOP_FACTOR = 0.1;
 	public static final String JOB_PROCESS_MANAGER_JAR = "RemoteSpiNNakerJobProcessManager.jar";
 
 	@Autowired
@@ -70,9 +73,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private Logger logger = getLogger(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
 	private Map<Integer, File> jobOutputTempFiles = new HashMap<>();
-	private Map<Integer, Long> jobNCores = new HashMap<>();
-	private Map<Integer, Long> jobResourceUsage = new HashMap<>();
-	private Map<Integer, Map<String, String>> jobProvenance = new HashMap<>();
 	private ThreadGroup threadGroup;
 
 	public JobManager(URL baseUrl) {
@@ -136,44 +136,35 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 				+ " chips or " + nBoards + " boards for " + (runTime / 1000.0)
 				+ " seconds");
 
-		int nBoardsToRequest = nBoards;
-		long quotaNCores = (long) (nBoards * CORES_PER_CHIP * CHIPS_PER_BOARD);
+		int nBoardsToRequest;
+		long quotaNCores;
 
-		// If nothing specified, use 3 boards
-		if (nBoards <= 0 && nChips <= 0 && nCores <= 0) {
+		if (nBoards >= 0) {
+			nBoardsToRequest = nBoards;
+			quotaNCores = (long) (nBoards * CORES_PER_CHIP * CHIPS_PER_BOARD);
+		} else if (nChips >= 0) {
+			double nChipsExact = nChips;
+			quotaNCores = (long) (nChips * CORES_PER_CHIP);
+			nBoardsToRequest = (int) ceil(max(nChipsExact, 1.0) / CHIPS_PER_BOARD + SLOP_FACTOR);
+		} else if (nCores >= 0) {
+			double nChipsExact = nCores / CORES_PER_CHIP;
+			quotaNCores = nCores;
+			nBoardsToRequest = (int) ceil(max(nChipsExact, 1.0) / CHIPS_PER_BOARD + SLOP_FACTOR);
+		} else {
+			// If nothing specified, use 3 boards
 			nBoardsToRequest = 3;
 			quotaNCores = (long) (3 * CORES_PER_CHIP * CHIPS_PER_BOARD);
 		}
 
-		// If boards not specified, use cores or chips
-		if (nBoardsToRequest <= 0) {
-			double nChipsExact = nChips;
-			quotaNCores = (long) (nChipsExact * CORES_PER_CHIP);
-
-			// If chips not specified, use cores
-			if (nChipsExact <= 0) {
-				nChipsExact = nCores / CORES_PER_CHIP;
-				quotaNCores = nCores;
-			}
-
-			double nBoardsExact = (double) nChips / CHIPS_PER_BOARD;
-
-			if (ceil(nBoardsExact) - nBoardsExact < 0.1)
-				nBoardsExact += 1.0;
-			if (nBoardsExact < 1.0)
-				nBoardsExact = 1.0;
-			nBoardsExact = ceil(nBoardsExact);
-			nBoardsToRequest = (int) nBoardsExact;
-		}
+		// Clamp values to sanity
+		nBoardsToRequest = max(nBoardsToRequest, 1);
+		quotaNCores = max(quotaNCores, 1);
 
 		SpinnakerMachine machine = allocateMachineForJob(id, nBoardsToRequest);
 		logger.info("Running " + id + " on " + machine.getMachineName());
 		long resourceUsage = (long) ((runTime / 1000.0) * quotaNCores);
 		logger.info("Resource usage " + resourceUsage);
-		synchronized (jobResourceUsage) {
-			jobResourceUsage.put(id, resourceUsage);
-			jobNCores.put(id, quotaNCores);
-		}
+		storage.initResourceUsage(id, resourceUsage, (int) quotaNCores);
 
 		return machine;
 	}
@@ -205,12 +196,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			return;
 		// TODO Check quota that the lease can be extended
 
-		long usage;
-		synchronized (jobResourceUsage) {
-			usage = (long) (jobNCores.get(id) * (runTime / 1000.0));
-			jobResourceUsage.put(id, usage);
-		}
-		logger.info("Usage for " + id + " now " + usage);
+		storage.setResourceUsage(id, runTime / 1000.0);
 	}
 
 	/**{@inheritDoc}*/
@@ -318,34 +304,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Override
 	@Transactional
 	public void addProvenance(int id, String item, String value) {
-		synchronized (jobProvenance) {
-			if (!jobProvenance.containsKey(id))
-				jobProvenance.put(id, new HashMap<String, String>());
-			jobProvenance.get(id).put(requireNonNull(item),
-					requireNonNull(value));
-		}
-	}
-
-	private Map<String, String> getProvenance(int id) {
-		Map<String, String> prov;
-		synchronized (jobProvenance) {
-			prov = jobProvenance.remove(id);
-		}
-		if (prov != null && prov.isEmpty())
-			prov = null;
-		return prov;
-	}
-
-	private long getResourceUsage(int id) {
-		long resourceUsage = 0;
-		synchronized (jobResourceUsage) {
-			Long ru = jobResourceUsage.remove(id);
-			if (ru != null) {
-				resourceUsage = ru;
-				jobNCores.remove(id);
-			}
-		}
-		return resourceUsage;
+		storage.addProvenance(id, requireNonNull(item),
+				requireNonNull(value));
 	}
 
 	/**{@inheritDoc}*/
@@ -360,10 +320,13 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		logger.debug("Marking job " + id + " as finished");
 		releaseAllocatedMachines(id);
 
+		Job job = storage.getJob(id);
 		// Do these before anything that can throw
-		long resourceUsage = getResourceUsage(id);
-		Map<String, String> prov = getProvenance(id);
-		storage.markDone(storage.getJob(id));
+		long resourceUsage = storage.getResourceUsage(job);
+		Map<String, String> prov = storage.getProvenance(job);
+		if (prov.isEmpty())
+			prov = null;
+		storage.markDone(job);
 
 		try {
 			queueManager.setJobFinished(id, logToAppend,
@@ -400,12 +363,15 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 		logger.debug("Marking job " + id + " as error");
 		releaseAllocatedMachines(id);
-		storage.markDone(storage.getJob(id));
+		Job job = storage.getJob(id);
+		storage.markDone(job);
 
 		Exception exception = reconstructRemoteException(error, stackTrace);
 		// Do these before anything that can throw
-		long resourceUsage = getResourceUsage(id);
-		Map<String, String> prov = getProvenance(id);
+		long resourceUsage = storage.getResourceUsage(job);
+		Map<String, String> prov = storage.getProvenance(job);
+		if (prov.isEmpty())
+			prov = null;
 
 		try {
 			queueManager.setJobError(id, logToAppend,
@@ -444,8 +410,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			if (releaseAllocatedMachines(id)) {
 				logger.debug("Job " + id + " has not exited cleanly");
 				try {
-					long resourceUsage = getResourceUsage(id);
-					Map<String, String> prov = getProvenance(id);
+					long resourceUsage = storage.getResourceUsage(job);
+					Map<String, String> prov = storage.getProvenance(job);
+					if (prov.isEmpty())
+						prov = null;
 					String projectId = new File(job.getCollabId()).getName();
 					queueManager.setJobError(id, logToAppend,
 							getOutputFiles(projectId, id, null, null),

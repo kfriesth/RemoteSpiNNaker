@@ -24,8 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-import javax.sql.DataSource;
-
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -111,12 +109,12 @@ public class DatabaseTests {
 			ResultSet rs = s.executeQuery("SELECT * FROM job");
 			ResultSetMetaData md = rs.getMetaData();
 			assertEquals("id", md.getColumnLabel(1).toLowerCase());
-			assertEquals(4, md.getColumnCount());
+			assertTrue(md.getColumnCount() > 0);
 			List<String> names = new ArrayList<>();
 			for (int i = 1; i <= md.getColumnCount(); i++)
 				names.add(md.getColumnLabel(i).toLowerCase());
 			sort(names);
-			Assert.assertEquals("[executer, id, json, state]", names.toString());
+			Assert.assertEquals("[executer, id, json, numcores, resourceusage, state]", names.toString());
 		}
 	}
 

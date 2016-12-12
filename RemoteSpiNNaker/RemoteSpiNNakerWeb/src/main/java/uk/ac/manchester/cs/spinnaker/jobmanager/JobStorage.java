@@ -4,7 +4,6 @@ import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.Values.whe
 
 import java.io.IOException;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,21 +12,24 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+
+import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 
 public interface JobStorage {
 	void addJob(Job job, String executerId);
@@ -52,12 +54,25 @@ public interface JobStorage {
 	 *            to clear the assignment.
 	 */
 	void assignNewExecutor(Job job, JobExecuter executer);
+	
+	void initResourceUsage(int id, long plannedResourceUsage, long quotaNCores);
+
+	void setResourceUsage(int id, double seconds);
+
+	long getResourceUsage(Job job);
+
+	void addProvenance(int id, String key, String value);
+
+	Map<String, String> getProvenance(Job job);
 
 	static class Queue implements JobStorage {
 		private Map<String, Integer> map = new ConcurrentHashMap<>();
 		private Set<Integer> running = new ConcurrentSkipListSet<>();
 		private Map<Integer, Job> store = new ConcurrentHashMap<>();
 		private Set<Integer> waiting = new ConcurrentSkipListSet<>();
+		private Map<Integer,Long> resourceUsage = new ConcurrentHashMap<>();
+		private Map<Integer,Long> nCores = new ConcurrentHashMap<>();
+		private Map<Integer,Map<String,String>> provenance = new HashMap<>();
 
 		@Override
 		public void addJob(Job job, String executerId) {
@@ -117,6 +132,48 @@ public interface JobStorage {
 			if (executer != null)
 				map.put(executer.getExecuterId(), job.getId());
 		}
+
+		@Override
+		public void initResourceUsage(int id, long resourceUsage, long nCores) {
+			this.resourceUsage.put(id, resourceUsage);
+			this.nCores.put(id, nCores);
+		}
+
+		@Override
+		public void setResourceUsage(int id, double seconds) {
+			Long cores = nCores.get(id);
+			if (cores != null)
+				resourceUsage.put(id, (long) (seconds * cores));
+		}
+
+		@Override
+		public long getResourceUsage(Job job) {
+			Integer id = job.getId();
+			nCores.remove(id);
+			return resourceUsage.get(id);
+		}
+
+		@Override
+		public void addProvenance(int id, String key, String value) {
+			synchronized (provenance) {
+				Map<String, String> map = provenance.get(id);
+				if (map == null) {
+					map = new HashMap<>();
+					provenance.put(id, map);
+				}
+				map.put(key, value);
+			}
+		}
+
+		@Override
+		public Map<String, String> getProvenance(Job job) {
+			synchronized (provenance) {
+				Map<String, String> map = provenance.get(job.getId());
+				if (map == null || map.isEmpty())
+					return null;
+				return new HashMap<>(map);
+			}
+		}
 	}
 
 	static class DAO implements JobStorage {
@@ -135,9 +192,15 @@ public interface JobStorage {
 		private static final String GET_STATE = "SELECT state FROM job WHERE id = :id LIMIT 1";
 		private static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :id";
 		private static final String SET_EXEC = "UPDATE job SET executer = :executer WHERE id = :id";
+		private static final String INIT_RU = "UPDATE job SET resourceUsage = :resources, numCores = :cores WHERE id = :id";
+		private static final String SET_RU = "UPDATE job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :id";
+		private static final String GET_RU = "SELECT resourceUsage FROM job WHERE id = :id LIMIT 1";
+		private static final String ADD_PROV = "INSERT OR REPLACE INTO jobProvenance (id, provKey, provValue) "
+				+ "VALUES (:id, :key, :value)";
+		private static final String GET_PROV = "SELECT provKey, provValue FROM jobProvenance WHERE id = :id";
 
 		@Override
-		public void addJob(final Job job, final String executerId) {
+		public void addJob(Job job, String executerId) {
 			Objects.requireNonNull(job, "can only register real jobs");
 			db.update(ADD_JOB,
 					where("id", job.getId()).and("json", JobMapper.map(job))
@@ -145,7 +208,7 @@ public interface JobStorage {
 		}
 
 		@Override
-		public Job getJob(final String executerId) {
+		public Job getJob(String executerId) {
 			if (executerId == null)
 				return null;
 			return db.queryForObject(GET_JOB_BY_EXECUTER,
@@ -153,24 +216,24 @@ public interface JobStorage {
 		}
 
 		@Override
-		public Job getJob(final int jobId) {
+		public Job getJob(int jobId) {
 			return db.queryForObject(GET_JOB_BY_ID, where("id", jobId),
 					new JobMapper("json"));
 		}
 
-		private List<Job> getInState(final int state) {
+		private List<Job> getInState(int state) {
 			return db.query(GET_IN_STATE, where("state", state), new JobMapper(
 					"json"));
 		}
 
-		private Integer getState(final Job job) {
+		private Integer getState(Job job) {
 			if (job == null)
 				return null;
 			return db.queryForObject(GET_STATE, where("id", job.getId()),
 					Integer.class);
 		}
 
-		private void setState(final Job job, final int state) {
+		private void setState(Job job, int state) {
 			if (job != null)
 				db.update(SET_STATE,
 						where("id", job.getId()).and("state", state));
@@ -201,7 +264,7 @@ public interface JobStorage {
 		}
 
 		@Override
-		public void assignNewExecutor(final Job job, final JobExecuter executer) {
+		public void assignNewExecutor(Job job, JobExecuter executer) {
 			if (job != null)
 				db.update(
 						SET_EXEC,
@@ -224,6 +287,48 @@ public interface JobStorage {
 				return this;
 			}
 		}
+
+		@Override
+		public void initResourceUsage(int id, long resourceUsage,
+				long quotaNCores) {
+			db.update(INIT_RU, where("id", id).and("resources", resourceUsage)
+					.and("cores", quotaNCores));
+		}
+
+		@Override
+		public void setResourceUsage(int id, double seconds) {
+			db.update(SET_RU, where("id", id).and("seconds", seconds));
+		}
+
+		@Override
+		public long getResourceUsage(Job job) {
+			Long l = db.queryForObject(GET_RU, where("id", job.getId()),
+					Long.class);
+			return l == null ? 0 : l;
+		}
+
+		@Override
+		public void addProvenance(int id, String key, String value) {
+			db.update(ADD_PROV, where("id", id).and("key", key).and("value",value));
+		}
+
+		@Override
+		public Map<String, String> getProvenance(Job job) {
+			return db.query(GET_PROV, where("id", job.getId()),
+					new ResultSetExtractor<Map<String, String>>() {
+						@Override
+						public Map<String, String> extractData(ResultSet rs)
+								throws SQLException, DataAccessException {
+							Map<String, String> map = new TreeMap<>();
+							int provKey = rs.findColumn("provKey");
+							int provValue = rs.findColumn("provValue");
+							while (rs.next())
+								map.put(rs.getString(provKey),
+										rs.getString(provValue));
+							return map.isEmpty() ? null : map;
+						}
+					});
+		}
 	}
 }
 
@@ -239,21 +344,12 @@ abstract class SingleColumnMapper<T> implements RowMapper<T> {
 	 */
 	protected int column;
 
-	static int getColumnIndex(String label, ResultSet rs) throws SQLException {
-		ResultSetMetaData md = rs.getMetaData();
-		for (int i = 1; i <= md.getColumnCount(); i++)
-			if (md.getColumnLabel(i).equals(label))
-				return i;
-		throw new SQLException("cannot look up column with label '" + label
-				+ "'");
-	}
-
 	protected abstract T mapRow(ResultSet rs) throws Exception;
 
 	@Override
 	public final T mapRow(ResultSet rs, int row) throws SQLException {
 		if (row == 0)
-			column = getColumnIndex(label, rs);
+			column = rs.findColumn(label);
 		try {
 			return mapRow(rs);
 		} catch (SQLException e) {

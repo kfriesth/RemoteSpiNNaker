@@ -1,7 +1,9 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.Values.where;
+import static uk.ac.manchester.cs.spinnaker.utils.DirectoryUtils.mktmpdir;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -54,7 +56,7 @@ public interface JobStorage {
 	 *            to clear the assignment.
 	 */
 	void assignNewExecutor(Job job, JobExecuter executer);
-	
+
 	void initResourceUsage(int id, long plannedResourceUsage, long quotaNCores);
 
 	void setResourceUsage(int id, double seconds);
@@ -65,14 +67,18 @@ public interface JobStorage {
 
 	Map<String, String> getProvenance(Job job);
 
+	/** Get (or create) the temporary directory for storing output files in. */
+	File getTempDirectory(Job job) throws IOException;
+
 	static class Queue implements JobStorage {
 		private Map<String, Integer> map = new ConcurrentHashMap<>();
 		private Set<Integer> running = new ConcurrentSkipListSet<>();
 		private Map<Integer, Job> store = new ConcurrentHashMap<>();
 		private Set<Integer> waiting = new ConcurrentSkipListSet<>();
-		private Map<Integer,Long> resourceUsage = new ConcurrentHashMap<>();
-		private Map<Integer,Long> nCores = new ConcurrentHashMap<>();
-		private Map<Integer,Map<String,String>> provenance = new HashMap<>();
+		private Map<Integer, Long> resourceUsage = new ConcurrentHashMap<>();
+		private Map<Integer, Long> nCores = new ConcurrentHashMap<>();
+		private Map<Integer, Map<String, String>> provenance = new HashMap<>();
+		private Map<Integer, File> tempDir = new HashMap<>();
 
 		@Override
 		public void addJob(Job job, String executerId) {
@@ -174,6 +180,18 @@ public interface JobStorage {
 				return new HashMap<>(map);
 			}
 		}
+
+		@Override
+		public File getTempDirectory(Job job) throws IOException {
+			synchronized (tempDir) {
+				File tmp = tempDir.get(job.getId());
+				if (tmp == null) {
+					tmp = mktmpdir();
+					tempDir.put(job.getId(), tmp);
+				}
+				return tmp;
+			}
+		}
 	}
 
 	static class DAO implements JobStorage {
@@ -198,6 +216,8 @@ public interface JobStorage {
 		private static final String ADD_PROV = "INSERT OR REPLACE INTO jobProvenance (id, provKey, provValue) "
 				+ "VALUES (:id, :key, :value)";
 		private static final String GET_PROV = "SELECT provKey, provValue FROM jobProvenance WHERE id = :id";
+		private static final String GET_TMPDIR = "SELECT temporaryDirectory FROM job WHERE id = :id LIMIT 1";
+		private static final String SET_TMPDIR = "UPDATE job SET temporaryDirectory = :tempdir WHERE id = :id";
 
 		@Override
 		public void addJob(Job job, String executerId) {
@@ -309,7 +329,8 @@ public interface JobStorage {
 
 		@Override
 		public void addProvenance(int id, String key, String value) {
-			db.update(ADD_PROV, where("id", id).and("key", key).and("value",value));
+			db.update(ADD_PROV,
+					where("id", id).and("key", key).and("value", value));
 		}
 
 		@Override
@@ -328,6 +349,18 @@ public interface JobStorage {
 							return map.isEmpty() ? null : map;
 						}
 					});
+		}
+
+		@Override
+		public File getTempDirectory(Job job) throws IOException {
+			File tmp = db.queryForObject(GET_TMPDIR, where("id", job.getId()),
+					File.class);
+			if (tmp == null) {
+				tmp = mktmpdir();
+				db.update(SET_TMPDIR,
+						where("id", job.getId()).and("tempdir", tmp));
+			}
+			return tmp;
 		}
 	}
 }

@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS job (
 	state INTEGER DEFAULT 0,
 	executer TEXT, -- TODO make the executers their own table
 	numCores INTEGER DEFAULT 0,
-	resourceUsage INTEGER DEFAULT 0
+	resourceUsage INTEGER DEFAULT 0,
+	temporaryDirectory TEXT
 );
 
 CREATE TABLE IF NOT EXISTS jobProvenance (

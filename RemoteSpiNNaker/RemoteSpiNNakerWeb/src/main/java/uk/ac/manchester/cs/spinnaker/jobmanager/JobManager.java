@@ -1,13 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
-import static java.io.File.createTempFile;
 import static java.lang.Math.ceil;
 import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.commons.io.FileUtils.copyInputStreamToFile;
-import static org.apache.commons.io.FileUtils.forceDelete;
-import static org.apache.commons.io.FileUtils.forceMkdir;
 import static org.apache.commons.io.FileUtils.forceMkdirParent;
 import static org.apache.commons.io.FileUtils.listFiles;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -17,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +70,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private Logger logger = getLogger(getClass());
 	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
-	private Map<Integer, File> jobOutputTempFiles = new HashMap<>();
 	private ThreadGroup threadGroup;
 
 	public JobManager(URL baseUrl) {
@@ -257,21 +254,21 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	public void addOutput(String projectId, int id, String output,
 			InputStream input) {
 		requireNonNull(output);
+		output = output.replaceFirst("^/+", "");
+		for (String bit : output.split("/"))
+			if (bit.equals("/") || bit.equals(".") || bit.equals(".."))
+				throw new WebApplicationException("bad filename", 400);
 		requireNonNull(input);
+		File tempOutputDir;
 		try {
-			if (!jobOutputTempFiles.containsKey(id)) {
-				File tempOutputDir = createTempFile("jobOutput", ".tmp");
-				forceDelete(tempOutputDir);
-				forceMkdir(tempOutputDir);
-				jobOutputTempFiles.put(id, tempOutputDir);
-			}
+			tempOutputDir = storage.getTempDirectory(storage.getJob(id));
 		} catch (IOException e) {
 			logger.error("Error creating temporary output directory for " + id,
 					e);
 			throw new WebApplicationException(INTERNAL_SERVER_ERROR);
 		}
 
-		File outputFile = new File(jobOutputTempFiles.get(id), output);
+		File outputFile = new File(tempOutputDir, output);
 		try {
 			forceMkdirParent(outputFile);
 			copyInputStreamToFile(input, outputFile);
@@ -292,11 +289,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			outputItems.addAll(outputManager.addOutputs(projectId, id,
 					new File(baseFile), outputFiles));
 		}
-		if (jobOutputTempFiles.containsKey(id)) {
-			File directory = jobOutputTempFiles.get(id);
+		File directory = storage.getTempDirectory(storage.getJob(id));
+		Collection<File> filelist = listFiles(directory, null, true);
+		if (filelist != null && !filelist.isEmpty())
 			outputItems.addAll(outputManager.addOutputs(projectId, id,
-					directory, listFiles(directory, null, true)));
-		}
+					directory, filelist));
 		return outputItems;
 	}
 

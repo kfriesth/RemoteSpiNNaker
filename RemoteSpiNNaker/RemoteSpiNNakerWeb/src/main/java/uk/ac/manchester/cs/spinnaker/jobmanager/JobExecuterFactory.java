@@ -23,4 +23,6 @@ public interface JobExecuterFactory {
 	 */
 	JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
 			throws IOException;
+
+	JobExecuter getJobExecuter(String executerId);
 }

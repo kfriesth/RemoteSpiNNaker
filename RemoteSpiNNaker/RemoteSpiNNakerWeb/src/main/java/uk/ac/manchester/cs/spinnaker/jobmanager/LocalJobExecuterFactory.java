@@ -21,7 +21,9 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -51,6 +53,7 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 
 	private List<File> jobProcessManagerClasspath = new ArrayList<>();
 	private File jobExecuterDirectory = null;
+	private Map<String,Executer>map = new ConcurrentHashMap<>();
 	private static Logger log = getLogger(Executer.class);
 
 	public LocalJobExecuterFactory() {
@@ -90,6 +93,11 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 	}
 
 	@Override
+	public JobExecuter getJobExecuter(String id) {
+		return map.get(id);
+	}
+
+	@Override
 	public JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
 			throws IOException {
 		String uuid = UUID.randomUUID().toString();
@@ -106,7 +114,9 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 		if (requestSpiNNakerMachine)
 			arguments.add("--requestMachine");
 
-		return new Executer(requireNonNull(manager), arguments, uuid);
+		Executer e = new Executer(requireNonNull(manager), arguments, uuid);
+		map.put(uuid, e);
+		return e;
 	}
 
 	class Executer implements JobExecuter, Runnable {
@@ -228,6 +238,7 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 				log.warn("problem in reporting log", e);
 			}
 			jobManager.setExecutorExited(id, logToAppend.toString());
+			map.remove(id);
 		}
 
 		/**

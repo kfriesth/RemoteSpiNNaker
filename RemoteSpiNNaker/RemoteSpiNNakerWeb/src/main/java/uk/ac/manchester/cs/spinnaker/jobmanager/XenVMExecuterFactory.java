@@ -14,8 +14,10 @@ import static uk.ac.manchester.cs.spinnaker.utils.ThreadUtils.sleep;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.slf4j.Logger;
@@ -59,6 +61,8 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
     @Value("${xen.server.maxVms}")
 	private int maxNVirtualMachines;
 
+    // TODO make this map persistent
+    private Map<String,Executer>map = new ConcurrentHashMap<>();
 	private int nVirtualMachines = 0;
 
 	public XenVMExecuterFactory() {
@@ -73,10 +77,17 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 		waitToClaimVM();
 
 		try {
-			return new Executer(manager, baseUrl);
+			Executer e = new Executer(manager, baseUrl);
+			map.put(e.getExecuterId(), e);
+			return e;
 		} catch (Exception e) {
 			throw new IOException("Error creating VM", e);
 		}
+	}
+
+	@Override
+	public JobExecuter getJobExecuter(String executerId) {
+		return map.get(executerId);
 	}
 
 	private void waitToClaimVM() {
@@ -97,11 +108,12 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 		}
 	}
 
-	protected void executorFinished() {
+	protected void executorFinished(Executer executor) {
 		synchronized (lock) {
 			nVirtualMachines--;
 			logger.debug(nVirtualMachines + " of " + maxNVirtualMachines
 					+ " now in use");
+			map.remove(executor.getExecuterId());
 			lock.notifyAll();
 		}
 	}
@@ -307,7 +319,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 				logger.error("Error setting up VM", e);
 				jobManager.setExecutorExited(uuid, e.getMessage());
 			} finally {
-				executorFinished();
+				executorFinished(this);
 			}
 		}
 	}

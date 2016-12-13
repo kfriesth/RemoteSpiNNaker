@@ -69,6 +69,7 @@ import uk.ac.manchester.cs.spinnaker.machinemanager.SpallocMachineManagerImpl;
 import uk.ac.manchester.cs.spinnaker.nmpi.NMPIQueueManager;
 import uk.ac.manchester.cs.spinnaker.output.OutputManagerImpl;
 import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
+import uk.ac.manchester.cs.spinnaker.rest.utils.NullExceptionMapper;
 
 
 @Configuration
@@ -242,7 +243,8 @@ public class RemoteSpinnakerBeans {
 		factory.setAddress(restPath);
 		factory.setBus(ctx.getBean(SpringBus.class));
 		factory.setServiceBeans(asList(outputManager(), jobManager()));
-		factory.setProviders(asList(new JacksonJsonProvider()));
+		factory.setProviders(asList(new JacksonJsonProvider(),
+				new NullExceptionMapper()));
 		return factory.create();
 	}
 
@@ -317,5 +319,5 @@ public class RemoteSpinnakerBeans {
 		JobStorage jobStorage() {
 			return new JobStorage.DAO();
 		}
-}
+	}
 }

@@ -25,3 +25,13 @@ CREATE TABLE IF NOT EXISTS jobMachines (
 );
 
 CREATE INDEX IF NOT EXISTS jobMachinesKeyIndex ON jobMachines (id);
+
+CREATE TABLE IF NOT EXISTS xen (
+	-- These are all UUIDs...
+	id TEXT PRIMARY KEY ON CONFLICT ABORT,
+	vm TEXT,
+	disk TEXT,
+	vdi TEXT,
+	extraVdi TEXT,
+	extraDisk TEXT
+);

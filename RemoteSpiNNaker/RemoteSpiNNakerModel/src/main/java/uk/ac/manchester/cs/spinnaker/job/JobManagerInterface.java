@@ -69,8 +69,10 @@ public interface JobManagerInterface {
 
 	@POST
 	@Path("{id}/provenance")
+	@Consumes(TEXT_PLAIN)
 	void addProvenance(@PathParam("id") int id,
-			@QueryParam("name") String name, @QueryParam("value") String value);
+			@QueryParam("name") String name, @QueryParam("value") String value,
+			String bodyValue);
 
 	@POST
 	@Path("{projectId}/{id}/addoutput")

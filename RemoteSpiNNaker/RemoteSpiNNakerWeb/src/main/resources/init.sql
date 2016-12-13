@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS job (
 	executer TEXT, -- TODO make the executers their own table
 	numCores INTEGER DEFAULT 0,
 	resourceUsage INTEGER DEFAULT 0,
-	temporaryDirectory TEXT
+	temporaryDirectory TEXT,
+	creation NUMERIC
 );
 
 CREATE TABLE IF NOT EXISTS jobProvenance (
@@ -17,3 +18,10 @@ CREATE TABLE IF NOT EXISTS jobProvenance (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS jobProvenanceKeyIndex ON jobProvenance (id, provKey);
+
+CREATE TABLE IF NOT EXISTS jobMachines (
+	id INTEGER REFERENCES job ON DELETE CASCADE,
+	machine TEXT
+);
+
+CREATE INDEX IF NOT EXISTS jobMachinesKeyIndex ON jobMachines (id);

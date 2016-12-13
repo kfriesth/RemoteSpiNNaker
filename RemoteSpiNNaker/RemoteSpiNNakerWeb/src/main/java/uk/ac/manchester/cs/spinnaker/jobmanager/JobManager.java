@@ -15,7 +15,6 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -69,7 +68,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
     private JobStorage storage;
 
 	private Logger logger = getLogger(getClass());
-	private Map<Integer, List<SpinnakerMachine>> allocatedMachines = new HashMap<>();
 	private ThreadGroup threadGroup;
 
 	public JobManager(URL baseUrl) {
@@ -97,14 +95,32 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		executer.startExecuter();
 	}
 
+	/**
+	 * Get the job with the ID.
+	 * 
+	 * @param the
+	 *            job ID to look up.
+	 * @return the job, never <tt>null</tt>
+	 * @throws WebApplicationException
+	 *             if there's no such job.
+	 */
+	private Job findJob(int id) {
+		Job job = storage.getJob(id);
+		if (job == null)
+			throw new WebApplicationException("bad job id", 400);
+		return job;
+	}
+
 	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public Job getNextJob(String executerId) {
 		requireNonNull(executerId);
 		Job job = storage.getJob(executerId);
+		if (job == null)
+			throw new WebApplicationException("bad executer id", 400);
 		logger.info("Executer " + executerId + " is running " + job.getId());
-		queueManager.setJobRunning(job.getId());
+		queueManager.setJobRunning(job);
 		storage.markRunning(job);
 		return job;
 	}
@@ -127,7 +143,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Transactional
 	public SpinnakerMachine getJobMachine(int id, int nCores, int nChips,
 			int nBoards, double runTime) {
-		// TODO Check quota
+		Job job = findJob(id);
+		runTime = max(runTime, 0);// TODO what does the default mean?
 
 		logger.info("Request for " + nCores + " cores or " + nChips
 				+ " chips or " + nBoards + " boards for " + (runTime / 1000.0)
@@ -157,50 +174,35 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		nBoardsToRequest = max(nBoardsToRequest, 1);
 		quotaNCores = max(quotaNCores, 1);
 
-		SpinnakerMachine machine = allocateMachineForJob(id, nBoardsToRequest);
+		SpinnakerMachine machine = machineManager
+				.getNextAvailableMachine(nBoardsToRequest);
+		storage.addMachine(job, machine);
 		logger.info("Running " + id + " on " + machine.getMachineName());
 		long resourceUsage = (long) ((runTime / 1000.0) * quotaNCores);
 		logger.info("Resource usage " + resourceUsage);
-		storage.initResourceUsage(id, resourceUsage, (int) quotaNCores);
+		storage.initResourceUsage(job, resourceUsage, (int) quotaNCores);
 
 		return machine;
 	}
 
-	/** Get a machine to run the job on */
-	private SpinnakerMachine allocateMachineForJob(int id, int nBoardsToRequest) {
-		SpinnakerMachine machine = machineManager
-				.getNextAvailableMachine(nBoardsToRequest);
-		synchronized (allocatedMachines) {
-			if (!allocatedMachines.containsKey(id))
-				allocatedMachines.put(id, new ArrayList<SpinnakerMachine>());
-			allocatedMachines.get(id).add(machine);
-		}
-		return machine;
-	}
-
-	private List<SpinnakerMachine> getMachineForJob(int id) {
-		synchronized (allocatedMachines) {
-			return allocatedMachines.get(id);
-		}
-	}
-	
 	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public void extendJobMachineLease(int id, double runTime) {
+		Job job = findJob(id);
 		if (runTime < 0.0)
 			// TODO handle the default a bit better
 			return;
 		// TODO Check quota that the lease can be extended
 
-		storage.setResourceUsage(id, runTime / 1000.0);
+		storage.setResourceUsage(job, runTime / 1000.0);
 	}
 
 	/**{@inheritDoc}*/
 	@Override
 	@Transactional
 	public JobMachineAllocated checkMachineLease(int id, int waitTime) {
-		List<SpinnakerMachine> machines = getMachineForJob(id);
+		List<SpinnakerMachine> machines = storage.getMachines(findJob(id));
 
 		// Return false if any machine is gone
 		for (SpinnakerMachine machine : machines)
@@ -243,9 +245,19 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Override
 	@Transactional
 	public void appendLog(int id, String logToAppend) {
+		findJob(id);
 		logger.debug("Updating log for " + id);
 		logger.trace(id + ": " + logToAppend);
 		queueManager.appendJobLog(id, requireNonNull(logToAppend));
+	}
+
+	private static String verifyFilename(String filename) {
+		requireNonNull(filename);
+		filename = filename.replaceFirst("^/+", "");
+		for (String bit : filename.split("/"))
+			if (bit.equals("/") || bit.equals(".") || bit.equals(".."))
+				throw new WebApplicationException("bad filename", 400);
+		return filename;
 	}
 
 	/**{@inheritDoc}*/
@@ -253,15 +265,12 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	@Transactional
 	public void addOutput(String projectId, int id, String output,
 			InputStream input) {
-		requireNonNull(output);
-		output = output.replaceFirst("^/+", "");
-		for (String bit : output.split("/"))
-			if (bit.equals("/") || bit.equals(".") || bit.equals(".."))
-				throw new WebApplicationException("bad filename", 400);
+		output = verifyFilename(output);
 		requireNonNull(input);
+		Job job = findJob(id);
 		File tempOutputDir;
 		try {
-			tempOutputDir = storage.getTempDirectory(storage.getJob(id));
+			tempOutputDir = storage.getTempDirectory(job);
 		} catch (IOException e) {
 			logger.error("Error creating temporary output directory for " + id,
 					e);
@@ -279,17 +288,20 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		}
 	}
 
-	private List<DataItem> getOutputFiles(String projectId, int id,
+	private List<DataItem> getOutputFiles(String projectId, Job job,
 			String baseFile, List<String> outputs) throws IOException {
+		int id = job.getId();
 		List<DataItem> outputItems = new ArrayList<>();
-		if (outputs != null) {
+
+		if (outputs != null && !outputs.isEmpty()) {
 			List<File> outputFiles = new ArrayList<>();
 			for (String filename : outputs)
-				outputFiles.add(new File(filename));
+				outputFiles.add(new File(verifyFilename(filename)));
 			outputItems.addAll(outputManager.addOutputs(projectId, id,
 					new File(baseFile), outputFiles));
 		}
-		File directory = storage.getTempDirectory(storage.getJob(id));
+
+		File directory = storage.getTempDirectory(job);
 		Collection<File> filelist = listFiles(directory, null, true);
 		if (filelist != null && !filelist.isEmpty())
 			outputItems.addAll(outputManager.addOutputs(projectId, id,
@@ -300,8 +312,10 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	/**{@inheritDoc}*/
 	@Override
 	@Transactional
-	public void addProvenance(int id, String item, String value) {
-		storage.addProvenance(id, requireNonNull(item),
+	public void addProvenance(int id, String item, String value, String body) {
+		if (value == null || value.isEmpty())
+			value = body;
+		storage.addProvenance(findJob(id), requireNonNull(item),
 				requireNonNull(value));
 	}
 
@@ -315,9 +329,9 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		requireNonNull(baseDirectory);
 		requireNonNull(outputs);
 		logger.debug("Marking job " + id + " as finished");
-		releaseAllocatedMachines(id);
+		Job job = findJob(id);
+		releaseAllocatedMachines(job);
 
-		Job job = storage.getJob(id);
 		// Do these before anything that can throw
 		long resourceUsage = storage.getResourceUsage(job);
 		Map<String, String> prov = storage.getProvenance(job);
@@ -326,8 +340,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		storage.markDone(job);
 
 		try {
-			queueManager.setJobFinished(id, logToAppend,
-					getOutputFiles(projectId, id, baseDirectory, outputs),
+			queueManager.setJobFinished(job, logToAppend,
+					getOutputFiles(projectId, job, baseDirectory, outputs),
 					resourceUsage, prov);
 		} catch (IOException e) {
 			logger.error("Error creating URLs while updating job", e);
@@ -335,14 +349,11 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	}
 
 	/** @return <tt>true</tt> if there were machines removed by this. */
-	private boolean releaseAllocatedMachines(int id) {
-		synchronized (allocatedMachines) {
-			List<SpinnakerMachine> machines = allocatedMachines.remove(id);
-			if (machines != null)
-				for (SpinnakerMachine machine : machines)
-					machineManager.releaseMachine(machine);
-			return machines != null;
-		}
+	private boolean releaseAllocatedMachines(Job job) {
+		List<SpinnakerMachine> machines = storage.getMachines(job);
+		for (SpinnakerMachine machine : machines)
+			machineManager.releaseMachine(machine);
+		return !machines.isEmpty();
 	}
 
 	/**{@inheritDoc}*/
@@ -359,8 +370,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		requireNonNull(stackTrace);
 
 		logger.debug("Marking job " + id + " as error");
-		releaseAllocatedMachines(id);
-		Job job = storage.getJob(id);
+		Job job = findJob(id);
+		releaseAllocatedMachines(job);
 		storage.markDone(job);
 
 		Exception exception = reconstructRemoteException(error, stackTrace);
@@ -371,8 +382,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			prov = null;
 
 		try {
-			queueManager.setJobError(id, logToAppend,
-					getOutputFiles(projectId, id, baseDirectory, outputs),
+			queueManager.setJobError(job, logToAppend,
+					getOutputFiles(projectId, job, baseDirectory, outputs),
 					exception, resourceUsage, prov);
 		} catch (IOException e) {
 			logger.error("Error creating URLs while updating job", e);
@@ -404,7 +415,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 			int id = job.getId();
 			logger.debug("Job " + id + " has exited");
 
-			if (releaseAllocatedMachines(id)) {
+			if (releaseAllocatedMachines(job)) {
 				logger.debug("Job " + id + " has not exited cleanly");
 				try {
 					long resourceUsage = storage.getResourceUsage(job);
@@ -412,8 +423,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 					if (prov.isEmpty())
 						prov = null;
 					String projectId = new File(job.getCollabId()).getName();
-					queueManager.setJobError(id, logToAppend,
-							getOutputFiles(projectId, id, null, null),
+					queueManager.setJobError(job, logToAppend,
+							getOutputFiles(projectId, job, null, null),
 							new Exception("Job did not finish cleanly"),
 							resourceUsage, prov);
 				} catch (IOException e) {

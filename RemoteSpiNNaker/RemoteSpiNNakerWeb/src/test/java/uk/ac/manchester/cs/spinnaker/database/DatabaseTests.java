@@ -114,7 +114,7 @@ public class DatabaseTests {
 			for (int i = 1; i <= md.getColumnCount(); i++)
 				names.add(md.getColumnLabel(i).toLowerCase());
 			sort(names);
-			Assert.assertEquals("[executer, id, json, numcores, resourceusage, state, temporarydirectory]", names.toString());
+			Assert.assertEquals("[creation, executer, id, json, numcores, resourceusage, state, temporarydirectory]", names.toString());
 		}
 	}
 

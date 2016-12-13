@@ -1,5 +1,10 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
+import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
+import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State.Done;
+import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State.Running;
+import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State.Waiting;
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.Values.where;
 import static uk.ac.manchester.cs.spinnaker.utils.DirectoryUtils.mktmpdir;
 
@@ -8,13 +13,13 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -27,6 +32,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
+import uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State;
+import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -34,6 +41,8 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public interface JobStorage {
+	void addJob(Job job);
+
 	void addJob(Job job, String executerId);
 
 	Job getJob(String executerId);
@@ -57,20 +66,24 @@ public interface JobStorage {
 	 */
 	void assignNewExecutor(Job job, JobExecuter executer);
 
-	void initResourceUsage(int id, long plannedResourceUsage, long quotaNCores);
+	void initResourceUsage(Job job, long plannedResourceUsage, long quotaNCores);
 
-	void setResourceUsage(int id, double seconds);
+	void setResourceUsage(Job job, double seconds);
 
 	long getResourceUsage(Job job);
 
-	void addProvenance(int id, String key, String value);
+	void addProvenance(Job job, String key, String value);
 
 	Map<String, String> getProvenance(Job job);
 
 	/** Get (or create) the temporary directory for storing output files in. */
 	File getTempDirectory(Job job) throws IOException;
 
-	static class Queue implements JobStorage {
+	List<SpinnakerMachine> getMachines(Job job);
+
+	void addMachine(Job job, SpinnakerMachine machine);
+
+	class Queue implements JobStorage {
 		private Map<String, Integer> map = new ConcurrentHashMap<>();
 		private Set<Integer> running = new ConcurrentSkipListSet<>();
 		private Map<Integer, Job> store = new ConcurrentHashMap<>();
@@ -79,11 +92,21 @@ public interface JobStorage {
 		private Map<Integer, Long> nCores = new ConcurrentHashMap<>();
 		private Map<Integer, Map<String, String>> provenance = new HashMap<>();
 		private Map<Integer, File> tempDir = new HashMap<>();
+		private Map<Integer, List<SpinnakerMachine>> machines = new ConcurrentHashMap<>();
+
+		@Override
+		public void addJob(Job job) {
+			if (getJob(job.getId()) == null) {
+				store.put(job.getId(), job);
+				// What state should it be in in this case?
+			}
+		}
 
 		@Override
 		public void addJob(Job job, String executerId) {
 			store.put(job.getId(), job);
-			map.put(executerId, job.getId());
+			if (executerId != null)
+				map.put(executerId, job.getId());
 			waiting.add(job.getId());
 		}
 
@@ -140,16 +163,16 @@ public interface JobStorage {
 		}
 
 		@Override
-		public void initResourceUsage(int id, long resourceUsage, long nCores) {
-			this.resourceUsage.put(id, resourceUsage);
-			this.nCores.put(id, nCores);
+		public void initResourceUsage(Job job, long resourceUsage, long nCores) {
+			this.resourceUsage.put(job.getId(), resourceUsage);
+			this.nCores.put(job.getId(), nCores);
 		}
 
 		@Override
-		public void setResourceUsage(int id, double seconds) {
-			Long cores = nCores.get(id);
+		public void setResourceUsage(Job job, double seconds) {
+			Long cores = nCores.get(job.getId());
 			if (cores != null)
-				resourceUsage.put(id, (long) (seconds * cores));
+				resourceUsage.put(job.getId(), (long) (seconds * cores));
 		}
 
 		@Override
@@ -160,12 +183,12 @@ public interface JobStorage {
 		}
 
 		@Override
-		public void addProvenance(int id, String key, String value) {
+		public void addProvenance(Job job, String key, String value) {
 			synchronized (provenance) {
-				Map<String, String> map = provenance.get(id);
+				Map<String, String> map = provenance.get(job.getId());
 				if (map == null) {
-					map = new HashMap<>();
-					provenance.put(id, map);
+					map = new LinkedHashMap<>();
+					provenance.put(job.getId(), map);
 				}
 				map.put(key, value);
 			}
@@ -177,7 +200,7 @@ public interface JobStorage {
 				Map<String, String> map = provenance.get(job.getId());
 				if (map == null || map.isEmpty())
 					return null;
-				return new HashMap<>(map);
+				return new LinkedHashMap<>(map);
 			}
 		}
 
@@ -192,9 +215,29 @@ public interface JobStorage {
 				return tmp;
 			}
 		}
+
+		@Override
+		public List<SpinnakerMachine> getMachines(Job job) {
+			synchronized (machines) {
+				List<SpinnakerMachine> m = machines.get(job.getId());
+				if (m == null)
+					return emptyList();
+				return new ArrayList<>(m);
+			}
+		}
+
+		@Override
+		public void addMachine(Job job, SpinnakerMachine machine) {
+			synchronized (machines) {
+				List<SpinnakerMachine> m = machines.get(job.getId());
+				if (m == null)
+					machines.put(job.getId(), m = new ArrayList<>());
+				m.add(machine);
+			}
+		}
 	}
 
-	static class DAO implements JobStorage {
+	class DAO implements JobStorage {
 		private NamedParameterJdbcTemplate db;
 
 		@Autowired
@@ -202,29 +245,69 @@ public interface JobStorage {
 			this.db = new NamedParameterJdbcTemplate(dataSource);
 		}
 
-		private static final String ADD_JOB = "INSERT INTO job(id, json, state, executer) "
-				+ "VALUES (:id, :json, 0, :executer)";
+		public static enum State {
+			Waiting(0), Running(1), Done(2);
+			private final int state;
+
+			State(int code) {
+				this.state = code;
+			}
+
+			public int getCode() {
+				return state;
+			}
+
+			public static State get(int i) {
+				for (State s : values())
+					if (s.getCode() == i)
+						return s;
+				throw new IllegalArgumentException("unexpected state code: "
+						+ i);
+			}
+		}
+
+		private static final String ADD_JOB = "INSERT INTO job (id, json, state, executer, creation) "
+				+ "VALUES (:job, :json, 0, :executer, :timestamp)";
+		private static final String ADD_MACH = "INSERT INTO jobMachines (id, machine) "
+				+ "VALUES (:job, :machine)";
+		private static final String ADD_PROV = "INSERT OR REPLACE INTO jobProvenance (id, provKey, provValue) "
+				+ "VALUES (:job, :key, :value)";
+		private static final String EXISTS_JOB = "SELECT EXISTS(1 AS b FROM job WHERE id = :id LIMIT 1)";
 		private static final String GET_JOB_BY_ID = "SELECT json FROM job WHERE id = :id LIMIT 1";
 		private static final String GET_JOB_BY_EXECUTER = "SELECT json FROM job WHERE executer = :executer LIMIT 1";
 		private static final String GET_IN_STATE = "SELECT json FROM job WHERE state = :state";
-		private static final String GET_STATE = "SELECT state FROM job WHERE id = :id LIMIT 1";
-		private static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :id";
-		private static final String SET_EXEC = "UPDATE job SET executer = :executer WHERE id = :id";
-		private static final String INIT_RU = "UPDATE job SET resourceUsage = :resources, numCores = :cores WHERE id = :id";
-		private static final String SET_RU = "UPDATE job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :id";
-		private static final String GET_RU = "SELECT resourceUsage FROM job WHERE id = :id LIMIT 1";
-		private static final String ADD_PROV = "INSERT OR REPLACE INTO jobProvenance (id, provKey, provValue) "
-				+ "VALUES (:id, :key, :value)";
-		private static final String GET_PROV = "SELECT provKey, provValue FROM jobProvenance WHERE id = :id";
-		private static final String GET_TMPDIR = "SELECT temporaryDirectory FROM job WHERE id = :id LIMIT 1";
-		private static final String SET_TMPDIR = "UPDATE job SET temporaryDirectory = :tempdir WHERE id = :id";
+		private static final String GET_STATE = "SELECT state FROM job WHERE id = :job LIMIT 1";
+		private static final String GET_RU = "SELECT resourceUsage FROM job WHERE id = :job LIMIT 1";
+		private static final String GET_PROV = "SELECT provKey, provValue FROM jobProvenance WHERE id = :job";
+		private static final String GET_TMPDIR = "SELECT temporaryDirectory FROM job WHERE id = :job LIMIT 1";
+		private static final String GET_MACH = "SELECT machine FROM jobMachines WHERE id = :job";
+		private static final String SET_EXEC = "UPDATE job SET executer = :executer WHERE id = :job";
+		private static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :job";
+		private static final String SET_TMPDIR = "UPDATE job SET temporaryDirectory = :tempdir WHERE id = :job";
+		private static final String INIT_RU = "UPDATE job SET resourceUsage = :resources, numCores = :cores WHERE id = :job";
+		private static final String SET_RU = "UPDATE job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :job";
+
+		@Override
+		public void addJob(Job job) {
+			requireNonNull(job, "can only register real jobs");
+			requireNonNull(job.getId(), "can only register jobs with IDs");
+			Integer i = db.queryForObject(EXISTS_JOB, where("id", job.getId()),
+					Integer.class);
+			if (i == null || i.intValue() == 0) {
+				addJob(job, null);
+				setState(job, Done);
+			}
+		}
 
 		@Override
 		public void addJob(Job job, String executerId) {
-			Objects.requireNonNull(job, "can only register real jobs");
-			db.update(ADD_JOB,
-					where("id", job.getId()).and("json", JobMapper.map(job))
-							.and("executer", executerId));
+			requireNonNull(job, "can only register real jobs");
+			requireNonNull(job.getId(), "can only register jobs with IDs");
+			db.update(
+					ADD_JOB,
+					where("job", job).and("json", JobMapper.map(job))
+							.and("executer", executerId)
+							.and("timestamp", new Date()));
 		}
 
 		@Override
@@ -237,130 +320,152 @@ public interface JobStorage {
 
 		@Override
 		public Job getJob(int jobId) {
-			return db.queryForObject(GET_JOB_BY_ID, where("id", jobId),
-					new JobMapper("json"));
+			try {
+				return db.queryForObject(GET_JOB_BY_ID, where("id", jobId),
+						new JobMapper("json"));
+			} catch (DataAccessException e) {
+				return null;
+			}
 		}
 
-		private List<Job> getInState(int state) {
+		private List<Job> getInState(State state) {
 			return db.query(GET_IN_STATE, where("state", state), new JobMapper(
 					"json"));
 		}
 
-		private Integer getState(Job job) {
+		private State getState(Job job) {
 			if (job == null)
 				return null;
-			return db.queryForObject(GET_STATE, where("id", job.getId()),
-					Integer.class);
+			return db.queryForObject(GET_STATE, where("job", job),
+					new StateMapper("state"));
 		}
 
-		private void setState(Job job, int state) {
+		private void setState(Job job, State state) {
 			if (job != null)
-				db.update(SET_STATE,
-						where("id", job.getId()).and("state", state));
+				db.update(SET_STATE, where("job", job).and("state", state));
 		}
 
 		@Override
 		public List<Job> getWaiting() {
-			return getInState(0);
+			return getInState(Waiting);
 		}
 
 		@Override
 		public boolean isRunning(Job job) {
 			if (job == null)
 				return false;
-			return getState(job) == 1;
+			return getState(job) == Running;
 		}
 
 		@Override
 		public void markDone(Job job) {
 			if (job != null)
-				setState(job, 2);
+				setState(job, Done);
 		}
 
 		@Override
 		public void markRunning(Job job) {
 			if (job != null)
-				setState(job, 1);
+				setState(job, Running);
 		}
 
 		@Override
 		public void assignNewExecutor(Job job, JobExecuter executer) {
 			if (job != null)
-				db.update(
-						SET_EXEC,
-						where("id", job.getId()).and(
-								"executer",
-								executer != null ? executer.getExecuterId()
-										: null));
-		}
-
-		@SuppressWarnings("serial")
-		static class Values extends HashMap<String, Object> {
-			static Values where(String key, Object value) {
-				Values v = new Values();
-				v.put(key, value);
-				return v;
-			}
-
-			Values and(String key, Object value) {
-				put(key, value);
-				return this;
-			}
+				db.update(SET_EXEC, where("job", job).and("executer", executer));
 		}
 
 		@Override
-		public void initResourceUsage(int id, long resourceUsage,
+		public void initResourceUsage(Job job, long resourceUsage,
 				long quotaNCores) {
-			db.update(INIT_RU, where("id", id).and("resources", resourceUsage)
-					.and("cores", quotaNCores));
+			db.update(INIT_RU, where("job", job)
+					.and("resources", resourceUsage).and("cores", quotaNCores));
 		}
 
 		@Override
-		public void setResourceUsage(int id, double seconds) {
-			db.update(SET_RU, where("id", id).and("seconds", seconds));
+		public void setResourceUsage(Job job, double seconds) {
+			db.update(SET_RU, where("job", job).and("seconds", seconds));
 		}
 
 		@Override
 		public long getResourceUsage(Job job) {
-			Long l = db.queryForObject(GET_RU, where("id", job.getId()),
-					Long.class);
-			return l == null ? 0 : l;
+			try {
+				Long l = db.queryForObject(GET_RU, where("job", job),
+						Long.class);
+				return l == null ? 0 : l;
+			} catch (DataAccessException e) {
+				return 0;
+			}
 		}
 
 		@Override
-		public void addProvenance(int id, String key, String value) {
+		public void addProvenance(Job job, String key, String value) {
 			db.update(ADD_PROV,
-					where("id", id).and("key", key).and("value", value));
+					where("job", job).and("key", key).and("value", value));
 		}
 
 		@Override
 		public Map<String, String> getProvenance(Job job) {
-			return db.query(GET_PROV, where("id", job.getId()),
-					new ResultSetExtractor<Map<String, String>>() {
+			return db.query(GET_PROV, where("job", job),
+					new MapExtractor<String>("provKey", "provValue") {
 						@Override
-						public Map<String, String> extractData(ResultSet rs)
-								throws SQLException, DataAccessException {
-							Map<String, String> map = new TreeMap<>();
-							int provKey = rs.findColumn("provKey");
-							int provValue = rs.findColumn("provValue");
-							while (rs.next())
-								map.put(rs.getString(provKey),
-										rs.getString(provValue));
-							return map.isEmpty() ? null : map;
+						protected String extractColumn(ResultSet rs,
+								int column) throws SQLException {
+							return rs.getString(column);
 						}
 					});
 		}
 
 		@Override
 		public File getTempDirectory(Job job) throws IOException {
-			File tmp = db.queryForObject(GET_TMPDIR, where("id", job.getId()),
+			File tmp = db.queryForObject(GET_TMPDIR, where("job", job),
 					File.class);
 			if (tmp == null) {
 				tmp = mktmpdir();
-				db.update(SET_TMPDIR,
-						where("id", job.getId()).and("tempdir", tmp));
+				db.update(SET_TMPDIR, where("job", job).and("tempdir", tmp));
 			}
 			return tmp;
+		}
+
+		@Override
+		public List<SpinnakerMachine> getMachines(Job job) {
+			return db.query(GET_MACH, where("job", job), new SpinMachineMapper(
+					"machine"));
+		}
+
+		@Override
+		public void addMachine(Job job, SpinnakerMachine machine) {
+			db.update(ADD_MACH, where("job", job).and("machine", machine));
+		}
+
+		@SuppressWarnings("serial")
+		static class Values extends HashMap<String, Object> {
+			private static Object ser(Object o) {
+				if (o == null)
+					return null;
+				if (o instanceof Job)
+					return ((Job) o).getId();
+				if (o instanceof State)
+					return ((State) o).getCode();
+				if (o instanceof SpinnakerMachine)
+					return o.toString();
+				if (o instanceof Date)
+					return ((Date) o).getTime();
+				if (o instanceof JobExecuter)
+					return ((JobExecuter) o).getExecuterId();
+				return o;
+			}
+
+			static Values where(String key, Object value) {
+				Values v = new Values();
+				v.put(key, ser(value));
+				return v;
+			}
+
+			Values and(String key, Object value) {
+				put(key, ser(value));
+				return this;
+			}
 		}
 	}
 }
@@ -393,6 +498,17 @@ abstract class SingleColumnMapper<T> implements RowMapper<T> {
 	}
 }
 
+class StateMapper extends SingleColumnMapper<State> {
+	public StateMapper(String columnLabel) {
+		super(columnLabel);
+	}
+
+	@Override
+	protected State mapRow(ResultSet rs) throws Exception {
+		return State.get(rs.getInt(column));
+	}
+}
+
 class JobMapper extends SingleColumnMapper<Job> {
 	public JobMapper(String columnLabel) {
 		super(columnLabel);
@@ -413,4 +529,69 @@ class JobMapper extends SingleColumnMapper<Job> {
 			JsonMappingException, IOException {
 		return mapper.readValue(rs.getString(column), Job.class);
 	}
+}
+
+class SpinMachineMapper extends SingleColumnMapper<SpinnakerMachine> {
+	public SpinMachineMapper(String columnLabel) {
+		super(columnLabel);
+	}
+
+	@Override
+	public SpinnakerMachine mapRow(ResultSet rs) throws SQLException {
+		return SpinnakerMachine.parse(rs.getString(column));
+	}
+}
+
+/**
+ * How to convert a {@linkplain ResultSet result set} into a {@linkplain Map map}.
+ * 
+ * @author Donal Fellows
+ * @param <T>
+ *            The type of the values in the extracted map. The keys are always
+ *            strings.
+ */
+abstract class MapExtractor<T> implements ResultSetExtractor<Map<String, T>> {
+	private String keyColumn, valueColumn;
+
+	/**
+	 * Create an instance of this class.
+	 * @param key The name of the column containing the (string) key.
+	 * @param value The name of the column containing the value.
+	 */
+	MapExtractor(String key, String value) {
+		keyColumn = key;
+		valueColumn = value;
+	}
+
+	/**
+	 * Build the map that will be used to contain the results. Defaults to a
+	 * {@link LinkedHashMap} but subclasses may override, e.g., where the key
+	 * ordering matters.
+	 * 
+	 * @return The new empty modifiable map.
+	 */
+	protected Map<String,T> createMap() {
+		return new LinkedHashMap<>();
+	}
+
+	@Override
+	public final Map<String, T> extractData(ResultSet rs) throws SQLException {
+		Map<String, T> map = createMap();
+		int provKey = rs.findColumn(keyColumn);
+		int provValue = rs.findColumn(valueColumn);
+		while (rs.next())
+			map.put(rs.getString(provKey), extractColumn(rs, provValue));
+		return map.isEmpty() ? null : map;
+	}
+
+	/**
+	 * How to get the value out of a row in the result set. (Do not call
+	 * {@link ResultSet#next()}.)
+	 * 
+	 * @param rs
+	 *            The result set, positioned on the row that is being extracted.
+	 * @param columnIndex
+	 *            The column that corresponds to the nominated value column.
+	 */
+	protected abstract T extractColumn(ResultSet rs, int columnIndex) throws SQLException;
 }

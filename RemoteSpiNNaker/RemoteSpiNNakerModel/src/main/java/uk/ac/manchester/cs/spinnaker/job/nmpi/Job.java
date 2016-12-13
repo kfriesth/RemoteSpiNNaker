@@ -1,17 +1,22 @@
 package uk.ac.manchester.cs.spinnaker.job.nmpi;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.List;
 import java.util.Map;
 
 import org.joda.time.DateTime;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**
- * A NMPI job
+ * An NMPI job.
  */
-public class Job implements QueueNextResponse {
+public class Job implements QueueNextResponse, Cloneable {
     private String code;
     private Map<String, Object> hardwareConfig;
     private String hardwarePlatform;
@@ -32,7 +37,29 @@ public class Job implements QueueNextResponse {
 	private DateTime timestampSubmission;
 	private Object provenance;
 
-    public String getCode() {
+	private static final ObjectMapper mapper = new ObjectMapper();
+
+	@Override
+	public Job clone() {
+		try (final PipedInputStream pis = new PipedInputStream()) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try (OutputStream pos = new PipedOutputStream(pis)) {
+						mapper.writeValue(pos, Job.this);
+					} catch (IOException e) {
+						throw new RuntimeException(
+								"unexpected exception in job cloning", e);
+					}
+				}
+			}).start();
+			return mapper.readValue(pis, Job.class);
+		} catch (IOException e) {
+			throw new RuntimeException("unexpected exception in job cloning", e);
+		}
+	}
+
+	public String getCode() {
         return code;
     }
 

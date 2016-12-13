@@ -21,12 +21,14 @@ import javax.annotation.PostConstruct;
 
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueEmpty;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.QueueNextResponse;
+import uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage;
 import uk.ac.manchester.cs.spinnaker.model.NMPILog;
 import uk.ac.manchester.cs.spinnaker.rest.NMPIQueue;
 import uk.ac.manchester.cs.spinnaker.rest.utils.CustomJacksonJsonProvider;
@@ -47,8 +49,6 @@ public class NMPIQueueManager implements Runnable {
 	private boolean done = false;
 	/** The set of listeners for this queue */
 	private final Set<NMPIQueueListener> listeners = new HashSet<>();
-	/** A cache of jobs that have been received */
-	private final Map<Integer, Job> jobCache = new HashMap<>();
 	/** The log of the job so far */
 	private final Map<Integer, NMPILog> jobLog = new HashMap<>();
 	private Logger logger = getLogger(getClass());
@@ -72,7 +72,10 @@ public class NMPIQueueManager implements Runnable {
     @Value("${nmpi.passwordIsApiKey}")
     private boolean nmpiPasswordIsApiKey;
 
-	@PostConstruct
+    @Autowired
+    private JobStorage storage;
+
+    @PostConstruct
 	private void initAPIClient() {
 		CustomJacksonJsonProvider provider = new CustomJacksonJsonProvider();
 
@@ -96,25 +99,6 @@ public class NMPIQueueManager implements Runnable {
 		}
 		queue = createApiKeyClient(nmpiUrl, nmpiUsername, apiKey,
 				NMPIQueue.class, provider);
-	}
-
-	/**
-	 * Gets a job from the cache, or from the server if the job is not in the
-	 * cache
-	 * 
-	 * @param id
-	 *            The id of the job
-	 * @return The job
-	 */
-	private Job getJob(int id) {
-		synchronized (jobCache) {
-			Job job = jobCache.get(id);
-			if (job == null) {
-				job = queue.getJob(id);
-				jobCache.put(id, job);
-			}
-			return job;
-		}
 	}
 
 	/**
@@ -151,9 +135,7 @@ public class NMPIQueueManager implements Runnable {
 	}
 
 	private void processResponse(Job job) throws MalformedURLException {
-		synchronized (jobCache) {
-			jobCache.put(job.getId(), job);
-		}
+		storage.addJob(job);
 		logger.debug("Job " + job.getId() + " received");
 		try {
 			for (NMPIQueueListener listener : listeners)
@@ -167,7 +149,7 @@ public class NMPIQueueManager implements Runnable {
 			queue.updateJob(job.getId(), job);
 		} catch (IOException e) {
 			logger.error("Error in executing job", e);
-			setJobError(job.getId(), null, null, e, 0, null);
+			setJobError(job, null, null, e, 0, null);
 		}
 	}
 
@@ -190,12 +172,11 @@ public class NMPIQueueManager implements Runnable {
 		queue.updateLog(id, existingLog);
 	}
 
-	public void setJobRunning(int id) {
-		logger.debug("Job " + id + " is running");
-		Job job = getJob(id);
+	public void setJobRunning(Job job) {
+		logger.debug("Job " + job.getId() + " is running");
 		job.setStatus("running");
 		logger.debug("Updating job status on server");
-		queue.updateJob(id, job);
+		queue.updateJob(job.getId(), job);
 	}
 
 	/**
@@ -210,15 +191,14 @@ public class NMPIQueueManager implements Runnable {
 	 *            The outputs of the job (null if none)
 	 * @throws MalformedURLException
 	 */
-	public void setJobFinished(int id, String logToAppend,
+	public void setJobFinished(Job job, String logToAppend,
 			List<DataItem> outputs, long resourceUsage,
 			Map<String, String> provenance) throws MalformedURLException {
-		logger.debug("Job " + id + " is finished");
+		logger.debug("Job " + job.getId() + " is finished");
 
 		if (logToAppend != null)
-			appendJobLog(id, logToAppend);
+			appendJobLog(job.getId(), logToAppend);
 
-		Job job = getJob(id);
 		job.setStatus("finished");
 		job.setOutputData(outputs);
 		job.setTimestampCompletion(new DateTime(UTC));
@@ -226,7 +206,7 @@ public class NMPIQueueManager implements Runnable {
 		job.setProvenance(provenance);
 
 		logger.debug("Updating job status on server");
-		queue.updateJob(id, job);
+		queue.updateJob(job.getId(), job);
 	}
 
 	/**
@@ -243,22 +223,21 @@ public class NMPIQueueManager implements Runnable {
 	 *            The error details
 	 * @throws MalformedURLException
 	 */
-	public void setJobError(int id, String logToAppend, List<DataItem> outputs,
+	public void setJobError(Job job, String logToAppend, List<DataItem> outputs,
 			Throwable error, long resourceUsage, Map<String, String> provenance)
 			throws MalformedURLException {
-		logger.debug("Job " + id + " finished with an error");
+		logger.debug("Job " + job.getId() + " finished with an error");
 		StringWriter errors = new StringWriter();
 		error.printStackTrace(new PrintWriter(errors));
 		StringBuilder logMessage = new StringBuilder();
 		if (logToAppend != null)
 			logMessage.append(logToAppend);
-		if (jobLog.containsKey(id) || logMessage.length() > 0)
+		if (jobLog.containsKey(job.getId()) || logMessage.length() > 0)
 			logMessage.append("\n\n==================\n");
 		logMessage.append("Error:\n");
 		logMessage.append(errors.toString());
-		appendJobLog(id, logMessage.toString());
+		appendJobLog(job.getId(), logMessage.toString());
 
-		Job job = getJob(id);
 		job.setStatus("error");
 		job.setTimestampCompletion(new DateTime(UTC));
 		job.setOutputData(outputs);
@@ -266,7 +245,7 @@ public class NMPIQueueManager implements Runnable {
 		job.setProvenance(provenance);
 
 		logger.debug("Updating job on server");
-		queue.updateJob(id, job);
+		queue.updateJob(job.getId(), job);
 	}
 
 	/**

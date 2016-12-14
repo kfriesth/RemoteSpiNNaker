@@ -89,8 +89,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 		requireNonNull(job);
 		logger.info("New job " + job.getId());
 
-		JobExecuter executer = jobExecuterFactory.createJobExecuter(this,
-				baseUrl);
+		JobExecuter executer = jobExecuterFactory.createJobExecuter(baseUrl);
 		storage.addJob(job, executer.getExecuterId());
 		executer.startExecuter();
 	}
@@ -144,7 +143,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	public SpinnakerMachine getJobMachine(int id, int nCores, int nChips,
 			int nBoards, double runTime) {
 		Job job = findJob(id);
-		runTime = max(runTime, 0);// TODO what does the default mean?
+		if (runTime < 0)
+			throw new WebApplicationException("runTime must be specified and not negative", 400);
 
 		logger.info("Request for " + nCores + " cores or " + nChips
 				+ " chips or " + nBoards + " boards for " + (runTime / 1000.0)
@@ -443,8 +443,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private void restartExecuters() {
 		try {
 			for (Job job : storage.getWaiting()) {
-				JobExecuter executer = jobExecuterFactory.createJobExecuter(
-						this, baseUrl);
+				JobExecuter executer = jobExecuterFactory
+						.createJobExecuter(baseUrl);
 				storage.assignNewExecutor(job, executer);
 				executer.startExecuter();
 			}

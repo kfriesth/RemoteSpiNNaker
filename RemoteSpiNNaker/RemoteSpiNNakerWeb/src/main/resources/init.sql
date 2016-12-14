@@ -32,6 +32,6 @@ CREATE TABLE IF NOT EXISTS xen (
 	vm TEXT,
 	disk TEXT,
 	vdi TEXT,
-	extraVdi TEXT,
-	extraDisk TEXT
+	extraDisk TEXT,
+	extraVdi TEXT
 );

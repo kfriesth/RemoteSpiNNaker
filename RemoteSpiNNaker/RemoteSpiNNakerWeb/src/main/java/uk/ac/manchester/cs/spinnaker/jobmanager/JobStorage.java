@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State.Done;
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State.Running;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -33,6 +35,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
 import uk.ac.manchester.cs.spinnaker.jobmanager.JobStorage.DAO.State;
+import uk.ac.manchester.cs.spinnaker.jobmanager.XenVMExecuterFactory.XenVMDescriptor;
 import uk.ac.manchester.cs.spinnaker.machine.SpinnakerMachine;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -82,6 +85,14 @@ public interface JobStorage {
 	List<SpinnakerMachine> getMachines(Job job);
 
 	void addMachine(Job job, SpinnakerMachine machine);
+
+	void addXenVm(String id, XenVMDescriptor descriptor);
+
+	void removeXenVm(String id);
+
+	XenVMDescriptor getXenVm(String id);
+
+	Map<String, XenVMDescriptor> getXenVms();
 
 	class Queue implements JobStorage {
 		private Map<String, Integer> map = new ConcurrentHashMap<>();
@@ -235,6 +246,27 @@ public interface JobStorage {
 				m.add(machine);
 			}
 		}
+
+		@Override
+		public void addXenVm(String id, XenVMDescriptor descriptor) {
+			// Do nothing to persist this right now
+		}
+
+		@Override
+		public XenVMDescriptor getXenVm(String id) {
+			// We never have a descriptor; always null
+			return null;
+		}
+
+		@Override
+		public void removeXenVm(String id) {
+			// Never need to do anything; it was never here
+		}
+
+		@Override
+		public Map<String, XenVMDescriptor> getXenVms() {
+			return emptyMap();
+		}
 	}
 
 	class DAO implements JobStorage {
@@ -272,6 +304,8 @@ public interface JobStorage {
 				+ "VALUES (:job, :machine)";
 		private static final String ADD_PROV = "INSERT OR REPLACE INTO jobProvenance (id, provKey, provValue) "
 				+ "VALUES (:job, :key, :value)";
+		private static final String ADD_XENVM = "INSERT INTO xen (id,vm,disk,vdi,extraDisk,extraVdi) "
+				+ "VALUES (:id,:vmid,:disk1id,:ifc1id,:disk2id,:ifc2id)";
 		private static final String EXISTS_JOB = "SELECT EXISTS(1 AS b FROM job WHERE id = :id LIMIT 1)";
 		private static final String GET_JOB_BY_ID = "SELECT json FROM job WHERE id = :id LIMIT 1";
 		private static final String GET_JOB_BY_EXECUTER = "SELECT json FROM job WHERE executer = :executer LIMIT 1";
@@ -281,11 +315,14 @@ public interface JobStorage {
 		private static final String GET_PROV = "SELECT provKey, provValue FROM jobProvenance WHERE id = :job";
 		private static final String GET_TMPDIR = "SELECT temporaryDirectory FROM job WHERE id = :job LIMIT 1";
 		private static final String GET_MACH = "SELECT machine FROM jobMachines WHERE id = :job";
-		private static final String SET_EXEC = "UPDATE job SET executer = :executer WHERE id = :job";
-		private static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :job";
-		private static final String SET_TMPDIR = "UPDATE job SET temporaryDirectory = :tempdir WHERE id = :job";
-		private static final String INIT_RU = "UPDATE job SET resourceUsage = :resources, numCores = :cores WHERE id = :job";
-		private static final String SET_RU = "UPDATE job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :job";
+		private static final String GET_XENVM = "SELECT vm AS vmid, disk AS disk1id, vdi AS ifc1id, extraDisk AS disk2id, extraVdi AS ifc2id FROM xen WHERE id = :id LIMIT 1";
+		private static final String GET_XENVMS = "SELECT id, vm AS vmid, disk AS disk1id, vdi AS ifc1id, extraDisk AS disk2id, extraVdi AS ifc2id FROM xen";
+		private static final String SET_EXEC = "ADD_XENVM job SET executer = :executer WHERE id = :job";
+		private static final String SET_STATE = "ADD_XENVM job SET state = :state WHERE id = :job";
+		private static final String SET_TMPDIR = "ADD_XENVM job SET temporaryDirectory = :tempdir WHERE id = :job";
+		private static final String INIT_RU = "ADD_XENVM job SET resourceUsage = :resources, numCores = :cores WHERE id = :job";
+		private static final String SET_RU = "ADD_XENVM job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :job";
+		private static final String DELETE_XENVM = "DELETE FROM xen WHERE id = :id";
 
 		@Override
 		public void addJob(Job job) {
@@ -436,6 +473,69 @@ public interface JobStorage {
 		@Override
 		public void addMachine(Job job, SpinnakerMachine machine) {
 			db.update(ADD_MACH, where("job", job).and("machine", machine));
+		}
+
+		@Override
+		public void addXenVm(String id, XenVMDescriptor descriptor) {
+			db.update(
+					ADD_XENVM,
+					where("id", id).and("vmid", descriptor.vm)
+							.and("disk1id", descriptor.disk1)
+							.and("ifc1id", descriptor.vdi1)
+							.and("disk2id", descriptor.disk2)
+							.and("ifc2id", descriptor.vdi2));
+		}
+
+		@Override
+		public XenVMDescriptor getXenVm(String id) {
+			return db.queryForObject(GET_XENVM, where("id", id),
+					new RowMapper<XenVMDescriptor>() {
+						@Override
+						public XenVMDescriptor mapRow(ResultSet rs, int rowNum)
+								throws SQLException {
+							XenVMDescriptor d = new XenVMDescriptor();
+							d.vm = rs.getString("vmid");
+							d.disk1 = rs.getString("disk1id");
+							d.vdi1 = rs.getString("ifc1id");
+							d.disk2 = rs.getString("disk2id");
+							d.vdi2 = rs.getString("ifc2id");
+							return d;
+						}
+					});
+		}
+
+		@Override
+		public void removeXenVm(String id) {
+			db.update(DELETE_XENVM, where("id", id));
+		}
+
+		@Override
+		public Map<String, XenVMDescriptor> getXenVms() {
+			return db.query(GET_XENVMS,
+					new ResultSetExtractor<Map<String, XenVMDescriptor>>() {
+						@Override
+						public Map<String, XenVMDescriptor> extractData(
+								ResultSet rs) throws SQLException,
+								DataAccessException {
+							int execid = rs.findColumn("id");
+							int vmid = rs.findColumn("vmid");
+							int disk1id = rs.findColumn("disk1id");
+							int ifc1id = rs.findColumn("ifc1id");
+							int disk2id = rs.findColumn("disk2id");
+							int ifc2id = rs.findColumn("ifc2id");
+							Map<String, XenVMDescriptor> map = new HashMap<>();
+							while (rs.next()) {
+								XenVMDescriptor d = new XenVMDescriptor();
+								d.vm = rs.getString(vmid);
+								d.disk1 = rs.getString(disk1id);
+								d.vdi1 = rs.getString(ifc1id);
+								d.disk2 = rs.getString(disk2id);
+								d.vdi2 = rs.getString(ifc2id);
+								map.put(rs.getString(execid), d);
+							}
+							return map;
+						}
+					});
 		}
 
 		@SuppressWarnings("serial")

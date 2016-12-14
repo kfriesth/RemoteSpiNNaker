@@ -6,7 +6,6 @@ import static com.xensource.xenapi.Types.VbdMode.RW;
 import static com.xensource.xenapi.Types.VbdType.DISK;
 import static com.xensource.xenapi.Types.VdiType.USER;
 import static com.xensource.xenapi.Types.VmPowerState.HALTED;
-import static java.util.Objects.requireNonNull;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobManager.JOB_PROCESS_MANAGER_JAR;
@@ -14,23 +13,23 @@ import static uk.ac.manchester.cs.spinnaker.utils.ThreadUtils.sleep;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import com.xensource.xenapi.Connection;
+import com.xensource.xenapi.Types.BadServerResponse;
 import com.xensource.xenapi.Types.VmPowerState;
 import com.xensource.xenapi.Types.XenAPIException;
 import com.xensource.xenapi.VBD;
 import com.xensource.xenapi.VDI;
 import com.xensource.xenapi.VM;
 
-public class XenVMExecuterFactory implements JobExecuterFactory {
+public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 	/** Bytes in a gigabyte. Well, a gibibyte, but that's a nasty word. */
 	private static final long GB = 1024L * 1024L * 1024L;
 	/** Time (in ms) between checks to see if a VM is running. */
@@ -61,8 +60,10 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
     @Value("${xen.server.maxVms}")
 	private int maxNVirtualMachines;
 
-    // TODO make this map persistent
-    private Map<String,Executer>map = new ConcurrentHashMap<>();
+    @Autowired
+    private JobManager jobManager;
+    @Autowired
+    private JobStorage storage;
 	private int nVirtualMachines = 0;
 
 	public XenVMExecuterFactory() {
@@ -70,24 +71,14 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 	}
 
 	@Override
-	public JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
-			throws IOException {
-		requireNonNull(manager);
-		requireNonNull(baseUrl);
+	protected JobExecuter makeExecuter(URL baseUrl) throws IOException {
 		waitToClaimVM();
 
 		try {
-			Executer e = new Executer(manager, baseUrl);
-			map.put(e.getExecuterId(), e);
-			return e;
+			return new Executer(baseUrl);
 		} catch (Exception e) {
 			throw new IOException("Error creating VM", e);
 		}
-	}
-
-	@Override
-	public JobExecuter getJobExecuter(String executerId) {
-		return map.get(executerId);
 	}
 
 	private void waitToClaimVM() {
@@ -108,12 +99,14 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 		}
 	}
 
-	protected void executorFinished(Executer executor) {
+	@Override
+	protected void executorFinished(JobExecuter executor) {
 		synchronized (lock) {
 			nVirtualMachines--;
 			logger.debug(nVirtualMachines + " of " + maxNVirtualMachines
 					+ " now in use");
-			map.remove(executor.getExecuterId());
+			storage.removeXenVm(executor.getExecuterId());
+			super.executorFinished(executor);
 			lock.notifyAll();
 		}
 	}
@@ -201,6 +194,18 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 			return vm.getPowerState(conn);
 		}
 
+		String getID(VM vm) throws XenAPIException, XmlRpcException {
+			return vm.getUuid(conn);
+		}
+
+		String getID(VDI vdi) throws XenAPIException, XmlRpcException {
+			return vdi.getUuid(conn);
+		}
+
+		String getID(VBD vbd) throws XenAPIException, XmlRpcException {
+			return vbd.getUuid(conn);
+		}
+
 		@Override
 		public void close() {
 			try {
@@ -214,9 +219,28 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 		}
 	}
 
+	static class XenVMDescriptor {
+		String vm;
+		String disk1;
+		String vdi1;
+		String disk2;
+		String vdi2;
+
+		XenVMDescriptor() {
+		}
+
+		XenVMDescriptor(XenConnection conn, VM vm, VBD disk1, VDI ifc1,
+				VBD disk2, VDI ifc2) throws XenAPIException, XmlRpcException {
+			this.vm = conn.getID(vm);
+			this.disk1 = conn.getID(disk1);
+			this.vdi1 = conn.getID(ifc1);
+			this.disk2 = conn.getID(disk2);
+			this.vdi2 = conn.getID(ifc2);
+		}
+	}
+
 	class Executer implements JobExecuter, Runnable {
 		// Parameters from constructor
-		private final JobManager jobManager;
 		private final String uuid;
 		private final URL jobProcessManagerUrl;
 		private final String args;
@@ -228,9 +252,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 		private VDI extraVdi;
 		private VBD extraDisk;
 
-		Executer(JobManager jobManager, URL baseUrl) throws XmlRpcException,
-				IOException {
-			this.jobManager = jobManager;
+		Executer(URL baseUrl) throws XmlRpcException, IOException {
 			uuid = UUID.randomUUID().toString();
 			jobProcessManagerUrl = new URL(baseUrl, "job/"
 					+ JOB_PROCESS_MANAGER_ZIP);
@@ -273,6 +295,7 @@ public class XenVMExecuterFactory implements JobExecuterFactory {
 			if (shutdownOnExit)
 				conn.addData(clonedVm, "vm-data/shutdown", true);
 			conn.start(clonedVm);
+			storage.addXenVm(uuid, new XenVMDescriptor(conn, clonedVm, disk, vdi, extraDisk, extraVdi));
 			return conn;
 		}
 

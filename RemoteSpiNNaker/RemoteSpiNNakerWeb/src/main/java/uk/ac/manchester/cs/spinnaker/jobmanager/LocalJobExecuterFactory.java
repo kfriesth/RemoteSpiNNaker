@@ -2,11 +2,11 @@ package uk.ac.manchester.cs.spinnaker.jobmanager;
 
 import static java.io.File.createTempFile;
 import static java.io.File.pathSeparator;
-import static java.util.Objects.requireNonNull;
 import static org.apache.commons.io.FileUtils.copyToFile;
 import static org.apache.commons.io.FileUtils.forceDeleteOnExit;
 import static org.apache.commons.io.FileUtils.forceMkdirParent;
 import static org.apache.commons.io.IOUtils.closeQuietly;
+import static org.apache.commons.lang3.StringUtils.join;
 import static org.slf4j.LoggerFactory.getLogger;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
 
@@ -21,18 +21,17 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.annotation.PostConstruct;
 
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
-public class LocalJobExecuterFactory implements JobExecuterFactory {
+public class LocalJobExecuterFactory extends AbstractJobExecuterFactory {
 	private static final String JOB_PROCESS_MANAGER_MAIN_CLASS = "uk.ac.manchester.cs.spinnaker.jobprocessmanager.JobProcessManager";
 
 	private static File getJavaExec() throws IOException {
@@ -49,11 +48,12 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 	private boolean liveUploadOutput;
     @Value("${requestSpiNNakerMachine}")
 	private boolean requestSpiNNakerMachine;
+    @Autowired
+    private JobManager jobManager;
 	private final ThreadGroup threadGroup;
 
 	private List<File> jobProcessManagerClasspath = new ArrayList<>();
 	private File jobExecuterDirectory = null;
-	private Map<String,Executer>map = new ConcurrentHashMap<>();
 	private static Logger log = getLogger(Executer.class);
 
 	public LocalJobExecuterFactory() {
@@ -93,34 +93,11 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 	}
 
 	@Override
-	public JobExecuter getJobExecuter(String id) {
-		return map.get(id);
-	}
-
-	@Override
-	public JobExecuter createJobExecuter(JobManager manager, URL baseUrl)
-			throws IOException {
-		String uuid = UUID.randomUUID().toString();
-		List<String> arguments = new ArrayList<>();
-		arguments.add("--serverUrl");
-		arguments.add(requireNonNull(baseUrl).toString());
-		arguments.add("--local");
-		arguments.add("--executerId");
-		arguments.add(uuid);
-		if (deleteOnExit)
-			arguments.add("--deleteOnExit");
-		if (liveUploadOutput)
-			arguments.add("--liveUploadOutput");
-		if (requestSpiNNakerMachine)
-			arguments.add("--requestMachine");
-
-		Executer e = new Executer(requireNonNull(manager), arguments, uuid);
-		map.put(uuid, e);
-		return e;
+	protected JobExecuter makeExecuter(URL baseUrl) throws IOException {
+		return new Executer(baseUrl);
 	}
 
 	class Executer implements JobExecuter, Runnable {
-		private final JobManager jobManager;
 		private final List<String> arguments;
 		private final String id;
 		private final File javaExec;
@@ -139,12 +116,22 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 		 * @throws IOException
 		 *             If there is an error creating the log file
 		 */
-		Executer(JobManager jobManager, List<String> arguments, String id)
-				throws IOException {
-			this.jobManager = jobManager;
-			this.arguments = arguments;
-			this.id = id;
+		Executer(URL baseUrl) throws IOException {
 			javaExec = getJavaExec();
+			id = UUID.randomUUID().toString();
+
+			arguments = new ArrayList<>();
+			arguments.add("--serverUrl");
+			arguments.add(baseUrl.toString());
+			arguments.add("--local");
+			arguments.add("--executerId");
+			arguments.add(id);
+			if (deleteOnExit)
+				arguments.add("--deleteOnExit");
+			if (liveUploadOutput)
+				arguments.add("--liveUploadOutput");
+			if (requestSpiNNakerMachine)
+				arguments.add("--requestMachine");
 		}
 
 		@Override
@@ -182,15 +169,10 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 			List<String> command = new ArrayList<>();
 			command.add(javaExec.getAbsolutePath());
 
-			StringBuilder classPathBuilder = new StringBuilder();
-			String separator = "";
-			for (File file : jobProcessManagerClasspath) {
-				classPathBuilder.append(separator).append(file);
-				separator = pathSeparator;
-			}
 			command.add("-cp");
-			command.add(classPathBuilder.toString());
-			log.debug("Classpath: " + classPathBuilder);
+			command.add(join(jobProcessManagerClasspath, pathSeparator));
+			if (log.isDebugEnabled())
+				log.debug("Classpath: " + command.get(command.size() - 1));
 
 			command.add(JOB_PROCESS_MANAGER_MAIN_CLASS);
 			log.debug("Main command: " + JOB_PROCESS_MANAGER_MAIN_CLASS);
@@ -206,22 +188,20 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 			builder.directory(jobExecuterDirectory);
 			log.debug("Working directory: " + jobExecuterDirectory);
 			builder.redirectErrorStream(true);
-			JobOutputPipe pipe = null;
 			synchronized (this) {
 				try {
 					log.debug("Starting execution process");
 					process = builder.start();
-					log.debug("Starting pipe from process");
-					pipe = new JobOutputPipe(process.getInputStream(),
+					return new JobOutputPipe(process.getInputStream(),
 							new PrintWriter(outputLog));
-					pipe.start();
 				} catch (IOException e) {
 					log.error("Error running external job", e);
 					startException = e;
+					return null;
+				} finally {
+					notifyAll();
 				}
-				notifyAll();
 			}
-			return pipe;
 		}
 
 		private void reportResult() {
@@ -238,7 +218,7 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 				log.warn("problem in reporting log", e);
 			}
 			jobManager.setExecutorExited(id, logToAppend.toString());
-			map.remove(id);
+			executorFinished(this);
 		}
 
 		/**
@@ -282,19 +262,21 @@ public class LocalJobExecuterFactory implements JobExecuterFactory {
 			writer = output;
 			done = false;
 			setDaemon(true);
+			start();
+		}
+
+		private String readLine() {
+			try {
+				return reader.readLine();
+			} catch (IOException e) {
+				return null;
+			}
 		}
 
 		@Override
 		public void run() {
-			while (!done) {
-				String line;
-				try {
-					line = reader.readLine();
-				} catch (IOException e) {
-					break;
-				}
-				if (line == null)
-					break;
+			String line;
+			while (!done && (line = readLine()) != null) {
 				if (!line.isEmpty()) {
 					log.debug(line);
 					writer.println(line);

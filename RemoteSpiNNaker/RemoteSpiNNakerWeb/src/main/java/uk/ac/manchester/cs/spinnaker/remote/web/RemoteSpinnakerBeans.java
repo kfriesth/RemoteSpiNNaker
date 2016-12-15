@@ -107,7 +107,7 @@ public class RemoteSpinnakerBeans {
     @Value("${cxf.rest.path}")
     private String restPath;
 
-    @Configuration
+    @Configuration("hbp-security")
     @Profile("security")
 	@EnableGlobalMethodSecurity(prePostEnabled = true, proxyTargetClass = true)
     @EnableWebSecurity
@@ -253,11 +253,11 @@ public class RemoteSpinnakerBeans {
 	 * @author Donal Fellows
 	 * @see Database
 	 */
-	@Configuration
+	@Configuration("data-layer-memorystore")
 	@Profile("!db")
 	public static class TrivialStore {
 		@Bean
-		JobStorage jobStorage() {
+		JobStorage.Queue jobStorage() {
 			return new JobStorage.Queue();
 		}
 	}
@@ -266,7 +266,7 @@ public class RemoteSpinnakerBeans {
 	 * Database Access Layer
 	 * @author Donal Fellows
 	 */
-	@Configuration
+	@Configuration("data-layer-database")
 	@Profile("db")
 	@PropertySource("classpath:/database.properties")
 	@EnableTransactionManagement
@@ -315,7 +315,7 @@ public class RemoteSpinnakerBeans {
 		}
 
 		@Bean
-		JobStorage jobStorage() {
+		JobStorage.DAO jobStorage() {
 			return new JobStorage.DAO();
 		}
 	}

@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 abstract class AbstractJobExecuterFactory implements JobExecuterFactory {
-	private Map<String, JobExecuter> map = new ConcurrentHashMap<>();
+	Map<String, JobExecuter> map = new ConcurrentHashMap<>();
 
 	protected abstract JobExecuter makeExecuter(URL url) throws IOException;
 

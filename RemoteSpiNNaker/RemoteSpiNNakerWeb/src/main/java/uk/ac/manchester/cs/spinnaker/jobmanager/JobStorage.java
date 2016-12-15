@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -92,6 +91,10 @@ public interface JobStorage {
 
 	XenVMDescriptor getXenVm(String id);
 
+	/**
+	 * Describe <i>all</i> the VMs that we know about.
+	 * @return a map of IDs to VM descriptors. Never <tt>null</tt>.
+	 */
 	Map<String, XenVMDescriptor> getXenVms();
 
 	class Queue implements JobStorage {
@@ -304,8 +307,9 @@ public interface JobStorage {
 				+ "VALUES (:job, :machine)";
 		private static final String ADD_PROV = "INSERT OR REPLACE INTO jobProvenance (id, provKey, provValue) "
 				+ "VALUES (:job, :key, :value)";
-		private static final String ADD_XENVM = "INSERT INTO xen (id,vm,disk,vdi,extraDisk,extraVdi) "
-				+ "VALUES (:id,:vmid,:disk1id,:ifc1id,:disk2id,:ifc2id)";
+		private static final String ADD_XENVM = "INSERT INTO xen (id,vm,disk,image,extraDisk,extraImage) "
+				+ "VALUES (:id,:vmid,:disk1id,:image1id,:disk2id,:image2id)";
+
 		private static final String EXISTS_JOB = "SELECT EXISTS(1 AS b FROM job WHERE id = :id LIMIT 1)";
 		private static final String GET_JOB_BY_ID = "SELECT json FROM job WHERE id = :id LIMIT 1";
 		private static final String GET_JOB_BY_EXECUTER = "SELECT json FROM job WHERE executer = :executer LIMIT 1";
@@ -315,13 +319,15 @@ public interface JobStorage {
 		private static final String GET_PROV = "SELECT provKey, provValue FROM jobProvenance WHERE id = :job";
 		private static final String GET_TMPDIR = "SELECT temporaryDirectory FROM job WHERE id = :job LIMIT 1";
 		private static final String GET_MACH = "SELECT machine FROM jobMachines WHERE id = :job";
-		private static final String GET_XENVM = "SELECT vm AS vmid, disk AS disk1id, vdi AS ifc1id, extraDisk AS disk2id, extraVdi AS ifc2id FROM xen WHERE id = :id LIMIT 1";
-		private static final String GET_XENVMS = "SELECT id, vm AS vmid, disk AS disk1id, vdi AS ifc1id, extraDisk AS disk2id, extraVdi AS ifc2id FROM xen";
-		private static final String SET_EXEC = "ADD_XENVM job SET executer = :executer WHERE id = :job";
-		private static final String SET_STATE = "ADD_XENVM job SET state = :state WHERE id = :job";
-		private static final String SET_TMPDIR = "ADD_XENVM job SET temporaryDirectory = :tempdir WHERE id = :job";
-		private static final String INIT_RU = "ADD_XENVM job SET resourceUsage = :resources, numCores = :cores WHERE id = :job";
-		private static final String SET_RU = "ADD_XENVM job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :job";
+		private static final String GET_XENVM = "SELECT vm AS vmid, disk AS disk1id, image AS image1id, extraDisk AS disk2id, extraImage AS image2id FROM xen WHERE id = :id LIMIT 1";
+		private static final String GET_XENVMS = "SELECT id, vm AS vmid, disk AS disk1id, image AS image1id, extraDisk AS disk2id, extraImage AS image2id FROM xen";
+
+		private static final String SET_EXEC = "UPDATE job SET executer = :executer WHERE id = :job";
+		private static final String SET_STATE = "UPDATE job SET state = :state WHERE id = :job";
+		private static final String SET_TMPDIR = "UPDATE job SET temporaryDirectory = :tempdir WHERE id = :job";
+		private static final String INIT_RU = "UPDATE job SET resourceUsage = :resources, numCores = :cores WHERE id = :job";
+		private static final String SET_RU = "UPDATE job SET resourceUsage = CAST(numCores * :seconds AS INTEGER) WHERE id = :job";
+
 		private static final String DELETE_XENVM = "DELETE FROM xen WHERE id = :id";
 
 		@Override
@@ -481,9 +487,9 @@ public interface JobStorage {
 					ADD_XENVM,
 					where("id", id).and("vmid", descriptor.vm)
 							.and("disk1id", descriptor.disk1)
-							.and("ifc1id", descriptor.vdi1)
+							.and("image1id", descriptor.image1)
 							.and("disk2id", descriptor.disk2)
-							.and("ifc2id", descriptor.vdi2));
+							.and("image2id", descriptor.image2));
 		}
 
 		@Override
@@ -496,9 +502,9 @@ public interface JobStorage {
 							XenVMDescriptor d = new XenVMDescriptor();
 							d.vm = rs.getString("vmid");
 							d.disk1 = rs.getString("disk1id");
-							d.vdi1 = rs.getString("ifc1id");
+							d.image1 = rs.getString("image1id");
 							d.disk2 = rs.getString("disk2id");
-							d.vdi2 = rs.getString("ifc2id");
+							d.image2 = rs.getString("image2id");
 							return d;
 						}
 					});
@@ -520,17 +526,17 @@ public interface JobStorage {
 							int execid = rs.findColumn("id");
 							int vmid = rs.findColumn("vmid");
 							int disk1id = rs.findColumn("disk1id");
-							int ifc1id = rs.findColumn("ifc1id");
+							int image1id = rs.findColumn("image1id");
 							int disk2id = rs.findColumn("disk2id");
-							int ifc2id = rs.findColumn("ifc2id");
+							int image2id = rs.findColumn("image2id");
 							Map<String, XenVMDescriptor> map = new HashMap<>();
 							while (rs.next()) {
 								XenVMDescriptor d = new XenVMDescriptor();
 								d.vm = rs.getString(vmid);
 								d.disk1 = rs.getString(disk1id);
-								d.vdi1 = rs.getString(ifc1id);
+								d.image1 = rs.getString(image1id);
 								d.disk2 = rs.getString(disk2id);
-								d.vdi2 = rs.getString(ifc2id);
+								d.image2 = rs.getString(image2id);
 								map.put(rs.getString(execid), d);
 							}
 							return map;

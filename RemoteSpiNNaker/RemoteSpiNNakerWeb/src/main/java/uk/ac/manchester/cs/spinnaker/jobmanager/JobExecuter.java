@@ -4,7 +4,7 @@ package uk.ac.manchester.cs.spinnaker.jobmanager;
  * Executes jobs in an external process
  *
  * @see LocalJobExecuterFactory.Executer
- * @see XenVMExecuterFactory.Executer
+ * @see XenVMExecuterFactory.NewExecuter
  */
 public interface JobExecuter {
 	/**

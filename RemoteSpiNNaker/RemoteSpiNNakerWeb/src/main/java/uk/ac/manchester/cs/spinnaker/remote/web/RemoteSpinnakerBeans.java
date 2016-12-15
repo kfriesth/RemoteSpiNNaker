@@ -109,7 +109,7 @@ public class RemoteSpinnakerBeans {
 
     @Configuration
     @Profile("security")
-    @EnableGlobalMethodSecurity(prePostEnabled=true, proxyTargetClass=true)
+	@EnableGlobalMethodSecurity(prePostEnabled = true, proxyTargetClass = true)
     @EnableWebSecurity
     public static class HbpSecurityServices extends WebSecurityConfigurerAdapter {
     	@Value("${baseserver.url}${callback.path}")
@@ -119,7 +119,6 @@ public class RemoteSpinnakerBeans {
 		@Value("${callback.path}")
 		private String callbackPath;
 
-    	
 		@Autowired
 		public void configureGlobal(AuthenticationManagerBuilder auth)
 				throws Exception {

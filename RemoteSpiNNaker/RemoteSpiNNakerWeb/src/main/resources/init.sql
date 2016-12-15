@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS xen (
 	id TEXT PRIMARY KEY ON CONFLICT ABORT,
 	vm TEXT,
 	disk TEXT,
-	vdi TEXT,
+	image TEXT,
 	extraDisk TEXT,
-	extraVdi TEXT
+	extraImage TEXT
 );

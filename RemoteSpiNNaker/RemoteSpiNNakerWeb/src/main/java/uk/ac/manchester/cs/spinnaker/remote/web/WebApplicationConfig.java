@@ -4,6 +4,7 @@ import static java.lang.System.getProperty;
 import static javax.servlet.DispatcherType.ASYNC;
 import static javax.servlet.DispatcherType.ERROR;
 import static javax.servlet.DispatcherType.REQUEST;
+import static org.springframework.core.env.AbstractEnvironment.ACTIVE_PROFILES_PROPERTY_NAME;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +28,22 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 	 * configuration properties from.
 	 */
 	public static final String LOCATION_PROPERTY = "remotespinnaker.properties.location";
+	/**
+	 * The name of the <i>system property</i> that describes what Spring
+	 * application profiles are enabled. Contains a comma-separated list of
+	 * enabled profiles; they're (supposed to be) orthogonal to each other.
+	 * <p>
+	 * <h3><i>Profile Names</i></h3>
+	 * <dl>
+	 * <dt>db</dt>
+	 * <dd>Store webapp state in a database.</dt>
+	 * <dt>security</dt>
+	 * <dd>Require HBP auth to talk to the webapp.</dt> 
+	 * </dl>
+	 * @see RemoteSpinnakerBeans
+	 */
+	public static final String PROFILES_PROPERTY = ACTIVE_PROFILES_PROPERTY_NAME;
+
 	private static final String FILTER_NAME = "springSecurityFilterChain";
 	private static final boolean ADD_FILTER = false;
 	private static final boolean ADD_SERVLET = true;
@@ -47,12 +64,11 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 	}
 
 	private ContextLoaderListener getContextLoaderListener(
-			PropertySource<?> properties) {
-		AnnotationConfigWebApplicationContext annotationConfig = new AnnotationConfigWebApplicationContext();
-		annotationConfig.getEnvironment().getPropertySources()
-				.addFirst(properties);
-		annotationConfig.register(RemoteSpinnakerBeans.class);
-		return new ContextLoaderListener(annotationConfig);
+			PropertySource<?> props) {
+		AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
+		context.getEnvironment().getPropertySources().addFirst(props);
+		context.register(RemoteSpinnakerBeans.class);
+		return new ContextLoaderListener(context);
 	}
 
 	private void addServlet(ServletContext container,

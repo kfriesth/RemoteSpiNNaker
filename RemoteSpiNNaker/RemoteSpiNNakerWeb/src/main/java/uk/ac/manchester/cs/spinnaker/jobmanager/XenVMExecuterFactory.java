@@ -7,22 +7,26 @@ import static com.xensource.xenapi.Types.VbdType.DISK;
 import static com.xensource.xenapi.Types.VdiType.USER;
 import static com.xensource.xenapi.Types.VmPowerState.HALTED;
 import static org.slf4j.LoggerFactory.getLogger;
+import static org.springframework.core.Ordered.LOWEST_PRECEDENCE;
 import static uk.ac.manchester.cs.spinnaker.job.JobManagerInterface.JOB_PROCESS_MANAGER_ZIP;
 import static uk.ac.manchester.cs.spinnaker.jobmanager.JobManager.JOB_PROCESS_MANAGER_JAR;
 import static uk.ac.manchester.cs.spinnaker.utils.ThreadUtils.sleep;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+
+import javax.annotation.PostConstruct;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 
 import com.xensource.xenapi.Connection;
-import com.xensource.xenapi.Types.BadServerResponse;
 import com.xensource.xenapi.Types.VmPowerState;
 import com.xensource.xenapi.Types.XenAPIException;
 import com.xensource.xenapi.VBD;
@@ -41,33 +45,44 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 
 	@Value("${xen.server.url}")
 	private URL xenServerUrl;
-    @Value("${xen.server.username}")
+	@Value("${xen.server.username}")
 	private String username;
-    @Value("${xen.server.password}")
+	@Value("${xen.server.password}")
 	private String password;
-    @Value("${xen.server.templateVm}")
+	@Value("${xen.server.templateVm}")
 	private String templateLabel;
-    @Value("${deleteJobsOnExit}")
+	@Value("${deleteJobsOnExit}")
 	private boolean deleteOnExit;
-    @Value("${xen.server.shutdownOnExit}")
+	@Value("${xen.server.shutdownOnExit}")
 	private boolean shutdownOnExit;
-    @Value("${liveUploadOutput}")
+	@Value("${liveUploadOutput}")
 	private boolean liveUploadOutput;
-    @Value("${requestSpiNNakerMachine}")
+	@Value("${requestSpiNNakerMachine}")
 	private boolean requestSpiNNakerMachine;
-    @Value("${xen.server.diskspaceInGbs}")
+	@Value("${xen.server.diskspaceInGbs}")
 	private long defaultDiskSizeInGbs;
-    @Value("${xen.server.maxVms}")
+	@Value("${xen.server.maxVms}")
 	private int maxNVirtualMachines;
 
-    @Autowired
-    private JobManager jobManager;
-    @Autowired
-    private JobStorage storage;
+	@Autowired
+	private JobManager jobManager;
+	@Autowired
+	private JobStorage storage;
 	private int nVirtualMachines = 0;
 
 	public XenVMExecuterFactory() {
 		this.threadGroup = new ThreadGroup("XenVM");
+	}
+
+	@PostConstruct
+	@Order(LOWEST_PRECEDENCE)
+	void connectExistingVMs() {
+		for (Entry<String, XenVMDescriptor> e : storage.getXenVms().entrySet()) {
+			ExistingExecuter exec = new ExistingExecuter(e.getKey(),
+					e.getValue());
+			nVirtualMachines++;
+			map.put(exec.getExecuterId(), exec);
+		}
 	}
 
 	@Override
@@ -75,7 +90,7 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 		waitToClaimVM();
 
 		try {
-			return new Executer(baseUrl);
+			return new NewExecuter(baseUrl);
 		} catch (Exception e) {
 			throw new IOException("Error creating VM", e);
 		}
@@ -131,24 +146,33 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 			return template.createClone(conn, templateLabel + "_" + id);
 		}
 
-		VBD getVirtualBlockDevice(VM vm) throws XmlRpcException, IOException {
+		VM getVirtualMachine(String uuid) throws XmlRpcException, IOException {
+			return VM.getByUuid(conn, uuid);
+		}
+
+		VBD getBlockDevice(VM vm) throws XmlRpcException, IOException {
 			Set<VBD> disks = vm.getVBDs(conn);
 			if (disks.isEmpty())
 				throw new IOException("No disks found on " + templateLabel);
 			return disks.iterator().next();
 		}
 
-		String getLabel(VDI vdi, String suffix) throws XmlRpcException, XenAPIException {
+		VBD getBlockDevice(String uuid) throws XmlRpcException, IOException {
+			return VBD.getByUuid(conn, uuid);
+		}
+
+		String getLabel(VDI vdi, String suffix) throws XmlRpcException,
+				XenAPIException {
 			return vdi.getNameLabel(conn) + "_" + id + "_" + suffix;
 		}
 
-		VDI getBaseVDI(VBD disk) throws XmlRpcException, XenAPIException {
+		VDI getBaseImage(VBD disk) throws XmlRpcException, XenAPIException {
 			VDI vdi = disk.getVDI(conn);
 			vdi.setNameLabel(conn, getLabel(vdi, "base"));
 			return vdi;
 		}
 
-		VDI createVDI(VDI baseVDI) throws XenAPIException, XmlRpcException {
+		VDI createImage(VDI baseVDI) throws XenAPIException, XmlRpcException {
 			VDI.Record descriptor = new VDI.Record();
 			descriptor.nameLabel = getLabel(baseVDI, "storage");
 			descriptor.type = USER;
@@ -158,7 +182,12 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 			return VDI.create(conn, descriptor);
 		}
 
-		VBD createVBD(VM vm, VDI vdi) throws XenAPIException, XmlRpcException {
+		VDI getDiskImage(String uuid) throws XmlRpcException, IOException {
+			return VDI.getByUuid(conn, uuid);
+		}
+
+		VBD createBlockDevice(VM vm, VDI vdi) throws XenAPIException,
+				XmlRpcException {
 			VBD.Record descriptor = new VBD.Record();
 			descriptor.VM = vm;
 			descriptor.VDI = vdi;
@@ -222,9 +251,9 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 	static class XenVMDescriptor {
 		String vm;
 		String disk1;
-		String vdi1;
+		String image1;
 		String disk2;
-		String vdi2;
+		String image2;
 
 		XenVMDescriptor() {
 		}
@@ -233,27 +262,139 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 				VBD disk2, VDI ifc2) throws XenAPIException, XmlRpcException {
 			this.vm = conn.getID(vm);
 			this.disk1 = conn.getID(disk1);
-			this.vdi1 = conn.getID(ifc1);
+			this.image1 = conn.getID(ifc1);
 			this.disk2 = conn.getID(disk2);
-			this.vdi2 = conn.getID(ifc2);
+			this.image2 = conn.getID(ifc2);
 		}
 	}
 
-	class Executer implements JobExecuter, Runnable {
+	abstract class AbstractExecuter implements JobExecuter, Runnable {
+		protected AbstractExecuter() {
+			uuid = UUID.randomUUID().toString();
+		}
+
+		protected AbstractExecuter(String id) {
+			uuid = id;
+		}
+
 		// Parameters from constructor
 		private final String uuid;
+
+		// Internal entities
+		VM clonedVm;
+		VBD disk;
+		VDI image;
+		VDI extraImage;
+		VBD extraDisk;
+
+		@Override
+		public final String getExecuterId() {
+			return uuid;
+		}
+
+		@Override
+		public final void startExecuter() {
+			new Thread(threadGroup, this, "Executer (" + uuid + ")").start();
+		}
+
+		protected final XenConnection connect() throws XenAPIException,
+				XmlRpcException {
+			return new XenConnection(uuid);
+		}
+
+		protected abstract XenConnection createVm() throws XmlRpcException,
+				IOException;
+
+		@Override
+		public final void run() {
+			try (XenConnection conn = createVm()) {
+				waitForTermination(conn);
+				exit(null);
+				finishedWithVM(conn);
+			} catch (Exception e) {
+				logger.error("Error connecting to VM", e);
+				exit(e);
+			} finally {
+				executorFinished(this);
+			}
+		}
+
+		private void waitForTermination(XenConnection conn) {
+			try {
+				VmPowerState powerState;
+				do {
+					sleep(VM_POLL_INTERVAL);
+					powerState = conn.getState(clonedVm);
+					logger.debug("VM for " + getExecuterId() + " is in state "
+							+ powerState);
+				} while (powerState != HALTED);
+			} catch (Exception e) {
+				logger.error("Could not get VM power state, assuming off", e);
+			}
+		}
+
+		private void finishedWithVM(XenConnection conn) {
+			try {
+				if (deleteOnExit)
+					deleteVm(conn);
+			} catch (Exception e) {
+				logger.error("Error deleting VM");
+			}
+		}
+
+		private void deleteVm(XenConnection conn) throws XenAPIException,
+				XmlRpcException {
+			if (conn == null)
+				return;
+			storage.removeXenVm(getExecuterId());
+			if (disk != null)
+				conn.destroy(disk);
+			if (extraDisk != null)
+				conn.destroy(extraDisk);
+			if (image != null)
+				conn.destroy(image);
+			if (extraImage != null)
+				conn.destroy(extraImage);
+			if (clonedVm != null)
+				conn.destroy(clonedVm);
+		}
+
+		private void exit(Exception e) {
+			jobManager.setExecutorExited(uuid, e.getMessage());
+		}
+	}
+
+	/**
+	 * A revivified executer, risen from its grave of the database!
+	 * 
+	 * @author Donal Fellows
+	 */
+	class ExistingExecuter extends AbstractExecuter {
+		private XenVMDescriptor descriptor;
+
+		ExistingExecuter(String id, XenVMDescriptor descriptor) {
+			super(id);
+			this.descriptor = descriptor;
+		}
+
+		@Override
+		protected XenConnection createVm() throws XmlRpcException, IOException {
+			XenConnection conn = connect();
+			clonedVm = conn.getVirtualMachine(descriptor.vm);
+			disk = conn.getBlockDevice(descriptor.disk1);
+			image = conn.getDiskImage(descriptor.image1);
+			extraDisk = conn.getBlockDevice(descriptor.disk2);
+			extraImage = conn.getDiskImage(descriptor.image2);
+			return conn;
+		}
+	}
+
+	class NewExecuter extends AbstractExecuter {
+		// Parameters from constructor
 		private final URL jobProcessManagerUrl;
 		private final String args;
 
-		// Internal entities
-		private VM clonedVm;
-		private VBD disk;
-		private VDI vdi;
-		private VDI extraVdi;
-		private VBD extraDisk;
-
-		Executer(URL baseUrl) throws XmlRpcException, IOException {
-			uuid = UUID.randomUUID().toString();
+		NewExecuter(URL baseUrl) throws XmlRpcException, IOException {
 			jobProcessManagerUrl = new URL(baseUrl, "job/"
 					+ JOB_PROCESS_MANAGER_ZIP);
 
@@ -262,7 +403,7 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 			args.append(" --serverUrl ");
 			args.append(baseUrl);
 			args.append(" --executerId ");
-			args.append(uuid);
+			args.append(getExecuterId());
 			if (deleteOnExit)
 				args.append(" --deleteOnExit");
 			if (liveUploadOutput)
@@ -273,77 +414,22 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 		}
 
 		@Override
-		public String getExecuterId() {
-			return uuid;
-		}
-
-		@Override
-		public void startExecuter() {
-			new Thread(threadGroup, this, "Executer (" + uuid + ")").start();
-		}
-
-		synchronized XenConnection createVm() throws XmlRpcException, IOException {
-			XenConnection conn = new XenConnection(uuid);
+		protected XenConnection createVm() throws XmlRpcException, IOException {
+			XenConnection conn = connect();
 			clonedVm = conn.getVirtualMachine();
-			disk = conn.getVirtualBlockDevice(clonedVm);
-			vdi = conn.getBaseVDI(disk);
-			extraVdi = conn.createVDI(vdi);
-			extraDisk = conn.createVBD(clonedVm, extraVdi);
+			disk = conn.getBlockDevice(clonedVm);
+			image = conn.getBaseImage(disk);
+			extraImage = conn.createImage(image);
+			extraDisk = conn.createBlockDevice(clonedVm, extraImage);
 			conn.addData(clonedVm, "vm-data/nmpiurl", jobProcessManagerUrl);
 			conn.addData(clonedVm, "vm-data/nmpifile", JOB_PROCESS_MANAGER_ZIP);
 			conn.addData(clonedVm, "vm-data/nmpiargs", args);
 			if (shutdownOnExit)
 				conn.addData(clonedVm, "vm-data/shutdown", true);
 			conn.start(clonedVm);
-			storage.addXenVm(uuid, new XenVMDescriptor(conn, clonedVm, disk, vdi, extraDisk, extraVdi));
+			storage.addXenVm(getExecuterId(), new XenVMDescriptor(conn,
+					clonedVm, disk, image, extraDisk, extraImage));
 			return conn;
-		}
-
-		private synchronized void deleteVm(XenConnection conn)
-				throws XenAPIException, XmlRpcException {
-			if (conn == null)
-				return;
-			if (disk != null)
-				conn.destroy(disk);
-			if (extraDisk != null)
-				conn.destroy(extraDisk);
-			if (vdi != null)
-				conn.destroy(vdi);
-			if (extraVdi != null)
-				conn.destroy(extraVdi);
-			if (clonedVm != null)
-				conn.destroy(clonedVm);
-		}
-
-		@Override
-		public void run() {
-			try (XenConnection conn = createVm()) {
-				try {
-					VmPowerState powerState;
-					do {
-						sleep(VM_POLL_INTERVAL);
-						powerState = conn.getState(clonedVm);
-						logger.debug("VM for " + uuid + " is in state " + powerState);
-					} while (powerState != HALTED);
-				} catch (Exception e) {
-					logger.error("Could not get VM power state, assuming off",
-							e);
-				} finally {
-					jobManager.setExecutorExited(uuid, null);
-				}
-
-				try {
-					if (deleteOnExit)
-						deleteVm(conn);
-				} catch (Exception e) {
-					logger.error("Error deleting VM");
-				}
-			} catch (Exception e) {
-				logger.error("Error setting up VM", e);
-				jobManager.setExecutorExited(uuid, e.getMessage());
-			} finally {
-				executorFinished(this);
-			}
 		}
 	}
 }

@@ -6,6 +6,8 @@ import static java.nio.file.Files.probeContentType;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static javax.ws.rs.core.Response.ok;
+import static javax.ws.rs.core.Response.status;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
@@ -33,6 +35,7 @@ import javax.ws.rs.core.Response;
 
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
@@ -135,6 +138,7 @@ public class OutputManagerImpl implements OutputManager {
 	}
 
     @Override
+	@PreAuthorize("hasRole('JOB')")
 	public List<DataItem> addOutputs(String projectId, int id,
 			File baseDirectory, Collection<File> outputs) throws IOException {
 		if (outputs == null)
@@ -180,15 +184,14 @@ public class OutputManagerImpl implements OutputManager {
         try (JobLock op = new JobLock(idDirectory)) {
             if (purgeFile.exists()) {
                 logger.debug(idDirectory + " was purged");
-				return Response
-						.status(NOT_FOUND)
+				return status(NOT_FOUND)
 						.entity("Results from job " + idDirectory.getName()
 								+ " have been removed").build();
             }
 
             if (!resultFile.canRead()) {
                 logger.debug(resultFile + " was not found");
-                return Response.status(NOT_FOUND).build();
+                return status(NOT_FOUND).build();
             }
 
 			try {
@@ -196,7 +199,7 @@ public class OutputManagerImpl implements OutputManager {
 					String contentType = probeContentType(resultFile.toPath());
 					if (contentType != null) {
 						logger.debug("File has content type " + contentType);
-						return Response.ok(resultFile, contentType).build();
+						return ok(resultFile, contentType).build();
 					}
 				}
 			} catch (IOException e) {
@@ -204,8 +207,7 @@ public class OutputManagerImpl implements OutputManager {
 						+ " could not be determined", e);
 			}
 
-			return Response
-					.ok((Object) resultFile)
+			return ok((Object) resultFile)
 					.header("Content-Disposition",
 							"attachment; filename=" + filename).build();
         }
@@ -216,9 +218,9 @@ public class OutputManagerImpl implements OutputManager {
 	}
 
 	@Override
+	@PreAuthorize("hasAnyRole('NMPI','USER')")
 	public Response getResultFile(String projectId, int id, String filename,
 			boolean download) {
-    	// TODO projectId and id? What's going on? 
 		logger.debug("Retrieving " + filename + " from " + projectId + "/" + id);
 		File projectDirectory = getProjectDirectory(projectId);
 		File idDirectory = new File(projectDirectory, String.valueOf(id));
@@ -226,10 +228,11 @@ public class OutputManagerImpl implements OutputManager {
 	}
 
     @Override
+	@PreAuthorize("hasRole('USER')")
     public Response getResultFile(int id, String filename, boolean download) {
     	// TODO projectId and NO id? What's going on? 
-        logger.debug(
-            "Retrieving " + filename + " from " + id);
+        logger.warn(
+            "project-free retrieve of " + filename + " from " + id);
         File idDirectory = getProjectDirectory(String.valueOf(id));
         return getResultFile(idDirectory, filename, download);
     }
@@ -264,6 +267,7 @@ public class OutputManagerImpl implements OutputManager {
 	}
 
     @Override
+	@PreAuthorize("hasRole('NMPI','USER')")
 	public Response uploadResultsToHPCServer(String projectId, int id,
 			String serverUrl, String storageId, String filePath, String userId,
 			String token) {

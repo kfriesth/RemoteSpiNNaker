@@ -27,6 +27,7 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 import uk.ac.manchester.cs.spinnaker.job.JobMachineAllocated;
@@ -46,6 +47,7 @@ import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
  * processes and machines.
  */
 // TODO needs security; Role = JobEngine
+@PreAuthorize("hasAnyRole('NMPI','JOB')")
 public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private static final double CHIPS_PER_BOARD = 48.0;
 	private static final double CORES_PER_CHIP = 15.0;
@@ -84,6 +86,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('NMPI')")
 	@Transactional
 	public void addJob(Job job) throws IOException {
 		requireNonNull(job);
@@ -112,6 +115,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public Job getNextJob(String executerId) {
 		requireNonNull(executerId);
@@ -126,6 +130,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	public SpinnakerMachine getLargestJobMachine(int id, double runTime) {
 		// TODO Check quota to get the largest machine within the quota
 
@@ -139,6 +144,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public SpinnakerMachine getJobMachine(int id, int nCores, int nChips,
 			int nBoards, double runTime) {
@@ -187,6 +193,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void extendJobMachineLease(int id, double runTime) {
 		Job job = findJob(id);
@@ -200,6 +207,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public JobMachineAllocated checkMachineLease(int id, int waitTime) {
 		List<SpinnakerMachine> machines = storage.getMachines(findJob(id));
@@ -243,6 +251,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void appendLog(int id, String logToAppend) {
 		findJob(id);
@@ -262,6 +271,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void addOutput(String projectId, int id, String output,
 			InputStream input) {
@@ -311,6 +321,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void addProvenance(int id, String item, String value, String body) {
 		if (value == null || value.isEmpty())
@@ -321,6 +332,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void setJobFinished(String projectId, int id, String logToAppend,
 			String baseDirectory, List<String> outputs) {
@@ -358,6 +370,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	/**{@inheritDoc}*/
 	@Override
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void setJobError(String projectId, int id, String error,
 			String logToAppend, String baseDirectory, List<String> outputs,
@@ -407,6 +420,7 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	 * @param executorId The ID of the executor that has executed.
 	 * @param logToAppend May be <tt>null</tt>
 	 */
+	@PreAuthorize("hasRole('JOB')")
 	@Transactional
 	public void setExecutorExited(String executorId, String logToAppend) {
 		Job job = storage.getJob(requireNonNull(executorId));

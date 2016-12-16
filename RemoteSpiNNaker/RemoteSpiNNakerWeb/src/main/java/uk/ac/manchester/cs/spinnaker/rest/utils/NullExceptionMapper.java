@@ -8,6 +8,7 @@ import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 
 import org.slf4j.Logger;
+import org.springframework.stereotype.Component;
 
 /**
  * Convert NPEs into complaints about their most likely causes, bad inputs.
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
  * @author Donal Fellows
  */
 @Provider
+@Component
 public class NullExceptionMapper implements
 		ExceptionMapper<NullPointerException> {
 	private Logger log = getLogger(getClass());

@@ -33,18 +33,21 @@ import javax.ws.rs.core.Response;
 
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.rest.OutputManager;
 import uk.ac.manchester.cs.spinnaker.rest.UnicoreFileClient;
 
 //TODO needs security; Role = OutputHandler
+@Component
 public class OutputManagerImpl implements OutputManager {
     private static final String PURGED_FILE = ".purged_";
 
     @Value("${results.directory}")
     private File resultsDirectory;
-    private URL baseServerUrl;
+	@Value("${baseserver.url}${cxf.path}${cxf.rest.path}/")
+	private URL baseServerUrl;
     private long timeToKeepResults;
     private final Map<File, JobLock.Token> synchronizers = new HashMap<>();
     private Logger logger = getLogger(getClass());
@@ -104,10 +107,6 @@ public class OutputManagerImpl implements OutputManager {
     		}
     	}
     }
-
-	public OutputManagerImpl(URL baseServerUrl) {
-		this.baseServerUrl = baseServerUrl;
-	}
 
     @Value("${results.purge.days}")
     void setPurgeTimeout(long nDaysToKeepResults) {

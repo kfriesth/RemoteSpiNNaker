@@ -1,6 +1,7 @@
 package uk.ac.manchester.cs.spinnaker.remote.web;
 
 import static java.lang.System.getProperty;
+import static java.util.Arrays.asList;
 import static javax.servlet.DispatcherType.ASYNC;
 import static javax.servlet.DispatcherType.ERROR;
 import static javax.servlet.DispatcherType.REQUEST;
@@ -14,6 +15,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 
 import org.apache.cxf.transport.servlet.CXFServlet;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.support.ResourcePropertySource;
 import org.springframework.web.WebApplicationInitializer;
@@ -45,18 +47,15 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 	public static final String PROFILES_PROPERTY = ACTIVE_PROFILES_PROPERTY_NAME;
 
 	private static final String FILTER_NAME = "springSecurityFilterChain";
-	private static final boolean ADD_FILTER = false;
-	private static final boolean ADD_SERVLET = true;
+	private boolean securityEnabled;
 
 	@Override
 	public void onStartup(ServletContext container) throws ServletException {
 		try {
 			PropertySource<?> properties = getPropertySource();
-			if (ADD_SERVLET | ADD_FILTER)
-				container.addListener(getContextLoaderListener(properties));
-			if (ADD_SERVLET)
-				addServlet(container, properties);
-			if (ADD_FILTER)
+			container.addListener(getContextLoaderListener(properties));
+			addServlet(container, properties);
+			if (securityEnabled)
 				addFilterChain(container);
 		} catch (IOException e) {
 			throw new ServletException(e);
@@ -67,8 +66,18 @@ public class WebApplicationConfig implements WebApplicationInitializer {
 			PropertySource<?> props) {
 		AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
 		context.getEnvironment().getPropertySources().addFirst(props);
+		securityEnabled = asList(context.getEnvironment().getActiveProfiles())
+				.contains("security");
+		addProfiles(context.getEnvironment());
 		context.register(RemoteSpinnakerBeans.class);
 		return new ContextLoaderListener(context);
+	}
+
+	private void addProfiles(ConfigurableEnvironment environment) {
+		if (environment.getProperty("spalloc.enabled", Boolean.class, true))
+			environment.addActiveProfile("spalloc");
+		if (environment.getProperty("xen.server.enabled", Boolean.class, false))
+			environment.addActiveProfile("xen");
 	}
 
 	private void addServlet(ServletContext container,

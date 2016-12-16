@@ -23,6 +23,7 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import uk.ac.manchester.cs.spinnaker.job.nmpi.DataItem;
 import uk.ac.manchester.cs.spinnaker.job.nmpi.Job;
@@ -37,6 +38,7 @@ import uk.ac.manchester.cs.spinnaker.rest.utils.PropertyBasedDeserialiser;
 /**
  * Manages the NMPI queue, receiving jobs and submitting them to be run
  */
+@Component
 public class NMPIQueueManager implements Runnable {
 	/**
 	 * The amount of time to sleep when an empty queue is detected.

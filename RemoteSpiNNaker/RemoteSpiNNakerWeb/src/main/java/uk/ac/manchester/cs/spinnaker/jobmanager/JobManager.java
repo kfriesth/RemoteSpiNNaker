@@ -59,7 +59,8 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 	private NMPIQueueManager queueManager;
 	@Autowired
 	private OutputManager outputManager;
-	private final URL baseUrl;
+	@Value("${baseserver.url}${cxf.path}${cxf.rest.path}/")
+	private URL baseUrl;
 	@Autowired
 	private JobExecuterFactory jobExecuterFactory;
     @Value("${restartJobExecutorOnFailure}")
@@ -69,10 +70,6 @@ public class JobManager implements NMPIQueueListener, JobManagerInterface {
 
 	private Logger logger = getLogger(getClass());
 	private ThreadGroup threadGroup;
-
-	public JobManager(URL baseUrl) {
-		this.baseUrl = requireNonNull(baseUrl);
-	}
 
 	@PostConstruct
 	void startManager() {

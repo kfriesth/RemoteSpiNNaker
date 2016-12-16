@@ -333,30 +333,25 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 			}
 		}
 
-		private void finishedWithVM(XenConnection conn) {
+		protected void finishedWithVM(XenConnection conn) {
 			try {
-				if (deleteOnExit)
-					deleteVm(conn);
+				if (deleteOnExit && conn != null) {
+					if (disk != null)
+						conn.destroy(disk);
+					if (extraDisk != null)
+						conn.destroy(extraDisk);
+					if (image != null)
+						conn.destroy(image);
+					if (extraImage != null)
+						conn.destroy(extraImage);
+					if (clonedVm != null)
+						conn.destroy(clonedVm);
+				}
+				if (conn != null)
+					storage.removeXenVm(getExecuterId());
 			} catch (Exception e) {
 				logger.error("Error deleting VM");
 			}
-		}
-
-		private void deleteVm(XenConnection conn) throws XenAPIException,
-				XmlRpcException {
-			if (conn == null)
-				return;
-			storage.removeXenVm(getExecuterId());
-			if (disk != null)
-				conn.destroy(disk);
-			if (extraDisk != null)
-				conn.destroy(extraDisk);
-			if (image != null)
-				conn.destroy(image);
-			if (extraImage != null)
-				conn.destroy(extraImage);
-			if (clonedVm != null)
-				conn.destroy(clonedVm);
 		}
 
 		private void exit(Exception e) {
@@ -416,11 +411,16 @@ public class XenVMExecuterFactory extends AbstractJobExecuterFactory {
 		@Override
 		protected XenConnection createVm() throws XmlRpcException, IOException {
 			XenConnection conn = connect();
-			clonedVm = conn.getVirtualMachine();
-			disk = conn.getBlockDevice(clonedVm);
-			image = conn.getBaseImage(disk);
-			extraImage = conn.createImage(image);
-			extraDisk = conn.createBlockDevice(clonedVm, extraImage);
+			try {
+				clonedVm = conn.getVirtualMachine();
+				disk = conn.getBlockDevice(clonedVm);
+				image = conn.getBaseImage(disk);
+				extraImage = conn.createImage(image);
+				extraDisk = conn.createBlockDevice(clonedVm, extraImage);
+			} catch (XmlRpcException | IOException e) {
+				finishedWithVM(conn);
+				throw e;
+			}
 			conn.addData(clonedVm, "vm-data/nmpiurl", jobProcessManagerUrl);
 			conn.addData(clonedVm, "vm-data/nmpifile", JOB_PROCESS_MANAGER_ZIP);
 			conn.addData(clonedVm, "vm-data/nmpiargs", args);

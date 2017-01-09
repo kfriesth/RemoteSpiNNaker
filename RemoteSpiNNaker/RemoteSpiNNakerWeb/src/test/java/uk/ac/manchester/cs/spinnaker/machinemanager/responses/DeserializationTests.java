@@ -1,6 +1,8 @@
 package uk.ac.manchester.cs.spinnaker.machinemanager.responses;
 
 import static org.junit.Assert.*;
+import static uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobState.State.READY;
+import static uk.ac.manchester.cs.spinnaker.machinemanager.responses.JobState.State.POWER;
 
 import java.io.IOException;
 
@@ -48,7 +50,7 @@ public class DeserializationTests {
 	public void jobMachineInfo() throws JsonParseException, JsonMappingException, IOException {
 		String machine = "{\"width\":123,\"height\":456,\"connections\":["
 				+ "[[1,2],\"abcde\"],[[3,4],\"edcba\"]"
-				+ "],\"machineName\":\"foo\"}";
+				+ "],\"machine_name\":\"foo\"}";
 		JobMachineInfo m = mapper.readValue(machine, JobMachineInfo.class);
 		assertNotNull(m);
 
@@ -68,14 +70,39 @@ public class DeserializationTests {
 
 	@Test
 	public void jobState() throws JsonParseException, JsonMappingException, IOException {
-		String machine = "{\"state\":2,\"power\":true,\"keepAlive\":1.25,\"reason\":\"foo\"}";
+		String machine = "{\"state\":2,\"power\":true,\"keepalive\":1.25,\"reason\":\"foo\"}";
 		JobState m = mapper.readValue(machine, JobState.class);
 		assertNotNull(m);
 
 		assertEquals("foo", m.getReason());
-		assertEquals(2,m.getState());
+		assertEquals(POWER,m.getState());
 		assertEquals(true,m.getPower());
 		// Hack to work around deprecation of comparison of doubles
 		assertEquals(1250000, (int)(m.getKeepAlive()*1000000));
+	}
+
+	@Test
+	public void jobList() throws JsonParseException, JsonMappingException, IOException {
+		String joblist = "[{\"job_id\":12,\"owner\":\"me\",\"start_time\":\"123456\",\"keepalive\":60,"
+				+ "\"state\":3,\"power\":true,\"args\":[11],\"kwargs\":{\"a\":\"b\",\"c\":\"d\"},"
+				+ "\"allocated_machine_name\":\"vorpal\",\"boards\":[[1,1,1],[2,2,2]]},"
+				+ "{\"job_id\":34,\"owner\":\"you\"}]";
+		JobInfo[] ji = mapper.readValue(joblist, JobInfo[].class);
+		assertNotNull(ji);
+		assertEquals(2, ji.length);
+
+		assertEquals(12, ji[0].getJobId());
+		assertEquals("me", ji[0].getOwner());
+		assertEquals("123456", ji[0].getStartTime());
+		assertEquals(60.0+"",ji[0].getKeepalive()+"");
+		assertEquals(READY, ji[0].getState());
+		assertEquals(true, ji[0].getPower());
+		assertArrayEquals(new Object[]{new Integer(11)}, ji[0].getArgs().toArray());
+		assertEquals("{a=b, c=d}", ji[0].getKwargs().toString());
+		assertEquals("vorpal", ji[0].getAllocatedMachineName());
+		assertEquals("[[1, 1, 1], [2, 2, 2]]", ji[0].getBoards().toString());
+
+		assertEquals(34, ji[1].getJobId());
+		assertEquals("you", ji[1].getOwner());
 	}
 }

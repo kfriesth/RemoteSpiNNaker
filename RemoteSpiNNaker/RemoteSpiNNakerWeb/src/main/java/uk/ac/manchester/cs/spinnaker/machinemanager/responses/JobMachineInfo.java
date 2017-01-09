@@ -2,6 +2,8 @@ package uk.ac.manchester.cs.spinnaker.machinemanager.responses;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class JobMachineInfo {
     private int width;
     private int height;
@@ -32,6 +34,7 @@ public class JobMachineInfo {
         this.connections = connections;
     }
 
+	@JsonProperty("machine_name")
     public String getMachineName() {
         return machineName;
     }
